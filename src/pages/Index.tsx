@@ -3,6 +3,7 @@ import { TenderCard } from "@/components/TenderCard";
 import { TenderFilters } from "@/components/TenderFilters";
 import { useNavigate } from "react-router-dom";
 import { useToast } from "@/hooks/use-toast";
+import { Button } from "@/components/ui/button";
 
 // Mock data - replace with real API data later
 const MOCK_TENDERS = [
