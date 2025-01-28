@@ -2,37 +2,71 @@ import { Navigation } from "@/components/Navigation";
 import { TenderCard } from "@/components/TenderCard";
 import { TenderFilters } from "@/components/TenderFilters";
 import { useNavigate } from "react-router-dom";
+import { useToast } from "@/hooks/use-toast";
 
 // Mock data - replace with real API data later
 const MOCK_TENDERS = [
   {
     id: 1,
-    title: "Construction of New Municipal Building",
-    organization: "City Council",
+    title: "National Infrastructure Development Project",
+    organization: "Ministry of Public Works",
     deadline: "2024-05-15",
     category: "Construction",
-    value: "$500,000",
+    value: "$2,500,000",
   },
   {
     id: 2,
-    title: "IT Infrastructure Upgrade Project",
-    organization: "Ministry of Technology",
+    title: "Healthcare Information System Modernization",
+    organization: "National Health Service",
     deadline: "2024-05-20",
     category: "IT Services",
-    value: "$250,000",
+    value: "$750,000",
   },
   {
     id: 3,
-    title: "Medical Supplies Procurement",
+    title: "Emergency Medical Equipment Procurement",
     organization: "Regional Health Authority",
     deadline: "2024-05-25",
     category: "Healthcare",
-    value: "$150,000",
+    value: "$450,000",
+  },
+  {
+    id: 4,
+    title: "Renewable Energy Installation Project",
+    organization: "Department of Energy",
+    deadline: "2024-06-01",
+    category: "Energy",
+    value: "$1,200,000",
+  },
+  {
+    id: 5,
+    title: "Smart City Infrastructure Development",
+    organization: "Metropolitan Council",
+    deadline: "2024-06-10",
+    category: "IT Services",
+    value: "$3,000,000",
+  },
+  {
+    id: 6,
+    title: "Public Transportation Fleet Upgrade",
+    organization: "City Transit Authority",
+    deadline: "2024-06-15",
+    category: "Transportation",
+    value: "$5,000,000",
   },
 ];
 
 const Index = () => {
   const navigate = useNavigate();
+  const { toast } = useToast();
+
+  const handleViewDetails = (tenderId: number) => {
+    navigate(`/tenders/${tenderId}`);
+    toast({
+      title: "Opening tender details",
+      description: "Loading complete tender information...",
+    });
+  };
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -40,9 +74,19 @@ const Index = () => {
       
       <main className="max-w-7xl mx-auto py-6 sm:px-6 lg:px-8">
         <div className="px-4 py-6 sm:px-0">
-          <h1 className="text-3xl font-bold text-gray-900 mb-8">
-            Tender Opportunities
-          </h1>
+          <div className="flex justify-between items-center mb-8">
+            <div>
+              <h1 className="text-3xl font-bold text-gray-900">
+                Tender Opportunities
+              </h1>
+              <p className="mt-2 text-sm text-gray-600">
+                Discover and apply for the latest tender opportunities across various sectors
+              </p>
+            </div>
+            <Button onClick={() => navigate("/auth")} variant="outline">
+              Sign in to save tenders
+            </Button>
+          </div>
           
           <div className="grid grid-cols-1 lg:grid-cols-4 gap-8">
             <div className="lg:col-span-1">
@@ -50,12 +94,12 @@ const Index = () => {
             </div>
             
             <div className="lg:col-span-3">
-              <div className="grid gap-6 grid-cols-1 md:grid-cols-2">
+              <div className="grid gap-6 grid-cols-1 md:grid-cols-2 xl:grid-cols-2">
                 {MOCK_TENDERS.map((tender) => (
                   <TenderCard
                     key={tender.id}
                     {...tender}
-                    onViewDetails={() => navigate(`/tenders/${tender.id}`)}
+                    onViewDetails={() => handleViewDetails(tender.id)}
                   />
                 ))}
               </div>
