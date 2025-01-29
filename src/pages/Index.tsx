@@ -13,7 +13,8 @@ const MOCK_TENDERS = [
     organization: "Ministry of Public Works",
     deadline: "2024-05-15",
     category: "Construction",
-    value: "$2,500,000",
+    value: "2500000",
+    location: "Kenya",
   },
   {
     id: 2,
@@ -21,7 +22,8 @@ const MOCK_TENDERS = [
     organization: "National Health Service",
     deadline: "2024-05-20",
     category: "IT Services",
-    value: "$750,000",
+    value: "750000",
+    location: "UK",
   },
   {
     id: 3,
@@ -29,7 +31,8 @@ const MOCK_TENDERS = [
     organization: "Regional Health Authority",
     deadline: "2024-05-25",
     category: "Healthcare",
-    value: "$450,000",
+    value: "450000",
+    location: "USA",
   },
   {
     id: 4,
@@ -37,7 +40,8 @@ const MOCK_TENDERS = [
     organization: "Department of Energy",
     deadline: "2024-06-01",
     category: "Energy",
-    value: "$1,200,000",
+    value: "1200000",
+    location: "EU",
   },
   {
     id: 5,
@@ -45,7 +49,8 @@ const MOCK_TENDERS = [
     organization: "Metropolitan Council",
     deadline: "2024-06-10",
     category: "IT Services",
-    value: "$3,000,000",
+    value: "3000000",
+    location: "Kenya",
   },
   {
     id: 6,
@@ -53,7 +58,8 @@ const MOCK_TENDERS = [
     organization: "City Transit Authority",
     deadline: "2024-06-15",
     category: "Transportation",
-    value: "$5,000,000",
+    value: "5000000",
+    location: "USA",
   },
 ];
 
