@@ -13,10 +13,14 @@ const TenderDetails = () => {
   const { data: tender, isLoading } = useQuery({
     queryKey: ["tender", id],
     queryFn: async () => {
+      if (!id) throw new Error("No tender ID provided");
+      const numericId = parseInt(id, 10);
+      if (isNaN(numericId)) throw new Error("Invalid tender ID");
+
       const { data, error } = await supabase
         .from("tenders")
         .select("*")
-        .eq("id", id)
+        .eq("id", numericId)
         .single();
 
       if (error) throw error;
