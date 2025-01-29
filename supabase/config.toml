@@ -1,1 +1,3 @@
 project_id = "ohnqfcbplmsypwnpxiga"
+[functions.scrape-tenders]
+verify_jwt = false
