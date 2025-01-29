@@ -27,12 +27,24 @@ export const TenderFilters = () => {
               <SelectValue placeholder="Select category" />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="construction">Construction</SelectItem>
-              <SelectItem value="it">IT Services</SelectItem>
-              <SelectItem value="consulting">Consulting</SelectItem>
-              <SelectItem value="supplies">Supplies</SelectItem>
-              <SelectItem value="healthcare">Healthcare</SelectItem>
-              <SelectItem value="energy">Energy</SelectItem>
+              <SelectItem value="construction">Construction & Infrastructure</SelectItem>
+              <SelectItem value="it">IT & Technology</SelectItem>
+              <SelectItem value="consulting">Consulting Services</SelectItem>
+              <SelectItem value="healthcare">Healthcare & Medical</SelectItem>
+              <SelectItem value="energy">Energy & Utilities</SelectItem>
+              <SelectItem value="education">Education & Training</SelectItem>
+              <SelectItem value="transport">Transportation & Logistics</SelectItem>
+              <SelectItem value="agriculture">Agriculture & Food</SelectItem>
+              <SelectItem value="defense">Defense & Security</SelectItem>
+              <SelectItem value="environmental">Environmental Services</SelectItem>
+              <SelectItem value="telecom">Telecommunications</SelectItem>
+              <SelectItem value="financial">Financial Services</SelectItem>
+              <SelectItem value="research">Research & Development</SelectItem>
+              <SelectItem value="manufacturing">Manufacturing</SelectItem>
+              <SelectItem value="mining">Mining & Resources</SelectItem>
+              <SelectItem value="professional">Professional Services</SelectItem>
+              <SelectItem value="supplies">General Supplies</SelectItem>
+              <SelectItem value="other">Other</SelectItem>
             </SelectContent>
           </Select>
         </div>
