@@ -29,9 +29,9 @@ const Onboarding = () => {
     e.preventDefault();
     
     try {
-      const { data: { user } } = await supabase.auth.getUser();
+      const { data: { user }, error: userError } = await supabase.auth.getUser();
       
-      if (!user) {
+      if (userError || !user) {
         toast({
           title: "Error",
           description: "Please sign in to complete your profile",
@@ -41,7 +41,11 @@ const Onboarding = () => {
         return;
       }
 
+      // Generate a UUID for the profile
+      const profileId = crypto.randomUUID();
+
       const { error } = await supabase.from("profiles").insert({
+        id: profileId,
         user_id: user.id,
         company_name: formData.companyName,
         industry: formData.industry,
@@ -56,7 +60,7 @@ const Onboarding = () => {
         description: "Your profile has been set up successfully!",
       });
       
-      navigate("/");
+      navigate("/dashboard");
     } catch (error) {
       console.error("Error creating profile:", error);
       toast({
