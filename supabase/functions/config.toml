@@ -1,0 +1,7 @@
+project_id = "ohnqfcbplmsypwnpxiga"
+
+[functions.scrape-tenders]
+verify_jwt = false
+
+[functions.scrape-private-tenders]
+verify_jwt = false
