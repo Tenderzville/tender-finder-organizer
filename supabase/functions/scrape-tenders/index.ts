@@ -8,7 +8,6 @@ const corsHeaders = {
 }
 
 serve(async (req) => {
-  // Handle CORS preflight requests
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders })
   }
@@ -16,56 +15,69 @@ serve(async (req) => {
   try {
     console.log('Starting tender scraping process...')
     
-    // Create Supabase client
     const supabase = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
     )
 
-    // Example URL - replace with actual tender website URL
-    const url = 'https://tenders.go.ke/website/tenders/index'
-    
+    // Scraping the Public Procurement Information Portal
+    const url = 'https://tenders.go.ke'
     console.log(`Fetching data from ${url}...`)
     
     const response = await fetch(url)
+    if (!response.ok) {
+      throw new Error(`Failed to fetch: ${response.status} ${response.statusText}`)
+    }
+    
     const html = await response.text()
     const $ = cheerio.load(html)
     
     const tenders = []
 
-    // Example scraping logic - adjust selectors based on actual website structure
-    $('.tender-item').each((_, element) => {
+    // Updated selectors for tenders.go.ke
+    $('.tender-listing tbody tr').each((_, element) => {
+      const row = $(element)
+      const cells = row.find('td')
+      
+      // Skip header rows or invalid entries
+      if (cells.length < 4) return
+
       const tender = {
-        title: $(element).find('.tender-title').text().trim(),
-        organization: $(element).find('.organization').text().trim(),
-        deadline: $(element).find('.deadline').text().trim(),
-        category: $(element).find('.category').text().trim() || 'Other',
-        description: $(element).find('.description').text().trim(),
-        requirements: $(element).find('.requirements').text().trim(),
-        contact_info: $(element).find('.contact').text().trim(),
-        tender_url: $(element).find('a').attr('href'),
+        title: cells.eq(1).text().trim(),
+        organization: cells.eq(0).text().trim(),
+        deadline: cells.eq(2).text().trim(),
+        category: 'Government', // Default category for government tenders
+        description: cells.eq(3).text().trim(),
+        requirements: 'See tender details', // Default value
+        tender_url: row.find('a').attr('href'),
+        contact_info: 'Contact procuring entity',
       }
       
-      if (tender.title && tender.deadline) {
+      // Validate required fields before adding
+      if (tender.title && tender.deadline && tender.organization) {
+        console.log('Found tender:', tender.title)
         tenders.push(tender)
       }
     })
 
     console.log(`Found ${tenders.length} tenders`)
 
-    // Insert scraped tenders into the database
     if (tenders.length > 0) {
-      const { data, error } = await supabase
+      const { error } = await supabase
         .from('tenders')
         .upsert(
           tenders.map(tender => ({
             ...tender,
             created_at: new Date().toISOString(),
           })),
-          { onConflict: 'tender_url' }
+          { 
+            onConflict: 'tender_url',
+            ignoreDuplicates: true 
+          }
         )
 
       if (error) {
+        console.error('Error inserting tenders:', error)
         throw error
       }
 
