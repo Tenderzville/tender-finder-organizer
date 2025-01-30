@@ -14,7 +14,7 @@ export const Navigation = () => {
                 className="text-2xl font-bold text-primary cursor-pointer"
                 onClick={() => navigate("/")}
               >
-                TenderHub
+                Tenders Ville
               </h1>
             </div>
             <div className="hidden sm:ml-6 sm:flex sm:space-x-8">
