@@ -5,6 +5,7 @@ import { Badge } from "@/components/ui/badge";
 import { Calendar, Globe, Briefcase, ExternalLink, ArrowLeft } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
+import { useToast } from "@/hooks/use-toast";
 
 const TenderDetails = () => {
   const { id } = useParams();
@@ -166,3 +167,4 @@ const TenderDetails = () => {
 };
 
 export default TenderDetails;
+
