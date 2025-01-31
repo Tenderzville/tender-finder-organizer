@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -14,6 +14,17 @@ const Auth = () => {
   const [isLogin, setIsLogin] = useState(true);
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+
+  // Check if user is already authenticated
+  useEffect(() => {
+    const checkSession = async () => {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (session) {
+        navigate("/dashboard");
+      }
+    };
+    checkSession();
+  }, [navigate]);
 
   const handleAuth = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -33,15 +44,11 @@ const Auth = () => {
           password,
         });
         if (error) throw error;
-        navigate("/onboarding");
+        toast({
+          title: "Check your email",
+          description: "We've sent you a confirmation link to complete your registration",
+        });
       }
-
-      toast({
-        title: isLogin ? "Welcome back!" : "Account created",
-        description: isLogin
-          ? "Successfully logged in"
-          : "Please check your email to verify your account",
-      });
     } catch (error: any) {
       toast({
         title: "Error",

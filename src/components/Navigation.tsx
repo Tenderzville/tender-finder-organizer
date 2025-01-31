@@ -10,16 +10,32 @@ export const Navigation = () => {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
 
   useEffect(() => {
+    // Check initial session
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      setIsAuthenticated(!!session);
+    });
+
+    // Listen for auth changes
     const { data: authListener } = supabase.auth.onAuthStateChange(
-      (event, session) => {
+      async (event, session) => {
+        console.log("Auth state changed:", event, !!session);
         setIsAuthenticated(!!session);
+        
+        // Handle email confirmation
+        if (event === 'SIGNED_IN') {
+          toast({
+            title: "Welcome!",
+            description: "You have successfully signed in",
+          });
+          navigate("/dashboard");
+        }
       }
     );
 
     return () => {
       authListener.subscription.unsubscribe();
     };
-  }, []);
+  }, [navigate, toast]);
 
   const handleSignOut = async () => {
     try {
@@ -62,7 +78,7 @@ export const Navigation = () => {
                   Dashboard
                 </Button>
                 <Button
-                  onClick={() => navigate("/tenders")}
+                  onClick={() => navigate("/dashboard")}
                   variant="ghost"
                   className="text-gray-900 inline-flex items-center px-1 pt-1 text-sm font-medium"
                 >
