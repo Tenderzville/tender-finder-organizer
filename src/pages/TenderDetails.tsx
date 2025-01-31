@@ -9,6 +9,7 @@ import { supabase } from "@/integrations/supabase/client";
 const TenderDetails = () => {
   const { id } = useParams();
   const navigate = useNavigate();
+  const { toast } = useToast();
 
   const { data: tender, isLoading } = useQuery({
     queryKey: ["tender", id],
@@ -17,13 +18,34 @@ const TenderDetails = () => {
       const numericId = parseInt(id, 10);
       if (isNaN(numericId)) throw new Error("Invalid tender ID");
 
+      console.log("Fetching tender details for ID:", numericId);
+
       const { data, error } = await supabase
         .from("tenders")
         .select("*")
         .eq("id", numericId)
         .single();
 
-      if (error) throw error;
+      if (error) {
+        console.error("Error fetching tender:", error);
+        toast({
+          title: "Error",
+          description: "Failed to load tender details. Please try again.",
+          variant: "destructive",
+        });
+        throw error;
+      }
+
+      if (!data) {
+        toast({
+          title: "Not Found",
+          description: "The requested tender could not be found.",
+          variant: "destructive",
+        });
+        throw new Error("Tender not found");
+      }
+
+      console.log("Fetched tender details:", data);
       return data;
     },
   });
@@ -34,7 +56,9 @@ const TenderDetails = () => {
         <Navigation />
         <main className="max-w-7xl mx-auto py-6 sm:px-6 lg:px-8">
           <div className="px-4 py-6 sm:px-0">
-            <div>Loading...</div>
+            <div className="flex items-center justify-center h-64">
+              <div className="text-lg text-gray-600">Loading tender details...</div>
+            </div>
           </div>
         </main>
       </div>
@@ -47,7 +71,13 @@ const TenderDetails = () => {
         <Navigation />
         <main className="max-w-7xl mx-auto py-6 sm:px-6 lg:px-8">
           <div className="px-4 py-6 sm:px-0">
-            <div>Tender not found</div>
+            <div className="text-center">
+              <h2 className="text-2xl font-semibold text-gray-900">Tender Not Found</h2>
+              <p className="mt-2 text-gray-600">The tender you're looking for doesn't exist or has been removed.</p>
+              <Button onClick={() => navigate("/dashboard")} className="mt-4">
+                Return to Dashboard
+              </Button>
+            </div>
           </div>
         </main>
       </div>
@@ -94,18 +124,18 @@ const TenderDetails = () => {
             <div className="space-y-6">
               <div>
                 <h2 className="text-xl font-semibold mb-2">Description</h2>
-                <p className="text-gray-600">{tender.description}</p>
+                <p className="text-gray-600 whitespace-pre-wrap">{tender.description}</p>
               </div>
 
               <div>
                 <h2 className="text-xl font-semibold mb-2">Requirements</h2>
-                <p className="text-gray-600">{tender.requirements}</p>
+                <p className="text-gray-600 whitespace-pre-wrap">{tender.requirements}</p>
               </div>
 
               {tender.prerequisites && (
                 <div>
                   <h2 className="text-xl font-semibold mb-2">Prerequisites</h2>
-                  <p className="text-gray-600">{tender.prerequisites}</p>
+                  <p className="text-gray-600 whitespace-pre-wrap">{tender.prerequisites}</p>
                 </div>
               )}
 
