@@ -7,6 +7,7 @@ import Landing from "./pages/Landing";
 import Index from "./pages/Index";
 import Onboarding from "./pages/Onboarding";
 import TenderDetails from "./pages/TenderDetails";
+import Auth from "./pages/Auth";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -22,7 +23,7 @@ const App = () => (
           <Route path="/dashboard" element={<Index />} />
           <Route path="/onboarding" element={<Onboarding />} />
           <Route path="/tenders/:id" element={<TenderDetails />} />
-          <Route path="/auth" element={<NotFound />} />
+          <Route path="/auth" element={<Auth />} />
           <Route path="/profile" element={<NotFound />} />
           <Route path="*" element={<NotFound />} />
         </Routes>

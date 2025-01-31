@@ -1,8 +1,43 @@
 import { Button } from "@/components/ui/button";
 import { useNavigate } from "react-router-dom";
+import { useEffect, useState } from "react";
+import { supabase } from "@/integrations/supabase/client";
+import { useToast } from "@/hooks/use-toast";
 
 export const Navigation = () => {
   const navigate = useNavigate();
+  const { toast } = useToast();
+  const [isAuthenticated, setIsAuthenticated] = useState(false);
+
+  useEffect(() => {
+    const { data: authListener } = supabase.auth.onAuthStateChange(
+      (event, session) => {
+        setIsAuthenticated(!!session);
+      }
+    );
+
+    return () => {
+      authListener.subscription.unsubscribe();
+    };
+  }, []);
+
+  const handleSignOut = async () => {
+    try {
+      const { error } = await supabase.auth.signOut();
+      if (error) throw error;
+      navigate("/");
+      toast({
+        title: "Signed out",
+        description: "Successfully signed out of your account",
+      });
+    } catch (error: any) {
+      toast({
+        title: "Error",
+        description: error.message,
+        variant: "destructive",
+      });
+    }
+  };
 
   return (
     <nav className="border-b bg-white">
@@ -17,38 +52,50 @@ export const Navigation = () => {
                 Tenders Ville
               </h1>
             </div>
-            <div className="hidden sm:ml-6 sm:flex sm:space-x-8">
-              <Button
-                onClick={() => navigate("/dashboard")}
-                variant="ghost"
-                className="text-gray-900 inline-flex items-center px-1 pt-1 text-sm font-medium"
-              >
-                Dashboard
-              </Button>
-              <Button
-                onClick={() => navigate("/tenders")}
-                variant="ghost"
-                className="text-gray-900 inline-flex items-center px-1 pt-1 text-sm font-medium"
-              >
-                Tenders
-              </Button>
-              <Button
-                onClick={() => navigate("/profile")}
-                variant="ghost"
-                className="text-gray-900 inline-flex items-center px-1 pt-1 text-sm font-medium"
-              >
-                Profile
-              </Button>
-            </div>
+            {isAuthenticated && (
+              <div className="hidden sm:ml-6 sm:flex sm:space-x-8">
+                <Button
+                  onClick={() => navigate("/dashboard")}
+                  variant="ghost"
+                  className="text-gray-900 inline-flex items-center px-1 pt-1 text-sm font-medium"
+                >
+                  Dashboard
+                </Button>
+                <Button
+                  onClick={() => navigate("/tenders")}
+                  variant="ghost"
+                  className="text-gray-900 inline-flex items-center px-1 pt-1 text-sm font-medium"
+                >
+                  Tenders
+                </Button>
+                <Button
+                  onClick={() => navigate("/profile")}
+                  variant="ghost"
+                  className="text-gray-900 inline-flex items-center px-1 pt-1 text-sm font-medium"
+                >
+                  Profile
+                </Button>
+              </div>
+            )}
           </div>
           <div className="flex items-center">
-            <Button
-              onClick={() => navigate("/auth")}
-              variant="default"
-              className="ml-4"
-            >
-              Sign In
-            </Button>
+            {isAuthenticated ? (
+              <Button
+                onClick={handleSignOut}
+                variant="default"
+                className="ml-4"
+              >
+                Sign Out
+              </Button>
+            ) : (
+              <Button
+                onClick={() => navigate("/auth")}
+                variant="default"
+                className="ml-4"
+              >
+                Sign In
+              </Button>
+            )}
           </div>
         </div>
       </div>
