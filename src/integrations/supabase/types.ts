@@ -84,6 +84,7 @@ export type Database = {
           description: string
           fees: string | null
           id: number
+          location: string
           prerequisites: string | null
           requirements: string
           subcategory: string | null
@@ -98,6 +99,7 @@ export type Database = {
           description: string
           fees?: string | null
           id?: never
+          location?: string
           prerequisites?: string | null
           requirements: string
           subcategory?: string | null
@@ -112,6 +114,7 @@ export type Database = {
           description?: string
           fees?: string | null
           id?: never
+          location?: string
           prerequisites?: string | null
           requirements?: string
           subcategory?: string | null

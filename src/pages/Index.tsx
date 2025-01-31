@@ -34,6 +34,10 @@ const Index = () => {
         query = query.eq("category", filters.category);
       }
 
+      if (filters.location) {
+        query = query.eq("location", filters.location);
+      }
+
       if (filters.deadline) {
         const now = new Date();
         let endDate;
