@@ -3,7 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useToast } from "@/hooks/use-toast";
-import { Mail, Gift, Video, Eye, Award } from "lucide-react";
+import { Mail, Gift, Video, Eye, Award, ArrowRight } from "lucide-react";
 import {
   Card,
   CardContent,
@@ -36,6 +36,11 @@ const GetStarted = () => {
 
   return (
     <div className="min-h-screen bg-gray-50">
+      {/* Top Banner Ad */}
+      <div className="w-full bg-blue-100 p-4 text-center border-b">
+        <p className="text-sm text-blue-800">Advertisement Space</p>
+      </div>
+
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
         {/* Hero Section */}
         <div className="text-center mb-16">
@@ -43,8 +48,32 @@ const GetStarted = () => {
             Welcome to Tenderzville Portal
           </h1>
           <p className="text-xl text-gray-600 max-w-2xl mx-auto">
-            Your gateway to discovering and winning tender opportunities. Join our community and unlock exclusive benefits.
+            Your gateway to discovering and winning tender opportunities. Start with 5 free tender views!
           </p>
+        </div>
+
+        {/* Points System Highlight */}
+        <div className="bg-gradient-to-r from-blue-50 to-indigo-50 rounded-xl p-6 mb-16">
+          <div className="max-w-3xl mx-auto">
+            <h2 className="text-2xl font-semibold text-center mb-6">How Our Reward System Works</h2>
+            <div className="grid md:grid-cols-3 gap-6 text-center">
+              <div className="space-y-2">
+                <Eye className="h-8 w-8 mx-auto text-blue-600" />
+                <h3 className="font-medium">Start Free</h3>
+                <p className="text-sm text-gray-600">Get 5 free tender views when you sign up</p>
+              </div>
+              <div className="space-y-2">
+                <Video className="h-8 w-8 mx-auto text-blue-600" />
+                <h3 className="font-medium">Watch & Earn</h3>
+                <p className="text-sm text-gray-600">Watch 5 ads to earn 10 points</p>
+              </div>
+              <div className="space-y-2">
+                <ArrowRight className="h-8 w-8 mx-auto text-blue-600" />
+                <h3 className="font-medium">Redeem</h3>
+                <p className="text-sm text-gray-600">Use 10 points for 1 tender view</p>
+              </div>
+            </div>
+          </div>
         </div>
 
         {/* Benefits Grid */}
@@ -78,7 +107,7 @@ const GetStarted = () => {
             </CardHeader>
             <CardContent>
               <p className="text-sm text-gray-600">
-                Each ad watched = 2 points
+                5 ads = 10 points
                 <br />
                 10 points = 1 tender view
               </p>
@@ -101,6 +130,11 @@ const GetStarted = () => {
               </p>
             </CardContent>
           </Card>
+        </div>
+
+        {/* Bottom Banner Ad */}
+        <div className="w-full bg-blue-100 p-4 text-center rounded-lg mb-16">
+          <p className="text-sm text-blue-800">Advertisement Space</p>
         </div>
 
         {/* Newsletter Signup */}
