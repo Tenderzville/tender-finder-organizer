@@ -3,7 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useToast } from "@/hooks/use-toast";
-import { Mail, Gift, Video, Eye, Award, ArrowRight } from "lucide-react";
+import { Mail, Gift, Video, Eye, Award, ArrowRight, Share2, Facebook } from "lucide-react";
 import {
   Card,
   CardContent,
@@ -48,30 +48,39 @@ const GetStarted = () => {
             Welcome to Tenderzville Portal
           </h1>
           <p className="text-xl text-gray-600 max-w-2xl mx-auto">
-            Your gateway to discovering and winning tender opportunities. Start with 5 free tender views!
+            Your gateway to discovering and winning tender opportunities. Start earning points today!
           </p>
         </div>
 
         {/* Points System Highlight */}
         <div className="bg-gradient-to-r from-blue-50 to-indigo-50 rounded-xl p-6 mb-16">
           <div className="max-w-3xl mx-auto">
-            <h2 className="text-2xl font-semibold text-center mb-6">How Our Reward System Works</h2>
-            <div className="grid md:grid-cols-3 gap-6 text-center">
+            <h2 className="text-2xl font-semibold text-center mb-6">How Our Points System Works</h2>
+            <div className="grid md:grid-cols-4 gap-6 text-center">
               <div className="space-y-2">
                 <Eye className="h-8 w-8 mx-auto text-blue-600" />
-                <h3 className="font-medium">Start Free</h3>
-                <p className="text-sm text-gray-600">Get 5 free tender views when you sign up</p>
+                <h3 className="font-medium">Sign Up Bonus</h3>
+                <p className="text-sm text-gray-600">Get 50 points instantly when you sign up</p>
               </div>
               <div className="space-y-2">
                 <Video className="h-8 w-8 mx-auto text-blue-600" />
                 <h3 className="font-medium">Watch & Earn</h3>
-                <p className="text-sm text-gray-600">Watch 5 ads to earn 10 points</p>
+                <p className="text-sm text-gray-600">Watch 10 ads = 100 points</p>
               </div>
               <div className="space-y-2">
-                <ArrowRight className="h-8 w-8 mx-auto text-blue-600" />
-                <h3 className="font-medium">Redeem</h3>
-                <p className="text-sm text-gray-600">Use 10 points for 1 tender view</p>
+                <Share2 className="h-8 w-8 mx-auto text-blue-600" />
+                <h3 className="font-medium">Invite Friends</h3>
+                <p className="text-sm text-gray-600">500 points per successful referral</p>
               </div>
+              <div className="space-y-2">
+                <Facebook className="h-8 w-8 mx-auto text-blue-600" />
+                <h3 className="font-medium">Share Socially</h3>
+                <p className="text-sm text-gray-600">1000 points for social media shares</p>
+              </div>
+            </div>
+            <div className="mt-8 text-center">
+              <p className="text-lg font-semibold text-blue-800">100 Points = 10 Tender Views</p>
+              <p className="text-sm text-gray-600 mt-2">Save your points and use them anytime!</p>
             </div>
           </div>
         </div>
@@ -90,7 +99,7 @@ const GetStarted = () => {
             </CardHeader>
             <CardContent>
               <p className="text-sm text-gray-600">
-                Start with 5 free tender views. Earn more through our reward system.
+                Redeem your points for tender views anytime. Points never expire!
               </p>
             </CardContent>
           </Card>
@@ -102,14 +111,18 @@ const GetStarted = () => {
                 Earn Points
               </CardTitle>
               <CardDescription>
-                Watch short ads to earn points
+                Multiple ways to earn points
               </CardDescription>
             </CardHeader>
             <CardContent>
               <p className="text-sm text-gray-600">
-                5 ads = 10 points
+                • Watch 10 ads = 100 points
                 <br />
-                10 points = 1 tender view
+                • Sign up = 50 points
+                <br />
+                • Referral = 500 points
+                <br />
+                • Social share = 1000 points
               </p>
             </CardContent>
           </Card>
@@ -126,7 +139,7 @@ const GetStarted = () => {
             </CardHeader>
             <CardContent>
               <p className="text-sm text-gray-600">
-                Earn additional perks like tender alerts and analytics
+                Save points for later use and access exclusive tender opportunities
               </p>
             </CardContent>
           </Card>
