@@ -1,16 +1,56 @@
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuthState } from "@/hooks/useAuthState";
 
+interface UserPreferences {
+  push: boolean;
+  email: boolean;
+  categories?: string[];
+  locations?: string[];
+}
+
 export const TenderNotification = () => {
   const { toast } = useToast();
   const { isAuthenticated } = useAuthState();
+  const [userPreferences, setUserPreferences] = useState<UserPreferences | null>(null);
 
+  // Fetch user preferences
   useEffect(() => {
     if (!isAuthenticated) return;
 
-    console.log("Setting up real-time tender notifications");
+    const fetchUserPreferences = async () => {
+      try {
+        const { data: { user } } = await supabase.auth.getUser();
+        if (!user) return;
+
+        const { data: profile, error } = await supabase
+          .from('profiles')
+          .select('notification_preferences')
+          .eq('user_id', user.id)
+          .single();
+
+        if (error) throw error;
+        
+        console.log('Fetched user preferences:', profile?.notification_preferences);
+        setUserPreferences(profile?.notification_preferences as UserPreferences);
+      } catch (error) {
+        console.error('Error fetching user preferences:', error);
+      }
+    };
+
+    fetchUserPreferences();
+  }, [isAuthenticated]);
+
+  // Set up real-time notifications
+  useEffect(() => {
+    if (!isAuthenticated || !userPreferences) return;
+    if (!userPreferences.push) {
+      console.log('Push notifications are disabled for this user');
+      return;
+    }
+
+    console.log("Setting up real-time tender notifications with preferences:", userPreferences);
     
     const channel = supabase
       .channel('schema-db-changes')
@@ -23,10 +63,25 @@ export const TenderNotification = () => {
         },
         (payload) => {
           console.log('New tender received:', payload);
-          toast({
-            title: "New Tender Available!",
-            description: `${payload.new.title} has been posted.`,
-          });
+          
+          // Check if tender matches user preferences
+          const tender = payload.new;
+          const matchesCategory = !userPreferences.categories?.length || 
+            userPreferences.categories.includes(tender.category);
+          const matchesLocation = !userPreferences.locations?.length || 
+            userPreferences.locations.includes(tender.location);
+
+          if (matchesCategory && matchesLocation) {
+            toast({
+              title: "New Tender Available!",
+              description: `${tender.title} has been posted.`,
+            });
+          } else {
+            console.log('Tender does not match user preferences:', {
+              tender,
+              userPreferences
+            });
+          }
         }
       )
       .on(
@@ -38,10 +93,20 @@ export const TenderNotification = () => {
         },
         (payload) => {
           console.log('Tender updated:', payload);
-          toast({
-            title: "Tender Updated",
-            description: `${payload.new.title} has been updated.`,
-          });
+          
+          // Check if updated tender matches user preferences
+          const tender = payload.new;
+          const matchesCategory = !userPreferences.categories?.length || 
+            userPreferences.categories.includes(tender.category);
+          const matchesLocation = !userPreferences.locations?.length || 
+            userPreferences.locations.includes(tender.location);
+
+          if (matchesCategory && matchesLocation) {
+            toast({
+              title: "Tender Updated",
+              description: `${tender.title} has been updated.`,
+            });
+          }
         }
       )
       .subscribe();
@@ -50,7 +115,7 @@ export const TenderNotification = () => {
       console.log("Cleaning up tender notification subscription");
       supabase.removeChannel(channel);
     };
-  }, [toast, isAuthenticated]);
+  }, [toast, isAuthenticated, userPreferences]);
 
   return null; // This is a background component
 };
