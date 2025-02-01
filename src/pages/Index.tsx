@@ -3,6 +3,7 @@ import { Navigation } from "@/components/Navigation";
 import { TenderFilters } from "@/components/TenderFilters";
 import { TenderList } from "@/components/tenders/TenderList";
 import { TenderHeader } from "@/components/tenders/TenderHeader";
+import { TenderNotification } from "@/components/notifications/TenderNotification";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { format } from "date-fns";
@@ -88,6 +89,7 @@ const Index = () => {
   return (
     <div className="min-h-screen bg-gray-50">
       <Navigation />
+      <TenderNotification />
       
       <main className="max-w-7xl mx-auto py-6 sm:px-6 lg:px-8">
         <div className="px-4 py-6 sm:px-0">

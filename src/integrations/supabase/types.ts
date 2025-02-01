@@ -9,6 +9,47 @@ export type Json =
 export type Database = {
   public: {
     Tables: {
+      discussions: {
+        Row: {
+          content: string
+          created_at: string
+          id: number
+          points_earned: number | null
+          tender_id: number | null
+          title: string
+          updated_at: string
+          user_id: string | null
+        }
+        Insert: {
+          content: string
+          created_at?: string
+          id?: number
+          points_earned?: number | null
+          tender_id?: number | null
+          title: string
+          updated_at?: string
+          user_id?: string | null
+        }
+        Update: {
+          content?: string
+          created_at?: string
+          id?: number
+          points_earned?: number | null
+          tender_id?: number | null
+          title?: string
+          updated_at?: string
+          user_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "discussions_tender_id_fkey"
+            columns: ["tender_id"]
+            isOneToOne: false
+            referencedRelation: "tenders"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       profiles: {
         Row: {
           areas_of_expertise: string[] | null
@@ -16,6 +57,10 @@ export type Database = {
           id: string
           industry: string
           location: string
+          notification_preferences: Json | null
+          preferred_language: string | null
+          premium_until: string | null
+          total_points: number | null
           user_id: string | null
         }
         Insert: {
@@ -24,6 +69,10 @@ export type Database = {
           id: string
           industry: string
           location: string
+          notification_preferences?: Json | null
+          preferred_language?: string | null
+          premium_until?: string | null
+          total_points?: number | null
           user_id?: string | null
         }
         Update: {
@@ -32,7 +81,56 @@ export type Database = {
           id?: string
           industry?: string
           location?: string
+          notification_preferences?: Json | null
+          preferred_language?: string | null
+          premium_until?: string | null
+          total_points?: number | null
           user_id?: string | null
+        }
+        Relationships: []
+      }
+      sponsored_ads: {
+        Row: {
+          cash_cost: number | null
+          company_name: string
+          created_at: string
+          description: string
+          end_date: string
+          id: number
+          image_url: string | null
+          points_cost: number | null
+          start_date: string
+          status: string | null
+          title: string
+          website_url: string | null
+        }
+        Insert: {
+          cash_cost?: number | null
+          company_name: string
+          created_at?: string
+          description: string
+          end_date: string
+          id?: number
+          image_url?: string | null
+          points_cost?: number | null
+          start_date: string
+          status?: string | null
+          title: string
+          website_url?: string | null
+        }
+        Update: {
+          cash_cost?: number | null
+          company_name?: string
+          created_at?: string
+          description?: string
+          end_date?: string
+          id?: number
+          image_url?: string | null
+          points_cost?: number | null
+          start_date?: string
+          status?: string | null
+          title?: string
+          website_url?: string | null
         }
         Relationships: []
       }
@@ -68,6 +166,68 @@ export type Database = {
           },
           {
             foreignKeyName: "supplier_tender_tender_id_fkey"
+            columns: ["tender_id"]
+            isOneToOne: false
+            referencedRelation: "tenders"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      templates: {
+        Row: {
+          category: string
+          created_at: string
+          description: string | null
+          file_url: string
+          id: number
+          title: string
+        }
+        Insert: {
+          category: string
+          created_at?: string
+          description?: string | null
+          file_url: string
+          id?: number
+          title: string
+        }
+        Update: {
+          category?: string
+          created_at?: string
+          description?: string | null
+          file_url?: string
+          id?: number
+          title?: string
+        }
+        Relationships: []
+      }
+      tender_reviews: {
+        Row: {
+          comment: string | null
+          created_at: string
+          id: number
+          rating: number | null
+          tender_id: number | null
+          user_id: string | null
+        }
+        Insert: {
+          comment?: string | null
+          created_at?: string
+          id?: number
+          rating?: number | null
+          tender_id?: number | null
+          user_id?: string | null
+        }
+        Update: {
+          comment?: string | null
+          created_at?: string
+          id?: number
+          rating?: number | null
+          tender_id?: number | null
+          user_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "tender_reviews_tender_id_fkey"
             columns: ["tender_id"]
             isOneToOne: false
             referencedRelation: "tenders"
@@ -123,6 +283,39 @@ export type Database = {
         }
         Relationships: []
       }
+      user_points: {
+        Row: {
+          ads_watched: number | null
+          created_at: string
+          id: number
+          points: number | null
+          referrals: number | null
+          social_shares: number | null
+          updated_at: string
+          user_id: string | null
+        }
+        Insert: {
+          ads_watched?: number | null
+          created_at?: string
+          id?: number
+          points?: number | null
+          referrals?: number | null
+          social_shares?: number | null
+          updated_at?: string
+          user_id?: string | null
+        }
+        Update: {
+          ads_watched?: number | null
+          created_at?: string
+          id?: number
+          points?: number | null
+          referrals?: number | null
+          social_shares?: number | null
+          updated_at?: string
+          user_id?: string | null
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
@@ -130,6 +323,13 @@ export type Database = {
     Functions: {
       remove_expired_tenders: {
         Args: Record<PropertyKey, never>
+        Returns: undefined
+      }
+      update_user_points: {
+        Args: {
+          user_id: string
+          points_to_add: number
+        }
         Returns: undefined
       }
     }
