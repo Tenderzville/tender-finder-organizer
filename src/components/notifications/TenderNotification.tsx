@@ -10,6 +10,28 @@ interface UserPreferences {
   locations?: string[];
 }
 
+// Type guard function to validate UserPreferences
+function isUserPreferences(data: unknown): data is UserPreferences {
+  if (!data || typeof data !== 'object') return false;
+  
+  const preferences = data as Record<string, unknown>;
+  
+  // Check required boolean properties
+  if (typeof preferences.push !== 'boolean' || typeof preferences.email !== 'boolean') {
+    return false;
+  }
+  
+  // Check optional array properties if they exist
+  if (preferences.categories !== undefined && !Array.isArray(preferences.categories)) {
+    return false;
+  }
+  if (preferences.locations !== undefined && !Array.isArray(preferences.locations)) {
+    return false;
+  }
+  
+  return true;
+}
+
 export const TenderNotification = () => {
   const { toast } = useToast();
   const { isAuthenticated } = useAuthState();
@@ -33,7 +55,20 @@ export const TenderNotification = () => {
         if (error) throw error;
         
         console.log('Fetched user preferences:', profile?.notification_preferences);
-        setUserPreferences(profile?.notification_preferences as UserPreferences);
+        
+        // Validate preferences before setting them
+        if (profile?.notification_preferences && isUserPreferences(profile.notification_preferences)) {
+          setUserPreferences(profile.notification_preferences);
+        } else {
+          console.error('Invalid notification preferences format:', profile?.notification_preferences);
+          // Set default preferences if invalid
+          setUserPreferences({
+            push: true,
+            email: true,
+            categories: [],
+            locations: []
+          });
+        }
       } catch (error) {
         console.error('Error fetching user preferences:', error);
       }
