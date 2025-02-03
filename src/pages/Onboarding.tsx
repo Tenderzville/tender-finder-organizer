@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -16,6 +16,21 @@ const Onboarding = () => {
     location: "",
     areasOfExpertise: "",
   });
+
+  // Check if user is authenticated
+  useEffect(() => {
+    const checkAuth = async () => {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) {
+        toast({
+          title: "Authentication required",
+          description: "Please sign in to complete your profile",
+        });
+        navigate("/auth");
+      }
+    };
+    checkAuth();
+  }, [navigate, toast]);
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;
@@ -44,6 +59,7 @@ const Onboarding = () => {
       // Generate a UUID for the profile
       const profileId = crypto.randomUUID();
 
+      // Create profile with notification preferences
       const { error } = await supabase.from("profiles").insert({
         id: profileId,
         user_id: user.id,
@@ -51,13 +67,27 @@ const Onboarding = () => {
         industry: formData.industry,
         location: formData.location,
         areas_of_expertise: formData.areasOfExpertise.split(",").map(item => item.trim()),
+        notification_preferences: {
+          push: true,
+          email: true,
+          categories: [],
+          locations: []
+        }
       });
 
       if (error) throw error;
 
+      // Initialize user points with 250 starting points
+      await supabase.from("user_points").insert({
+        user_id: user.id,
+        points: 250,
+        ads_watched: 0,
+        social_shares: 0
+      });
+
       toast({
         title: "Profile Created",
-        description: "Your profile has been set up successfully!",
+        description: "Your profile has been set up successfully! You've earned 250 welcome points!",
       });
       
       navigate("/dashboard");
@@ -80,6 +110,9 @@ const Onboarding = () => {
           </h2>
           <p className="mt-2 text-center text-gray-600">
             Step {step} of 2
+          </p>
+          <p className="mt-2 text-center text-green-600">
+            Get 250 welcome points when you complete your profile!
           </p>
         </div>
 
