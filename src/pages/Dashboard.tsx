@@ -9,6 +9,7 @@ import { UserProfileCard } from "@/components/dashboard/UserProfile";
 import { PointsCard } from "@/components/dashboard/PointsCard";
 import { NotificationPreferencesCard } from "@/components/dashboard/NotificationPreferences";
 import { SavedTendersCard } from "@/components/dashboard/SavedTenders";
+import { Button } from "@/components/ui/button";
 
 const Dashboard = () => {
   const navigate = useNavigate();

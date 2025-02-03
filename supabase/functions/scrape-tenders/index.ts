@@ -20,36 +20,70 @@ async function scrapeTenders() {
     const url = 'https://tenders.go.ke'
     console.log(`Fetching data from ${url}...`)
     
-    const response = await fetch(url)
+    const response = await fetch(url, {
+      headers: {
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
+      }
+    });
+
+    console.log('Response status:', response.status);
+    console.log('Response headers:', Object.fromEntries(response.headers));
+
     if (!response.ok) {
       throw new Error(`Failed to fetch: ${response.status} ${response.statusText}`)
     }
     
     const html = await response.text()
-    const $ = cheerio.load(html)
+    console.log('HTML content length:', html.length);
     
+    const $ = cheerio.load(html)
     const tenders = []
+
+    // Log the structure we're trying to parse
+    console.log('Found tender listings:', $('.tender-listing').length);
 
     // Specific selectors for tenders.go.ke
     $('.tender-listing').each((_, table) => {
       $(table).find('tr').each((_, row) => {
         const cells = $(row).find('td')
-        if (cells.length < 4) return // Skip header rows
-        
-        const tender = {
-          title: cells.eq(1).text().trim(),
-          organization: cells.eq(0).text().trim(),
-          deadline: new Date(cells.eq(2).text().trim()).toISOString(),
-          category: 'Government',
-          description: cells.eq(3).text().trim(),
-          requirements: 'Standard government tender requirements apply',
-          tender_url: $(row).find('a').attr('href'),
-          contact_info: 'Contact the procuring entity directly',
+        if (cells.length < 4) {
+          console.log('Skipping row with insufficient cells:', cells.length);
+          return;
         }
         
-        if (tender.title && tender.deadline && tender.organization) {
-          console.log('Found tender:', tender.title)
-          tenders.push(tender)
+        try {
+          const title = cells.eq(1).text().trim();
+          const organization = cells.eq(0).text().trim();
+          const deadlineText = cells.eq(2).text().trim();
+          const description = cells.eq(3).text().trim();
+
+          console.log('Processing tender:', {
+            title,
+            organization,
+            deadlineText,
+            description
+          });
+
+          // Only add if we have valid data
+          if (title && organization && deadlineText) {
+            const tender = {
+              title,
+              organization,
+              deadline: new Date(deadlineText).toISOString(),
+              category: 'Government',
+              description,
+              requirements: 'Standard government tender requirements apply',
+              tender_url: $(row).find('a').attr('href'),
+              contact_info: 'Contact the procuring entity directly',
+            }
+            
+            console.log('Adding tender to list:', tender);
+            tenders.push(tender)
+          } else {
+            console.log('Skipping tender due to missing required fields');
+          }
+        } catch (error) {
+          console.error('Error processing tender row:', error);
         }
       })
     })
@@ -57,6 +91,7 @@ async function scrapeTenders() {
     console.log(`Found ${tenders.length} tenders`)
 
     if (tenders.length > 0) {
+      console.log('Inserting tenders into database...');
       const { error } = await supabase
         .from('tenders')
         .upsert(
@@ -76,9 +111,12 @@ async function scrapeTenders() {
       }
 
       console.log(`Successfully inserted/updated ${tenders.length} tenders`)
+    } else {
+      console.log('No tenders found to insert');
     }
   } catch (error) {
     console.error('Error in scheduled scraping:', error)
+    throw error;
   }
 }
 
