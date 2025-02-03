@@ -6,7 +6,8 @@ import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { TenderNotification } from "@/components/notifications/TenderNotification";
-import { Bell, BookmarkPlus, Video } from "lucide-react";
+import { Bell, BookmarkPlus, Video, Loader2 } from "lucide-react";
+import { useQuery } from "@tanstack/react-query";
 
 interface UserProfile {
   company_name: string;
@@ -27,85 +28,91 @@ interface SavedTender {
 const Dashboard = () => {
   const navigate = useNavigate();
   const { toast } = useToast();
-  const [profile, setProfile] = useState<UserProfile | null>(null);
-  const [userPoints, setUserPoints] = useState<UserPoints | null>(null);
-  const [savedTenders, setSavedTenders] = useState<SavedTender[]>([]);
+  const [isWatchingVideo, setIsWatchingVideo] = useState(false);
 
-  useEffect(() => {
-    const fetchDashboardData = async () => {
-      try {
-        const { data: { user } } = await supabase.auth.getUser();
-        
-        if (!user) {
-          navigate("/auth");
-          return;
-        }
-
-        // Fetch profile data
-        const { data: profileData } = await supabase
-          .from("profiles")
-          .select("company_name, total_points")
-          .eq("user_id", user.id)
-          .single();
-
-        if (profileData) {
-          setProfile(profileData);
-        }
-
-        // Fetch points data
-        const { data: pointsData } = await supabase
-          .from("user_points")
-          .select("points, ads_watched")
-          .eq("user_id", user.id)
-          .single();
-
-        if (pointsData) {
-          setUserPoints(pointsData);
-        }
-
-        // Fetch saved tenders
-        const { data: tenderData } = await supabase
-          .from("supplier_tender")
-          .select(`
-            tender_id,
-            tenders (
-              id,
-              title,
-              deadline
-            )
-          `)
-          .eq("supplier_id", user.id);
-
-        if (tenderData) {
-          const formattedTenders = tenderData.map((item: any) => ({
-            id: item.tenders.id,
-            title: item.tenders.title,
-            deadline: new Date(item.tenders.deadline).toLocaleDateString(),
-          }));
-          setSavedTenders(formattedTenders);
-        }
-
-      } catch (error) {
-        console.error("Error fetching dashboard data:", error);
-        toast({
-          title: "Error",
-          description: "Failed to load dashboard data",
-          variant: "destructive",
-        });
+  // Fetch user data
+  const { data: userData, isLoading: isUserLoading } = useQuery({
+    queryKey: ['user'],
+    queryFn: async () => {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) {
+        navigate("/auth");
+        return null;
       }
-    };
+      return user;
+    },
+  });
 
-    fetchDashboardData();
-  }, [navigate, toast]);
+  // Fetch profile data
+  const { data: profile, isLoading: isProfileLoading } = useQuery({
+    queryKey: ['profile', userData?.id],
+    enabled: !!userData?.id,
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("profiles")
+        .select("company_name, total_points")
+        .eq("user_id", userData?.id)
+        .single();
+
+      if (error) throw error;
+      return data as UserProfile;
+    },
+  });
+
+  // Fetch points data
+  const { data: userPoints, isLoading: isPointsLoading } = useQuery({
+    queryKey: ['points', userData?.id],
+    enabled: !!userData?.id,
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("user_points")
+        .select("points, ads_watched")
+        .eq("user_id", userData?.id)
+        .single();
+
+      if (error && error.code !== 'PGRST116') throw error;
+      return data as UserPoints;
+    },
+  });
+
+  // Fetch saved tenders
+  const { data: savedTenders = [], isLoading: isTendersLoading } = useQuery({
+    queryKey: ['saved-tenders', userData?.id],
+    enabled: !!userData?.id,
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("supplier_tender")
+        .select(`
+          tender_id,
+          tenders (
+            id,
+            title,
+            deadline
+          )
+        `)
+        .eq("supplier_id", userData?.id);
+
+      if (error) throw error;
+
+      return (data || []).map((item: any) => ({
+        id: item.tenders.id,
+        title: item.tenders.title,
+        deadline: new Date(item.tenders.deadline).toLocaleDateString(),
+      }));
+    },
+  });
 
   const handleVideoWatched = async () => {
-    try {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) return;
+    if (!userData?.id) return;
 
-      // Update ads_watched count and award points
+    try {
+      setIsWatchingVideo(true);
+      
+      // Simulate video watching with a delay
+      await new Promise(resolve => setTimeout(resolve, 3000));
+
       const { error } = await supabase.rpc("update_user_points", {
-        user_id: user.id,
+        user_id: userData.id,
         points_to_add: 100
       });
 
@@ -116,26 +123,46 @@ const Dashboard = () => {
         description: "You've earned 100 points for watching the video!",
       });
 
-      // Refresh points data
-      const { data: pointsData } = await supabase
-        .from("user_points")
-        .select("points, ads_watched")
-        .eq("user_id", user.id)
-        .single();
-
-      if (pointsData) {
-        setUserPoints(pointsData);
-      }
-
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error updating points:", error);
       toast({
         title: "Error",
         description: "Failed to update points",
         variant: "destructive",
       });
+    } finally {
+      setIsWatchingVideo(false);
     }
   };
+
+  if (isUserLoading || isProfileLoading || isPointsLoading || isTendersLoading) {
+    return (
+      <div className="min-h-screen bg-gray-50">
+        <Navigation />
+        <main className="max-w-7xl mx-auto py-6 sm:px-6 lg:px-8">
+          <div className="flex items-center justify-center h-64">
+            <Loader2 className="h-8 w-8 animate-spin text-primary" />
+          </div>
+        </main>
+      </div>
+    );
+  }
+
+  if (!userData || !profile) {
+    return (
+      <div className="min-h-screen bg-gray-50">
+        <Navigation />
+        <main className="max-w-7xl mx-auto py-6 sm:px-6 lg:px-8">
+          <div className="text-center">
+            <h2 className="text-xl font-semibold">Please sign in to view your dashboard</h2>
+            <Button onClick={() => navigate("/auth")} className="mt-4">
+              Sign In
+            </Button>
+          </div>
+        </main>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -146,7 +173,7 @@ const Dashboard = () => {
         <div className="px-4 py-6 sm:px-0">
           <div className="mb-8">
             <h1 className="text-2xl font-bold text-gray-900">
-              Welcome back, {profile?.company_name}!
+              Welcome back, {profile.company_name}!
             </h1>
             <p className="mt-2 text-gray-600">
               You have {userPoints?.points || 0} points
@@ -162,9 +189,22 @@ const Dashboard = () => {
                   <span>Videos Watched</span>
                   <span>{userPoints?.ads_watched || 0}</span>
                 </div>
-                <Button onClick={handleVideoWatched} className="w-full">
-                  <Video className="mr-2 h-4 w-4" />
-                  Watch Video (+100 points)
+                <Button 
+                  onClick={handleVideoWatched} 
+                  className="w-full"
+                  disabled={isWatchingVideo}
+                >
+                  {isWatchingVideo ? (
+                    <>
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                      Watching Video...
+                    </>
+                  ) : (
+                    <>
+                      <Video className="mr-2 h-4 w-4" />
+                      Watch Video (+100 points)
+                    </>
+                  )}
                 </Button>
               </div>
             </Card>
@@ -213,6 +253,13 @@ const Dashboard = () => {
                   <div className="text-center text-gray-500">
                     <BookmarkPlus className="mx-auto h-8 w-8 mb-2" />
                     <p>No saved tenders yet</p>
+                    <Button
+                      variant="outline"
+                      className="mt-4"
+                      onClick={() => navigate("/dashboard")}
+                    >
+                      Browse Tenders
+                    </Button>
                   </div>
                 )}
               </div>
