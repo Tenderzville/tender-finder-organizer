@@ -4,6 +4,7 @@ import { TenderFilters } from "@/components/TenderFilters";
 import { TenderList } from "@/components/tenders/TenderList";
 import { TenderHeader } from "@/components/tenders/TenderHeader";
 import { TenderNotification } from "@/components/notifications/TenderNotification";
+import { SocialShare } from "@/components/social/SocialShare";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { format } from "date-fns";
@@ -98,13 +99,23 @@ const Index = () => {
           <div className="grid grid-cols-1 lg:grid-cols-4 gap-8">
             <div className="lg:col-span-1">
               <TenderFilters onFilterChange={setFilters} />
+              <div className="mt-8">
+                <SocialShare />
+              </div>
             </div>
             
             <div className="lg:col-span-3">
               {isLoading ? (
                 <div className="text-center py-8">Loading tenders...</div>
-              ) : (
+              ) : tenders.length > 0 ? (
                 <TenderList tenders={tenders} />
+              ) : (
+                <div className="text-center py-8 bg-white rounded-lg shadow">
+                  <h3 className="text-lg font-medium text-gray-900">No tenders found</h3>
+                  <p className="mt-2 text-sm text-gray-500">
+                    Try adjusting your filters or check back later for new opportunities.
+                  </p>
+                </div>
               )}
             </div>
           </div>
