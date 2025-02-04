@@ -1,7 +1,7 @@
 import { useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
-import { Loader2, AlertCircle } from "lucide-react";
+import { Loader2, AlertCircle, User } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { Navigation } from "@/components/Navigation";
 import { TenderNotification } from "@/components/notifications/TenderNotification";
@@ -11,19 +11,27 @@ import { NotificationPreferencesCard } from "@/components/dashboard/Notification
 import { SavedTendersCard } from "@/components/dashboard/SavedTenders";
 import { Button } from "@/components/ui/button";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { useToast } from "@/hooks/use-toast";
 
 const Dashboard = () => {
   const navigate = useNavigate();
+  const { toast } = useToast();
 
   const { data: userData, isLoading, error } = useQuery({
     queryKey: ['user'],
     queryFn: async () => {
+      console.log("Fetching user data...");
       const { data: { user }, error } = await supabase.auth.getUser();
-      if (error) throw error;
+      if (error) {
+        console.error("Error fetching user:", error);
+        throw error;
+      }
       if (!user) {
+        console.log("No user found, redirecting to auth");
         navigate("/auth");
         return null;
       }
+      console.log("User data fetched successfully:", user);
       return user;
     },
   });
@@ -32,23 +40,46 @@ const Dashboard = () => {
   const { data: tendersExist } = useQuery({
     queryKey: ['tenders-exist'],
     queryFn: async () => {
+      console.log("Checking if tenders exist...");
       const { count, error } = await supabase
         .from('tenders')
         .select('*', { count: 'exact', head: true });
       
-      if (error) throw error;
+      if (error) {
+        console.error("Error checking tenders:", error);
+        throw error;
+      }
+      console.log("Tenders count:", count);
       return count && count > 0;
     },
     enabled: !!userData,
   });
+
+  useEffect(() => {
+    const checkAuth = async () => {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) {
+        console.log("No session found, redirecting to auth");
+        toast({
+          title: "Authentication Required",
+          description: "Please sign in to access the dashboard",
+          variant: "destructive",
+        });
+        navigate("/auth");
+      }
+    };
+
+    checkAuth();
+  }, [navigate, toast]);
 
   if (isLoading) {
     return (
       <div className="min-h-screen bg-gray-50">
         <Navigation />
         <main className="max-w-7xl mx-auto py-6 sm:px-6 lg:px-8">
-          <div className="flex items-center justify-center h-64">
+          <div className="flex flex-col items-center justify-center h-64 space-y-4">
             <Loader2 className="h-8 w-8 animate-spin text-primary" />
+            <p className="text-gray-500">Loading your dashboard...</p>
           </div>
         </main>
       </div>
@@ -78,7 +109,8 @@ const Dashboard = () => {
         <Navigation />
         <main className="max-w-7xl mx-auto py-6 sm:px-6 lg:px-8">
           <div className="text-center">
-            <h2 className="text-xl font-semibold">Please sign in to view your dashboard</h2>
+            <User className="mx-auto h-12 w-12 text-gray-400" />
+            <h2 className="mt-2 text-xl font-semibold">Please sign in to view your dashboard</h2>
             <Button onClick={() => navigate("/auth")} className="mt-4">
               Sign In
             </Button>
@@ -87,6 +119,8 @@ const Dashboard = () => {
       </div>
     );
   }
+
+  console.log("Rendering dashboard with user:", userData.id);
 
   return (
     <div className="min-h-screen bg-gray-50">
