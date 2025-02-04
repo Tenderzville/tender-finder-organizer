@@ -10,6 +10,7 @@ interface Tender {
   category: string;
   value: string;
   location?: string;
+  points_required?: number;
 }
 
 interface TenderListProps {
@@ -34,6 +35,7 @@ export const TenderList = ({ tenders }: TenderListProps) => {
         <TenderCard
           key={tender.id}
           {...tender}
+          pointsRequired={tender.points_required}
           onViewDetails={() => handleViewDetails(tender.id)}
         />
       ))}

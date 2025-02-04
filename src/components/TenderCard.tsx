@@ -9,25 +9,21 @@ interface TenderCardProps {
   deadline: string;
   category: string;
   value: string;
-  location?: string; // Make location optional to maintain compatibility
+  location?: string;
+  pointsRequired?: number;
   onViewDetails: () => void;
 }
 
-// Helper function to format currency based on location
 const formatCurrency = (value: string, location?: string): string => {
-  // Remove any existing currency symbols from the value
   const numericValue = value.replace(/[^0-9.]/g, '');
   
-  // Define currency formats for different locations
   const currencyFormats: { [key: string]: { symbol: string, position: 'before' | 'after' } } = {
     'Kenya': { symbol: 'KSh', position: 'before' },
     'USA': { symbol: '$', position: 'before' },
     'UK': { symbol: '£', position: 'before' },
     'EU': { symbol: '€', position: 'before' },
-    // Add more currencies as needed
   };
 
-  // Default to USD if location is not specified or not found
   const format = location && currencyFormats[location] 
     ? currencyFormats[location] 
     : { symbol: '$', position: 'before' };
@@ -44,6 +40,7 @@ export const TenderCard = ({
   category,
   value,
   location,
+  pointsRequired = 0,
   onViewDetails,
 }: TenderCardProps) => {
   const formattedValue = formatCurrency(value, location);
@@ -76,9 +73,16 @@ export const TenderCard = ({
             <span>{location || 'International'}</span>
           </div>
         </div>
-        <Badge variant="outline" className="w-full justify-center">
-          Value: {formattedValue}
-        </Badge>
+        <div className="space-y-2">
+          <Badge variant="outline" className="w-full justify-center">
+            Value: {formattedValue}
+          </Badge>
+          {pointsRequired > 0 && (
+            <Badge variant="secondary" className="w-full justify-center">
+              Required Points: {pointsRequired}
+            </Badge>
+          )}
+        </div>
       </CardContent>
       <CardFooter>
         <Button onClick={onViewDetails} className="w-full">

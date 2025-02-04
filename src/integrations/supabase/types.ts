@@ -272,6 +272,7 @@ export type Database = {
           fees: string | null
           id: number
           location: string
+          points_required: number | null
           prerequisites: string | null
           requirements: string
           subcategory: string | null
@@ -287,6 +288,7 @@ export type Database = {
           fees?: string | null
           id?: never
           location?: string
+          points_required?: number | null
           prerequisites?: string | null
           requirements: string
           subcategory?: string | null
@@ -302,6 +304,7 @@ export type Database = {
           fees?: string | null
           id?: never
           location?: string
+          points_required?: number | null
           prerequisites?: string | null
           requirements?: string
           subcategory?: string | null
@@ -357,6 +360,12 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      check_tender_access: {
+        Args: {
+          tender_id: number
+        }
+        Returns: boolean
+      }
       remove_expired_tenders: {
         Args: Record<PropertyKey, never>
         Returns: undefined
