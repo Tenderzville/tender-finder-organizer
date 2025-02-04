@@ -72,7 +72,7 @@ export const TenderFilters = ({ onFilterChange }: TenderFiltersProps) => {
               <SelectValue placeholder="Select category" />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="">All Categories</SelectItem>
+              <SelectItem value="all">All Categories</SelectItem>
               <SelectItem value="construction">Construction & Infrastructure</SelectItem>
               <SelectItem value="it">IT & Technology</SelectItem>
               <SelectItem value="consulting">Consulting Services</SelectItem>
@@ -105,7 +105,7 @@ export const TenderFilters = ({ onFilterChange }: TenderFiltersProps) => {
               <SelectValue placeholder="Select location" />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="">All Locations</SelectItem>
+              <SelectItem value="all">All Locations</SelectItem>
               <SelectItem value="Kenya">Kenya</SelectItem>
               <SelectItem value="Uganda">Uganda</SelectItem>
               <SelectItem value="Tanzania">Tanzania</SelectItem>
@@ -128,7 +128,7 @@ export const TenderFilters = ({ onFilterChange }: TenderFiltersProps) => {
               <SelectValue placeholder="Select value range" />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="">All Ranges</SelectItem>
+              <SelectItem value="all">All Ranges</SelectItem>
               <SelectItem value="0-50k">$0 - $50,000</SelectItem>
               <SelectItem value="50k-200k">$50,000 - $200,000</SelectItem>
               <SelectItem value="200k-1m">$200,000 - $1,000,000</SelectItem>
@@ -147,7 +147,7 @@ export const TenderFilters = ({ onFilterChange }: TenderFiltersProps) => {
               <SelectValue placeholder="Select deadline" />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="">All Deadlines</SelectItem>
+              <SelectItem value="all">All Deadlines</SelectItem>
               <SelectItem value="today">Today</SelectItem>
               <SelectItem value="this-week">This Week</SelectItem>
               <SelectItem value="this-month">This Month</SelectItem>
