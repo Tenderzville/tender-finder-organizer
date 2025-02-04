@@ -44,23 +44,43 @@ export const TenderNotification = () => {
     const fetchUserPreferences = async () => {
       try {
         const { data: { user } } = await supabase.auth.getUser();
-        if (!user) return;
+        if (!user) {
+          console.log('No user found, skipping preferences fetch');
+          return;
+        }
 
+        console.log('Fetching preferences for user:', user.id);
         const { data: profile, error } = await supabase
           .from('profiles')
           .select('notification_preferences')
           .eq('user_id', user.id)
-          .single();
+          .maybeSingle();
 
-        if (error) throw error;
+        if (error) {
+          console.error('Error fetching profile:', error);
+          throw error;
+        }
         
-        console.log('Fetched user preferences:', profile?.notification_preferences);
+        console.log('Fetched profile:', profile);
+        
+        if (!profile) {
+          console.log('No profile found, using default preferences');
+          // Set default preferences if no profile exists
+          setUserPreferences({
+            push: true,
+            email: true,
+            categories: [],
+            locations: []
+          });
+          return;
+        }
         
         // Validate preferences before setting them
-        if (profile?.notification_preferences && isUserPreferences(profile.notification_preferences)) {
+        if (profile.notification_preferences && isUserPreferences(profile.notification_preferences)) {
+          console.log('Setting valid preferences:', profile.notification_preferences);
           setUserPreferences(profile.notification_preferences);
         } else {
-          console.error('Invalid notification preferences format:', profile?.notification_preferences);
+          console.error('Invalid notification preferences format:', profile.notification_preferences);
           // Set default preferences if invalid
           setUserPreferences({
             push: true,
@@ -71,11 +91,16 @@ export const TenderNotification = () => {
         }
       } catch (error) {
         console.error('Error fetching user preferences:', error);
+        toast({
+          title: "Error",
+          description: "Failed to load notification preferences. Using default settings.",
+          variant: "destructive",
+        });
       }
     };
 
     fetchUserPreferences();
-  }, [isAuthenticated]);
+  }, [isAuthenticated, toast]);
 
   // Set up real-time notifications
   useEffect(() => {
