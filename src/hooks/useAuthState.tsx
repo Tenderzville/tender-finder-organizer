@@ -3,30 +3,64 @@ import { useNavigate } from "react-router-dom";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 
+type ProfileStatus = 'loading' | 'exists' | 'missing';
+
 export const useAuthState = () => {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const [profileStatus, setProfileStatus] = useState<ProfileStatus>('loading');
   const navigate = useNavigate();
   const { toast } = useToast();
 
   useEffect(() => {
-    // Check initial session
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      setIsAuthenticated(!!session);
-    });
+    const checkAuth = async () => {
+      const { data: { session } } = await supabase.auth.getSession();
+      const isAuthed = !!session;
+      setIsAuthenticated(isAuthed);
 
-    // Listen for auth changes
+      if (isAuthed) {
+        // Check if profile exists
+        const { data: profile, error } = await supabase
+          .from('profiles')
+          .select('id')
+          .eq('user_id', session.user.id)
+          .maybeSingle();
+
+        if (error) {
+          console.error('Error checking profile:', error);
+          return;
+        }
+
+        setProfileStatus(profile ? 'exists' : 'missing');
+      }
+    };
+
+    checkAuth();
+
     const { data: authListener } = supabase.auth.onAuthStateChange(
       async (event, session) => {
         console.log("Auth state changed:", event, !!session);
         setIsAuthenticated(!!session);
         
-        // Handle email confirmation
         if (event === 'SIGNED_IN') {
           toast({
             title: "Welcome!",
             description: "You have successfully signed in",
           });
-          navigate("/dashboard");
+          
+          // Check profile after sign in
+          if (session) {
+            const { data: profile } = await supabase
+              .from('profiles')
+              .select('id')
+              .eq('user_id', session.user.id)
+              .maybeSingle();
+
+            if (!profile) {
+              navigate("/onboarding");
+            } else {
+              navigate("/dashboard");
+            }
+          }
         }
       }
     );
@@ -55,5 +89,5 @@ export const useAuthState = () => {
     }
   };
 
-  return { isAuthenticated, handleSignOut };
+  return { isAuthenticated, profileStatus, handleSignOut };
 };
