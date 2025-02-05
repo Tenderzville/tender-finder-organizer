@@ -42,11 +42,13 @@ const Onboarding = () => {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    console.log("Submitting onboarding form...");
     
     try {
       const { data: { user }, error: userError } = await supabase.auth.getUser();
       
       if (userError || !user) {
+        console.error("Auth error:", userError);
         toast({
           title: "Error",
           description: "Please sign in to complete your profile",
@@ -58,6 +60,7 @@ const Onboarding = () => {
 
       // Generate a UUID for the profile
       const profileId = crypto.randomUUID();
+      console.log("Creating profile with ID:", profileId);
 
       // Create profile with notification preferences
       const { error } = await supabase.from("profiles").insert({
@@ -75,27 +78,44 @@ const Onboarding = () => {
         }
       });
 
-      if (error) throw error;
+      if (error) {
+        console.error("Profile creation error:", error);
+        throw error;
+      }
+
+      console.log("Profile created successfully");
 
       // Initialize user points with 250 starting points
-      await supabase.from("user_points").insert({
+      const { error: pointsError } = await supabase.from("user_points").insert({
         user_id: user.id,
         points: 250,
         ads_watched: 0,
         social_shares: 0
       });
 
+      if (pointsError) {
+        console.error("Points initialization error:", pointsError);
+        throw pointsError;
+      }
+
+      console.log("Points initialized successfully");
+
       toast({
         title: "Profile Created",
         description: "Your profile has been set up successfully! You've earned 250 welcome points!",
       });
       
-      navigate("/dashboard");
-    } catch (error) {
-      console.error("Error creating profile:", error);
+      // Add a small delay to ensure the toast is visible
+      setTimeout(() => {
+        console.log("Navigating to dashboard...");
+        navigate("/dashboard");
+      }, 1000);
+
+    } catch (error: any) {
+      console.error("Error in onboarding:", error);
       toast({
         title: "Error",
-        description: "Failed to create profile. Please try again.",
+        description: error.message || "Failed to create profile. Please try again.",
         variant: "destructive",
       });
     }
