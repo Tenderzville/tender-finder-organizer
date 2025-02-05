@@ -22,19 +22,16 @@ const queryClient = new QueryClient({
   },
 });
 
-// Protected route component that checks for profile
 const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
   const { isAuthenticated, profileStatus } = useAuthState();
-  console.log("Protected route check:", { isAuthenticated, profileStatus });
-
+  
   if (!isAuthenticated) {
-    console.log("User not authenticated, redirecting to auth");
+    console.log("Protected route: User not authenticated, redirecting to auth");
     return <Navigate to="/auth" />;
   }
 
-  // If authenticated but no profile, redirect to onboarding
   if (profileStatus === 'missing') {
-    console.log("Profile missing, redirecting to onboarding");
+    console.log("Protected route: Profile missing, redirecting to onboarding");
     return <Navigate to="/onboarding" />;
   }
 

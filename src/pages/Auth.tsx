@@ -5,23 +5,19 @@ import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
-import { useAuthState } from "@/hooks/useAuthState";
 import { Loader2 } from "lucide-react";
 
 const Auth = () => {
   const navigate = useNavigate();
   const { toast } = useToast();
-  const { isAuthenticated } = useAuthState();
   const [isLogin, setIsLogin] = useState(true);
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [isLoading, setIsLoading] = useState(false);
 
-  // Check session on mount and redirect if authenticated
   useEffect(() => {
     const checkSession = async () => {
       const { data: { session } } = await supabase.auth.getSession();
-      console.log("Initial session check:", !!session);
       if (session) {
         console.log("Session exists, redirecting to dashboard");
         navigate("/dashboard");
@@ -29,14 +25,6 @@ const Auth = () => {
     };
     checkSession();
   }, [navigate]);
-
-  // Listen for auth state changes
-  useEffect(() => {
-    console.log("Auth state changed:", isAuthenticated);
-    if (isAuthenticated) {
-      navigate("/dashboard");
-    }
-  }, [isAuthenticated, navigate]);
 
   const handleAuth = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -54,14 +42,8 @@ const Auth = () => {
 
         if (error) throw error;
 
-        console.log("Sign in response:", data);
-        if (data.session) {
-          toast({
-            title: "Success",
-            description: "Successfully signed in",
-          });
-          navigate("/dashboard");
-        }
+        console.log("Sign in successful:", data);
+        navigate("/dashboard");
       } else {
         const { data, error } = await supabase.auth.signUp({
           email,
@@ -70,10 +52,10 @@ const Auth = () => {
 
         if (error) throw error;
 
-        console.log("Sign up response:", data);
+        console.log("Sign up successful:", data);
         toast({
-          title: "Check your email",
-          description: "We've sent you a confirmation link to complete your registration",
+          title: "Success",
+          description: "Account created successfully. Please check your email to verify your account.",
         });
       }
     } catch (error: any) {
