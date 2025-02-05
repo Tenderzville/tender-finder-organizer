@@ -36,21 +36,21 @@ const Dashboard = () => {
     },
   });
 
-  // Check if tenders exist
-  const { data: tendersExist } = useQuery({
-    queryKey: ['tenders-exist'],
+  // Check available tenders
+  const { data: tendersCount } = useQuery({
+    queryKey: ['tenders-count'],
     queryFn: async () => {
-      console.log("Checking if tenders exist...");
+      console.log("Checking available tenders...");
       const { count, error } = await supabase
         .from('tenders')
-        .select('*', { count: 'exact', head: true });
+        .select('*', { count: 'exact' });
       
       if (error) {
         console.error("Error checking tenders:", error);
         throw error;
       }
-      console.log("Tenders count:", count);
-      return count && count > 0;
+      console.log("Available tenders count:", count);
+      return count;
     },
     enabled: !!userData,
   });
@@ -129,7 +129,7 @@ const Dashboard = () => {
       
       <main className="max-w-7xl mx-auto py-6 sm:px-6 lg:px-8">
         <div className="px-4 py-6 sm:px-0">
-          {!tendersExist && (
+          {!tendersCount && (
             <Alert className="mb-6">
               <AlertCircle className="h-4 w-4" />
               <AlertTitle>No Tenders Available</AlertTitle>

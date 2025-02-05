@@ -19,9 +19,24 @@ const Auth = () => {
 
   // Redirect if already authenticated
   useEffect(() => {
+    const checkAndRedirect = async () => {
+      console.log("Checking authentication status...");
+      const { data: { session } } = await supabase.auth.getSession();
+      console.log("Session status:", !!session);
+      
+      if (session) {
+        console.log("User is authenticated, redirecting to dashboard");
+        navigate("/dashboard");
+      }
+    };
+
+    checkAndRedirect();
+  }, [navigate]);
+
+  useEffect(() => {
     console.log("Auth state in Auth page:", isAuthenticated);
     if (isAuthenticated) {
-      console.log("User is authenticated, redirecting to dashboard");
+      console.log("isAuthenticated changed, redirecting to dashboard");
       navigate("/dashboard");
     }
   }, [isAuthenticated, navigate]);
@@ -32,11 +47,17 @@ const Auth = () => {
     try {
       if (isLogin) {
         console.log("Attempting to sign in with email:", email);
-        const { error } = await supabase.auth.signInWithPassword({
+        const { data, error } = await supabase.auth.signInWithPassword({
           email,
           password,
         });
         if (error) throw error;
+        
+        console.log("Sign in successful:", !!data.session);
+        if (data.session) {
+          console.log("Navigating to dashboard after successful sign in");
+          navigate("/dashboard");
+        }
       } else {
         console.log("Attempting to sign up with email:", email);
         const { error } = await supabase.auth.signUp({
