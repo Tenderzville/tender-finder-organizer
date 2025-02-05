@@ -13,11 +13,13 @@ export const useAuthState = () => {
 
   useEffect(() => {
     const checkAuth = async () => {
+      console.log("Checking auth state...");
       const { data: { session } } = await supabase.auth.getSession();
       const isAuthed = !!session;
+      console.log("Is authenticated:", isAuthed);
       setIsAuthenticated(isAuthed);
 
-      if (isAuthed) {
+      if (isAuthed && session) {
         // Check if profile exists
         const { data: profile, error } = await supabase
           .from('profiles')
@@ -30,7 +32,9 @@ export const useAuthState = () => {
           return;
         }
 
-        setProfileStatus(profile ? 'exists' : 'missing');
+        const status = profile ? 'exists' : 'missing';
+        console.log("Profile status:", status);
+        setProfileStatus(status);
       }
     };
 
@@ -41,26 +45,26 @@ export const useAuthState = () => {
         console.log("Auth state changed:", event, !!session);
         setIsAuthenticated(!!session);
         
-        if (event === 'SIGNED_IN') {
+        if (event === 'SIGNED_IN' && session) {
+          // Check profile after sign in
+          const { data: profile } = await supabase
+            .from('profiles')
+            .select('id')
+            .eq('user_id', session.user.id)
+            .maybeSingle();
+
+          if (!profile) {
+            console.log("No profile found, redirecting to onboarding");
+            navigate("/onboarding");
+          } else {
+            console.log("Profile found, redirecting to dashboard");
+            navigate("/dashboard");
+          }
+
           toast({
             title: "Welcome!",
             description: "You have successfully signed in",
           });
-          
-          // Check profile after sign in
-          if (session) {
-            const { data: profile } = await supabase
-              .from('profiles')
-              .select('id')
-              .eq('user_id', session.user.id)
-              .maybeSingle();
-
-            if (!profile) {
-              navigate("/onboarding");
-            } else {
-              navigate("/dashboard");
-            }
-          }
         }
       }
     );
@@ -72,6 +76,7 @@ export const useAuthState = () => {
 
   const handleSignOut = async () => {
     try {
+      console.log("Signing out...");
       const { error } = await supabase.auth.signOut();
       if (error) throw error;
       
@@ -81,6 +86,7 @@ export const useAuthState = () => {
       });
       navigate("/");
     } catch (error: any) {
+      console.error("Sign out error:", error);
       toast({
         title: "Error",
         description: error.message,

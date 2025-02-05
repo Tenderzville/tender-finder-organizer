@@ -13,18 +13,28 @@ import NotFound from "./pages/NotFound";
 import GetStarted from "./pages/GetStarted";
 import Dashboard from "./pages/Dashboard";
 
-const queryClient = new QueryClient();
+const queryClient = new QueryClient({
+  defaultOptions: {
+    queries: {
+      retry: 1,
+      refetchOnWindowFocus: false,
+    },
+  },
+});
 
 // Protected route component that checks for profile
 const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
   const { isAuthenticated, profileStatus } = useAuthState();
+  console.log("Protected route check:", { isAuthenticated, profileStatus });
 
   if (!isAuthenticated) {
+    console.log("User not authenticated, redirecting to auth");
     return <Navigate to="/auth" />;
   }
 
   // If authenticated but no profile, redirect to onboarding
   if (profileStatus === 'missing') {
+    console.log("Profile missing, redirecting to onboarding");
     return <Navigate to="/onboarding" />;
   }
 

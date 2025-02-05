@@ -17,54 +17,60 @@ const Auth = () => {
   const [password, setPassword] = useState("");
   const [isLoading, setIsLoading] = useState(false);
 
-  // Redirect if already authenticated
+  // Check session on mount and redirect if authenticated
   useEffect(() => {
-    const checkAndRedirect = async () => {
-      console.log("Checking authentication status...");
+    const checkSession = async () => {
       const { data: { session } } = await supabase.auth.getSession();
-      console.log("Session status:", !!session);
-      
+      console.log("Initial session check:", !!session);
       if (session) {
-        console.log("User is authenticated, redirecting to dashboard");
+        console.log("Session exists, redirecting to dashboard");
         navigate("/dashboard");
       }
     };
-
-    checkAndRedirect();
+    checkSession();
   }, [navigate]);
 
+  // Listen for auth state changes
   useEffect(() => {
-    console.log("Auth state in Auth page:", isAuthenticated);
+    console.log("Auth state changed:", isAuthenticated);
     if (isAuthenticated) {
-      console.log("isAuthenticated changed, redirecting to dashboard");
       navigate("/dashboard");
     }
   }, [isAuthenticated, navigate]);
 
   const handleAuth = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (isLoading) return;
+    
     setIsLoading(true);
+    console.log(`Attempting to ${isLogin ? 'sign in' : 'sign up'} with email:`, email);
+
     try {
       if (isLogin) {
-        console.log("Attempting to sign in with email:", email);
         const { data, error } = await supabase.auth.signInWithPassword({
           email,
           password,
         });
+
         if (error) throw error;
-        
-        console.log("Sign in successful:", !!data.session);
+
+        console.log("Sign in response:", data);
         if (data.session) {
-          console.log("Navigating to dashboard after successful sign in");
+          toast({
+            title: "Success",
+            description: "Successfully signed in",
+          });
           navigate("/dashboard");
         }
       } else {
-        console.log("Attempting to sign up with email:", email);
-        const { error } = await supabase.auth.signUp({
+        const { data, error } = await supabase.auth.signUp({
           email,
           password,
         });
+
         if (error) throw error;
+
+        console.log("Sign up response:", data);
         toast({
           title: "Check your email",
           description: "We've sent you a confirmation link to complete your registration",
@@ -118,9 +124,7 @@ const Auth = () => {
           </CardContent>
           <CardFooter className="flex flex-col space-y-4">
             <Button type="submit" className="w-full" disabled={isLoading}>
-              {isLoading ? (
-                <Loader2 className="h-4 w-4 animate-spin mr-2" />
-              ) : null}
+              {isLoading && <Loader2 className="h-4 w-4 animate-spin mr-2" />}
               {isLogin ? "Sign in" : "Create account"}
             </Button>
             <Button
