@@ -1,3 +1,4 @@
+
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -23,15 +24,24 @@ const queryClient = new QueryClient({
 });
 
 const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
-  const { isAuthenticated, profileStatus } = useAuthState();
+  const { isAuthenticated, profileStatus, isInitialized } = useAuthState();
   
+  // Show loading state until we've checked auth status
+  if (!isInitialized) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-900" />
+      </div>
+    );
+  }
+
   if (!isAuthenticated) {
-    console.log("Protected route: User not authenticated, redirecting to auth");
+    console.log("[ProtectedRoute] User not authenticated, redirecting to auth");
     return <Navigate to="/auth" />;
   }
 
   if (profileStatus === 'missing') {
-    console.log("Protected route: Profile missing, redirecting to onboarding");
+    console.log("[ProtectedRoute] Profile missing, redirecting to onboarding");
     return <Navigate to="/onboarding" />;
   }
 

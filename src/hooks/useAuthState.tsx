@@ -9,6 +9,7 @@ type ProfileStatus = 'loading' | 'exists' | 'missing';
 export const useAuthState = () => {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [profileStatus, setProfileStatus] = useState<ProfileStatus>('loading');
+  const [isInitialized, setIsInitialized] = useState(false);
   const navigate = useNavigate();
   const { toast } = useToast();
 
@@ -17,7 +18,7 @@ export const useAuthState = () => {
       try {
         const { data: { session } } = await supabase.auth.getSession();
         const isAuthed = !!session;
-        console.log("Initial auth check - Session exists:", isAuthed);
+        console.log("[useAuthState] Initial auth check - Session exists:", isAuthed);
         setIsAuthenticated(isAuthed);
 
         if (isAuthed && session) {
@@ -28,26 +29,34 @@ export const useAuthState = () => {
             .maybeSingle();
 
           const status = profile ? 'exists' : 'missing';
-          console.log("Initial profile status check:", status);
+          console.log("[useAuthState] Profile status:", status);
           setProfileStatus(status);
+        } else {
+          setProfileStatus('missing');
         }
+        
+        setIsInitialized(true);
       } catch (error) {
-        console.error("Auth check error:", error);
+        console.error("[useAuthState] Auth check error:", error);
+        setIsInitialized(true);
       }
     };
 
     checkAuth();
 
     const { data: authListener } = supabase.auth.onAuthStateChange(async (event, session) => {
-      console.log("Auth state changed:", event, !!session);
+      console.log("[useAuthState] Auth state changed:", event, !!session);
       
-      // Prevent unnecessary state updates if the auth state hasn't changed
-      const newAuthState = !!session;
-      if (isAuthenticated !== newAuthState) {
-        setIsAuthenticated(newAuthState);
+      if (event === 'SIGNED_OUT') {
+        setIsAuthenticated(false);
+        setProfileStatus('missing');
+        navigate("/auth");
+        return;
       }
 
       if (session) {
+        setIsAuthenticated(true);
+        
         const { data: profile } = await supabase
           .from('profiles')
           .select('id')
@@ -55,26 +64,26 @@ export const useAuthState = () => {
           .maybeSingle();
 
         const newStatus = profile ? 'exists' : 'missing';
-        if (profileStatus !== newStatus) {
-          setProfileStatus(newStatus);
-        }
+        console.log("[useAuthState] New profile status after auth change:", newStatus);
+        setProfileStatus(newStatus);
 
-        // Only navigate if we're not already on the correct page
-        if (!profile && window.location.pathname !== '/onboarding') {
-          navigate("/onboarding");
-        } else if (profile && window.location.pathname === '/auth') {
-          navigate("/dashboard");
+        // Only navigate if we have finished initialization
+        if (isInitialized) {
+          if (!profile && window.location.pathname !== '/onboarding') {
+            console.log("[useAuthState] No profile found, navigating to onboarding");
+            navigate("/onboarding");
+          } else if (profile && window.location.pathname === '/auth') {
+            console.log("[useAuthState] Profile exists, navigating to dashboard");
+            navigate("/dashboard");
+          }
         }
-      } else if (event === 'SIGNED_OUT') {
-        // Only navigate on actual sign out, not initial load
-        navigate("/auth");
       }
     });
 
     return () => {
       authListener.subscription.unsubscribe();
     };
-  }, [navigate, isAuthenticated, profileStatus]);
+  }, [navigate, isInitialized]);
 
   const handleSignOut = async () => {
     try {
@@ -96,5 +105,5 @@ export const useAuthState = () => {
     }
   };
 
-  return { isAuthenticated, profileStatus, handleSignOut };
+  return { isAuthenticated, profileStatus, isInitialized, handleSignOut };
 };

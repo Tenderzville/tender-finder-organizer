@@ -22,23 +22,25 @@ const Auth = () => {
       try {
         const { data: { session } } = await supabase.auth.getSession();
         if (session) {
-          console.log("Session exists in Auth page, checking profile");
+          console.log("[Auth] Session exists, checking profile");
           const { data: profile } = await supabase
             .from('profiles')
             .select('id')
             .eq('user_id', session.user.id)
             .maybeSingle();
 
-          if (profile) {
-            console.log("Profile exists, redirecting to dashboard");
+          // Only navigate if we're not already on the target route
+          const currentPath = window.location.pathname;
+          if (profile && currentPath === '/auth') {
+            console.log("[Auth] Profile exists, navigating to dashboard");
             navigate("/dashboard");
-          } else {
-            console.log("No profile found, redirecting to onboarding");
+          } else if (!profile && currentPath !== '/onboarding') {
+            console.log("[Auth] No profile found, navigating to onboarding");
             navigate("/onboarding");
           }
         }
       } catch (error) {
-        console.error("Session check error:", error);
+        console.error("[Auth] Session check error:", error);
       } finally {
         setInitialCheckDone(true);
       }
@@ -52,7 +54,7 @@ const Auth = () => {
     if (isLoading) return;
     
     setIsLoading(true);
-    console.log(`Attempting to ${isLogin ? 'sign in' : 'sign up'} with email:`, email);
+    console.log(`[Auth] Attempting to ${isLogin ? 'sign in' : 'sign up'} with email:`, email);
 
     try {
       if (isLogin) {
@@ -62,9 +64,7 @@ const Auth = () => {
         });
 
         if (error) throw error;
-
-        console.log("Sign in successful:", data);
-        // Navigation will be handled by the auth state change listener
+        console.log("[Auth] Sign in successful:", data);
       } else {
         const { data, error } = await supabase.auth.signUp({
           email,
@@ -72,15 +72,14 @@ const Auth = () => {
         });
 
         if (error) throw error;
-
-        console.log("Sign up successful:", data);
+        console.log("[Auth] Sign up successful:", data);
         toast({
           title: "Success",
           description: "Account created successfully. Please check your email to verify your account.",
         });
       }
     } catch (error: any) {
-      console.error("Auth error:", error);
+      console.error("[Auth] Auth error:", error);
       toast({
         title: "Error",
         description: error.message,
