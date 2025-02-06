@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { useToast } from "@/hooks/use-toast";
@@ -13,21 +14,25 @@ export const useAuthState = () => {
 
   useEffect(() => {
     const checkAuth = async () => {
-      const { data: { session } } = await supabase.auth.getSession();
-      const isAuthed = !!session;
-      console.log("Auth check - Session exists:", isAuthed);
-      setIsAuthenticated(isAuthed);
+      try {
+        const { data: { session } } = await supabase.auth.getSession();
+        const isAuthed = !!session;
+        console.log("Initial auth check - Session exists:", isAuthed);
+        setIsAuthenticated(isAuthed);
 
-      if (isAuthed && session) {
-        const { data: profile } = await supabase
-          .from('profiles')
-          .select('id')
-          .eq('user_id', session.user.id)
-          .maybeSingle();
+        if (isAuthed && session) {
+          const { data: profile } = await supabase
+            .from('profiles')
+            .select('id')
+            .eq('user_id', session.user.id)
+            .maybeSingle();
 
-        const status = profile ? 'exists' : 'missing';
-        console.log("Profile status:", status);
-        setProfileStatus(status);
+          const status = profile ? 'exists' : 'missing';
+          console.log("Initial profile status check:", status);
+          setProfileStatus(status);
+        }
+      } catch (error) {
+        console.error("Auth check error:", error);
       }
     };
 
@@ -35,7 +40,12 @@ export const useAuthState = () => {
 
     const { data: authListener } = supabase.auth.onAuthStateChange(async (event, session) => {
       console.log("Auth state changed:", event, !!session);
-      setIsAuthenticated(!!session);
+      
+      // Prevent unnecessary state updates if the auth state hasn't changed
+      const newAuthState = !!session;
+      if (isAuthenticated !== newAuthState) {
+        setIsAuthenticated(newAuthState);
+      }
 
       if (session) {
         const { data: profile } = await supabase
@@ -44,12 +54,19 @@ export const useAuthState = () => {
           .eq('user_id', session.user.id)
           .maybeSingle();
 
-        if (!profile) {
+        const newStatus = profile ? 'exists' : 'missing';
+        if (profileStatus !== newStatus) {
+          setProfileStatus(newStatus);
+        }
+
+        // Only navigate if we're not already on the correct page
+        if (!profile && window.location.pathname !== '/onboarding') {
           navigate("/onboarding");
-        } else {
+        } else if (profile && window.location.pathname === '/auth') {
           navigate("/dashboard");
         }
-      } else {
+      } else if (event === 'SIGNED_OUT') {
+        // Only navigate on actual sign out, not initial load
         navigate("/auth");
       }
     });
@@ -57,7 +74,7 @@ export const useAuthState = () => {
     return () => {
       authListener.subscription.unsubscribe();
     };
-  }, [navigate]);
+  }, [navigate, isAuthenticated, profileStatus]);
 
   const handleSignOut = async () => {
     try {

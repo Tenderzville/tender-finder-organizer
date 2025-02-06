@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
@@ -14,15 +15,35 @@ const Auth = () => {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [isLoading, setIsLoading] = useState(false);
+  const [initialCheckDone, setInitialCheckDone] = useState(false);
 
   useEffect(() => {
     const checkSession = async () => {
-      const { data: { session } } = await supabase.auth.getSession();
-      if (session) {
-        console.log("Session exists, redirecting to dashboard");
-        navigate("/dashboard");
+      try {
+        const { data: { session } } = await supabase.auth.getSession();
+        if (session) {
+          console.log("Session exists in Auth page, checking profile");
+          const { data: profile } = await supabase
+            .from('profiles')
+            .select('id')
+            .eq('user_id', session.user.id)
+            .maybeSingle();
+
+          if (profile) {
+            console.log("Profile exists, redirecting to dashboard");
+            navigate("/dashboard");
+          } else {
+            console.log("No profile found, redirecting to onboarding");
+            navigate("/onboarding");
+          }
+        }
+      } catch (error) {
+        console.error("Session check error:", error);
+      } finally {
+        setInitialCheckDone(true);
       }
     };
+    
     checkSession();
   }, [navigate]);
 
@@ -43,7 +64,7 @@ const Auth = () => {
         if (error) throw error;
 
         console.log("Sign in successful:", data);
-        navigate("/dashboard");
+        // Navigation will be handled by the auth state change listener
       } else {
         const { data, error } = await supabase.auth.signUp({
           email,
@@ -69,6 +90,14 @@ const Auth = () => {
       setIsLoading(false);
     }
   };
+
+  if (!initialCheckDone) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <Loader2 className="h-8 w-8 animate-spin" />
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-gray-50 flex items-center justify-center py-12 px-4 sm:px-6 lg:px-8">
