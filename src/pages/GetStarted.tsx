@@ -3,7 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useToast } from "@/hooks/use-toast";
-import { Mail, Gift, Video, Eye, Award, ArrowRight, Share2, Facebook } from "lucide-react";
+import { Mail, Gift, Video, Eye, Award, Share2, Facebook } from "lucide-react";
 import {
   Card,
   CardContent,
@@ -75,7 +75,7 @@ const GetStarted = () => {
               <div className="space-y-2">
                 <Facebook className="h-8 w-8 mx-auto text-blue-600" />
                 <h3 className="font-medium">Share Socially</h3>
-                <p className="text-sm text-gray-600">1000 points for social media shares</p>
+                <p className="text-sm text-gray-600">250 points for social media shares</p>
               </div>
             </div>
             <div className="mt-8 text-center">
