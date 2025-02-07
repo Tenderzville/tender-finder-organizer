@@ -1,4 +1,3 @@
-
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
 import * as cheerio from "https://esm.sh/cheerio@1.0.0-rc.12"
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.7.1'
@@ -15,38 +14,29 @@ async function scrapeTenders() {
   try {
     const supabase = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',
-      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '',
-      {
-        auth: {
-          persistSession: false
-        }
-      }
+      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
     )
 
-    // Define multiple sources to increase tender coverage
+    // Updated sources with publicly accessible tender websites
     const sources = [
       {
-        url: 'https://tenders.go.ke',
-        baseUrl: 'https://tenders.go.ke',
+        url: 'https://www.tendersonline.co.ke/Tenders',
         selectors: {
           tenderList: '.tender-item',
           title: '.tender-title',
-          deadline: '.tender-deadline',
-          description: '.tender-description',
-          requirements: '.tender-requirements',
-          organization: '.organization-name'
+          deadline: '.deadline-date',
+          description: '.description',
+          organization: '.organization'
         }
       },
       {
-        url: 'https://supplier.treasury.go.ke/site/tenders.go/public/tenders',
-        baseUrl: 'https://supplier.treasury.go.ke',
+        url: 'https://www.globaltenders.com/tenders-kenya.php',
         selectors: {
           tenderList: '.tender-listing',
-          title: 'h3',
-          deadline: '.deadline-date',
-          description: '.description',
-          requirements: '.requirements',
-          organization: '.procuring-entity'
+          title: '.tender-title',
+          deadline: '.closing-date',
+          description: '.tender-desc',
+          organization: '.department'
         }
       }
     ]
@@ -60,9 +50,12 @@ async function scrapeTenders() {
       try {
         const response = await fetch(source.url, {
           headers: {
-            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
-          },
-          redirect: 'follow'
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36',
+            'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
+            'Accept-Language': 'en-US,en;q=0.5',
+            'Connection': 'keep-alive',
+            'Upgrade-Insecure-Requests': '1'
+          }
         })
 
         if (!response.ok) {
@@ -82,34 +75,49 @@ async function scrapeTenders() {
             const title = $element.find(source.selectors.title).text().trim()
             const deadlineText = $element.find(source.selectors.deadline).text().trim()
             const description = $element.find(source.selectors.description).text().trim()
-            const requirements = $element.find(source.selectors.requirements).text().trim() || 'Contact organization for detailed requirements'
             const organization = $element.find(source.selectors.organization).text().trim()
-            const tenderUrl = new URL($element.find('a').first().attr('href') || '', source.baseUrl).toString()
 
             console.log('Processing tender:', { title, deadlineText, organization })
 
             if (title && deadlineText) {
-              // Parse deadline date - handle multiple date formats
+              // Parse deadline date with multiple format support
               let deadline
               try {
-                // Try parsing various date formats
-                deadline = new Date(deadlineText).toISOString()
+                // Try different date formats
+                const dateFormats = [
+                  'DD/MM/YYYY',
+                  'YYYY-MM-DD',
+                  'MM/DD/YYYY',
+                  'DD-MM-YYYY'
+                ]
+
+                for (const format of dateFormats) {
+                  const parsedDate = new Date(deadlineText)
+                  if (!isNaN(parsedDate.getTime())) {
+                    deadline = parsedDate.toISOString()
+                    break
+                  }
+                }
+
+                if (!deadline) {
+                  console.error(`Could not parse date: ${deadlineText}`)
+                  return
+                }
               } catch (error) {
                 console.error(`Error parsing date ${deadlineText}:`, error)
-                return // Skip this tender if date parsing fails
+                return
               }
 
               // Only add future tenders
               if (new Date(deadline) > new Date()) {
                 const tender = {
-                  title: title.substring(0, 255), // Ensure title fits in DB
+                  title: title.substring(0, 255),
                   description: description || 'No description provided',
-                  requirements: requirements,
+                  requirements: 'Contact organization for detailed requirements',
                   deadline,
                   contact_info: organization || 'Contact procurement office',
                   category: 'Government',
                   location: 'Kenya',
-                  tender_url: tenderUrl,
                   created_at: new Date().toISOString()
                 }
 
@@ -133,12 +141,12 @@ async function scrapeTenders() {
     console.log(`Scraped ${tenders.length} total tenders from ${successfulSources} sources`)
 
     if (tenders.length > 0) {
-      const { data, error } = await supabase
+      const { error } = await supabase
         .from('tenders')
         .upsert(
           tenders,
           { 
-            onConflict: 'tender_url',
+            onConflict: 'title',
             ignoreDuplicates: true 
           }
         )
