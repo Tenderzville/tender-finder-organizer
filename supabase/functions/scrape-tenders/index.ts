@@ -59,26 +59,32 @@ const sources: TenderSource[] = [
 
 // Utility functions
 function createSupabaseClient() {
-  return createClient(
+  const client = createClient(
     Deno.env.get('SUPABASE_URL') ?? '',
     Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
   );
+  console.log('Supabase client created successfully');
+  return client;
 }
 
 function parseDate(dateText: string): string | null {
+  console.log('Attempting to parse date:', dateText);
   try {
     const parsedDate = new Date(dateText);
     if (!isNaN(parsedDate.getTime())) {
+      console.log('Date parsed successfully:', parsedDate.toISOString());
       return parsedDate.toISOString();
     }
+    console.log('Invalid date format:', dateText);
     return null;
-  } catch {
-    console.error(`Failed to parse date: ${dateText}`);
+  } catch (error) {
+    console.error(`Failed to parse date: ${dateText}`, error);
     return null;
   }
 }
 
 async function fetchSourceWithRetry(url: string, retries = 3): Promise<string> {
+  console.log(`Attempting to fetch ${url}, retries left: ${retries}`);
   for (let i = 0; i < retries; i++) {
     try {
       const response = await fetch(url, {
@@ -95,7 +101,9 @@ async function fetchSourceWithRetry(url: string, retries = 3): Promise<string> {
         throw new Error(`HTTP error! status: ${response.status}`);
       }
 
-      return await response.text();
+      const html = await response.text();
+      console.log(`Successfully fetched ${url}, HTML length: ${html.length}`);
+      return html;
     } catch (error) {
       console.error(`Attempt ${i + 1} failed for ${url}:`, error);
       if (i === retries - 1) throw error;
@@ -110,6 +118,8 @@ async function scrapeTenderFromElement($element: cheerio.Cheerio, selectors: Ten
   const deadlineText = $element.find(selectors.deadline).text().trim();
   const description = $element.find(selectors.description).text().trim();
   const organization = $element.find(selectors.organization).text().trim();
+
+  console.log('Scraped tender data:', { title, deadlineText, description: description.substring(0, 100) + '...' });
 
   if (!title || !deadlineText) {
     console.log('Skipping tender due to missing required fields:', { title, deadlineText });
@@ -149,19 +159,23 @@ async function scrapeTenders() {
       const html = await fetchSourceWithRetry(source.url);
       const $ = cheerio.load(html);
       
-      console.log(`Found ${$(source.selectors.tenderList).length} potential tenders`);
+      const tenderElements = $(source.selectors.tenderList);
+      console.log(`Found ${tenderElements.length} potential tenders`);
 
-      for (const element of $(source.selectors.tenderList).toArray()) {
+      for (const element of tenderElements.toArray()) {
         try {
           const tender = await scrapeTenderFromElement($(element), source.selectors);
-          if (tender) tenders.push(tender);
+          if (tender) {
+            console.log('Successfully scraped tender:', tender.title);
+            tenders.push(tender);
+          }
         } catch (error) {
           console.error('Error processing tender element:', error);
         }
       }
 
       successfulSources++;
-      console.log(`Successfully scraped ${$(source.selectors.tenderList).length} tenders from ${source.url}`);
+      console.log(`Successfully scraped ${tenderElements.length} tenders from ${source.url}`);
     } catch (error) {
       console.error(`Failed to scrape ${source.url}:`, error);
     }
@@ -169,16 +183,20 @@ async function scrapeTenders() {
 
   if (tenders.length > 0) {
     try {
-      const { error } = await supabase
+      console.log(`Attempting to insert ${tenders.length} tenders into database`);
+      const { error, data } = await supabase
         .from('tenders')
         .upsert(tenders, {
           onConflict: 'title',
           ignoreDuplicates: true
         });
 
-      if (error) throw error;
+      if (error) {
+        console.error('Database error:', error);
+        throw error;
+      }
       console.log(`Successfully inserted/updated ${tenders.length} tenders`);
-      return { success: true, tenders_scraped: tenders.length };
+      return { success: true, tenders_scraped: tenders.length, data };
     } catch (error) {
       console.error('Error inserting tenders:', error);
       throw error;
@@ -201,6 +219,7 @@ serve(async (req) => {
   }
 
   try {
+    console.log('Manual scraping triggered via HTTP endpoint');
     const result = await scrapeTenders();
     return new Response(
       JSON.stringify(result),
