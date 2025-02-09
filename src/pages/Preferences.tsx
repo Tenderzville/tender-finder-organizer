@@ -1,13 +1,19 @@
 
 import { useQuery } from "@tanstack/react-query";
 import { useNavigate } from "react-router-dom";
-import { Bell, Loader2, ArrowLeft } from "lucide-react";
+import { Bell, Loader2, ArrowLeft, Mail } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
 import { toast } from "@/components/ui/use-toast";
 import { Navigation } from "@/components/Navigation";
+import { UserProfile } from "@/types/user";
+
+interface NotificationPreferences {
+  push: boolean;
+  email: boolean;
+}
 
 const Preferences = () => {
   const navigate = useNavigate();
@@ -25,17 +31,19 @@ const Preferences = () => {
         .single();
 
       if (error) throw error;
-      return profile?.notification_preferences || { push: true, email: true };
+      
+      const defaultPreferences: NotificationPreferences = { push: true, email: true };
+      return (profile?.notification_preferences as NotificationPreferences) || defaultPreferences;
     },
   });
 
-  const updatePreferences = async (key: 'push' | 'email', value: boolean) => {
+  const updatePreferences = async (key: keyof NotificationPreferences, value: boolean) => {
     try {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error('Not authenticated');
 
-      const newPreferences = {
-        ...(preferences || {}),
+      const newPreferences: NotificationPreferences = {
+        ...(preferences || { push: true, email: true }),
         [key]: value,
       };
 
