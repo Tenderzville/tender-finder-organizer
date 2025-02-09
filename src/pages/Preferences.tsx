@@ -15,6 +15,13 @@ interface NotificationPreferences {
   email: boolean;
 }
 
+// Type guard to verify the shape of notification preferences
+function isValidNotificationPreferences(data: unknown): data is NotificationPreferences {
+  if (!data || typeof data !== 'object') return false;
+  const pref = data as Record<string, unknown>;
+  return typeof pref.push === 'boolean' && typeof pref.email === 'boolean';
+}
+
 const Preferences = () => {
   const navigate = useNavigate();
 
@@ -33,7 +40,15 @@ const Preferences = () => {
       if (error) throw error;
       
       const defaultPreferences: NotificationPreferences = { push: true, email: true };
-      return (profile?.notification_preferences as NotificationPreferences) || defaultPreferences;
+      
+      if (!profile?.notification_preferences) {
+        return defaultPreferences;
+      }
+
+      // Validate the preferences before returning
+      return isValidNotificationPreferences(profile.notification_preferences)
+        ? profile.notification_preferences
+        : defaultPreferences;
     },
   });
 
