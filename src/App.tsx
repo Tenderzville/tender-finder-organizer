@@ -13,6 +13,7 @@ import Auth from "./pages/Auth";
 import NotFound from "./pages/NotFound";
 import GetStarted from "./pages/GetStarted";
 import Dashboard from "./pages/Dashboard";
+import Preferences from "./pages/Preferences";
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -26,7 +27,6 @@ const queryClient = new QueryClient({
 const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
   const { isAuthenticated, profileStatus, isInitialized } = useAuthState();
   
-  // Show loading state until we've checked auth status
   if (!isInitialized) {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
@@ -59,6 +59,11 @@ const App = () => (
           <Route path="/dashboard" element={
             <ProtectedRoute>
               <Dashboard />
+            </ProtectedRoute>
+          } />
+          <Route path="/preferences" element={
+            <ProtectedRoute>
+              <Preferences />
             </ProtectedRoute>
           } />
           <Route path="/get-started" element={<GetStarted />} />
