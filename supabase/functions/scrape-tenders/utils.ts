@@ -1,3 +1,4 @@
+
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.7.1';
 
 export const corsHeaders = {
@@ -19,11 +20,21 @@ export function createSupabaseClient() {
 export function parseDate(dateText: string): string | null {
   console.log('Attempting to parse date:', dateText);
   try {
-    const parsedDate = new Date(dateText);
+    // Try standard ISO format first
+    let parsedDate = new Date(dateText);
+    
+    // If invalid, try DD/MM/YYYY format
+    if (isNaN(parsedDate.getTime())) {
+      const [day, month, year] = dateText.split(/[\/\-\.]/);
+      parsedDate = new Date(parseInt(year), parseInt(month) - 1, parseInt(day));
+    }
+    
+    // Verify the date is valid
     if (!isNaN(parsedDate.getTime())) {
       console.log('Date parsed successfully:', parsedDate.toISOString());
       return parsedDate.toISOString();
     }
+    
     console.log('Invalid date format:', dateText);
     return null;
   } catch (error) {

@@ -89,6 +89,36 @@ export type Database = {
         }
         Relationships: []
       }
+      scraping_logs: {
+        Row: {
+          created_at: string | null
+          error_message: string | null
+          id: number
+          records_found: number | null
+          records_inserted: number | null
+          source: string
+          status: string
+        }
+        Insert: {
+          created_at?: string | null
+          error_message?: string | null
+          id?: number
+          records_found?: number | null
+          records_inserted?: number | null
+          source: string
+          status: string
+        }
+        Update: {
+          created_at?: string | null
+          error_message?: string | null
+          id?: number
+          records_found?: number | null
+          records_inserted?: number | null
+          source?: string
+          status?: string
+        }
+        Relationships: []
+      }
       social_shares: {
         Row: {
           created_at: string
@@ -268,13 +298,15 @@ export type Database = {
           contact_info: string | null
           created_at: string | null
           deadline: string
-          description: string
+          description: string | null
           fees: string | null
           id: number
+          last_scrape_attempt: string | null
           location: string
+          parsing_error: string | null
           points_required: number | null
           prerequisites: string | null
-          requirements: string
+          requirements: string | null
           subcategory: string | null
           tender_url: string | null
           title: string
@@ -284,13 +316,15 @@ export type Database = {
           contact_info?: string | null
           created_at?: string | null
           deadline: string
-          description: string
+          description?: string | null
           fees?: string | null
           id?: never
+          last_scrape_attempt?: string | null
           location?: string
+          parsing_error?: string | null
           points_required?: number | null
           prerequisites?: string | null
-          requirements: string
+          requirements?: string | null
           subcategory?: string | null
           tender_url?: string | null
           title: string
@@ -300,13 +334,15 @@ export type Database = {
           contact_info?: string | null
           created_at?: string | null
           deadline?: string
-          description?: string
+          description?: string | null
           fees?: string | null
           id?: never
+          last_scrape_attempt?: string | null
           location?: string
+          parsing_error?: string | null
           points_required?: number | null
           prerequisites?: string | null
-          requirements?: string
+          requirements?: string | null
           subcategory?: string | null
           tender_url?: string | null
           title?: string
