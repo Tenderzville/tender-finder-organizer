@@ -13,22 +13,26 @@ import { SavedTendersCard } from "@/components/dashboard/SavedTenders";
 import { Button } from "@/components/ui/button";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { useToast } from "@/hooks/use-toast";
+import { useAuthState } from "@/hooks/useAuthState";
 
 const Dashboard = () => {
   const navigate = useNavigate();
   const { toast } = useToast();
   const queryClient = useQueryClient();
-  const [isSessionChecked, setIsSessionChecked] = useState(false);
+  const { isAuthenticated, isInitialized } = useAuthState();
+  const [sessionChecked, setSessionChecked] = useState(false);
 
-  // Immediately check session before any other operations
+  console.log("Dashboard rendering - Auth state:", { isAuthenticated, isInitialized });
+
+  // Force explicit session check to prevent race conditions
   useEffect(() => {
     const checkSession = async () => {
+      console.log("Performing explicit session check");
       try {
-        console.log("Initial session check...");
-        const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+        const { data, error } = await supabase.auth.getSession();
         
-        if (sessionError) {
-          console.error("Session check error:", sessionError);
+        if (error) {
+          console.error("Session check error:", error);
           toast({
             title: "Authentication Error",
             description: "There was a problem verifying your session. Please sign in again.",
@@ -38,62 +42,62 @@ const Dashboard = () => {
           return;
         }
         
-        if (!session) {
-          console.log("No active session found, redirecting to auth");
-          toast({
-            title: "Authentication Required",
-            description: "Please sign in to access the dashboard",
-            variant: "destructive",
-          });
+        if (!data.session) {
+          console.log("No active session found in explicit check, redirecting to auth");
           navigate("/auth");
           return;
         }
         
-        console.log("Valid session found for user:", session.user.id);
-        setIsSessionChecked(true);
-      } catch (error) {
-        console.error("Failed to check session:", error);
-        toast({
-          title: "Authentication Error",
-          description: "There was a problem checking your session. Please try again.",
-          variant: "destructive",
-        });
+        console.log("Session verified for user:", data.session.user.id);
+        setSessionChecked(true);
+      } catch (err) {
+        console.error("Explicit session check failed:", err);
         navigate("/auth");
       }
     };
+    
+    if (isInitialized) {
+      if (!isAuthenticated) {
+        console.log("User not authenticated, redirecting to auth");
+        navigate("/auth");
+      } else {
+        // Even if authenticated via useAuthState, still do explicit check
+        checkSession();
+      }
+    }
+  }, [isAuthenticated, isInitialized, navigate, toast]);
 
-    checkSession();
-  }, [navigate, toast]);
-
-  // Only proceed with user data query if session is valid
+  // User data query
   const { 
     data: userData, 
     isLoading: userLoading, 
-    error: userError, 
-    refetch: refetchUser 
+    error: userError,
+    refetch: refetchUser
   } = useQuery({
-    queryKey: ['user'],
+    queryKey: ['dashboard-user'],
     queryFn: async () => {
-      console.log("Fetching user data...");
+      console.log("Fetching user data for dashboard...");
       const { data: { user }, error } = await supabase.auth.getUser();
+      
       if (error) {
         console.error("Error fetching user:", error);
         throw error;
       }
+      
       if (!user) {
-        console.log("No user found, redirecting to auth");
-        navigate("/auth");
-        return null;
+        console.log("No user found in getUser call");
+        throw new Error("User not found");
       }
-      console.log("User data fetched successfully:", user);
+      
+      console.log("User data fetched successfully for dashboard:", user.id);
       return user;
     },
-    enabled: isSessionChecked, // Only run query if session is valid
-    retry: 3,
-    retryDelay: 1000,
+    enabled: sessionChecked, // Only run this query after session is confirmed
+    retry: 1,
+    staleTime: 60 * 1000, // 1 minute
   });
 
-  // Check available tenders
+  // Tenders count query
   const { 
     data: tendersCount, 
     error: tendersError, 
@@ -112,41 +116,20 @@ const Dashboard = () => {
           console.error("Error checking tenders:", error);
           throw error;
         }
+
         console.log("Available tenders count:", count);
         return count || 0;
       } catch (err) {
         console.error("Failed to check tenders:", err);
-        return 0;
+        throw err;
       }
     },
-    enabled: !!userData, // Only run query if user data is available
+    enabled: !!userData, // Only run this query after user data is loaded
     retry: 2,
+    staleTime: 5 * 60 * 1000, // 5 minutes
   });
 
-  // Handle session changes
-  useEffect(() => {
-    if (!isSessionChecked) return; // Skip if initial session check not completed
-    
-    console.log("Setting up auth state change listener");
-    const { data: authListener } = supabase.auth.onAuthStateChange(
-      async (event, session) => {
-        console.log("Auth state changed:", event);
-        if (event === "SIGNED_OUT") {
-          queryClient.clear();
-          navigate("/auth");
-        } else if (event === "SIGNED_IN" && session) {
-          refetchUser();
-        }
-      }
-    );
-
-    return () => {
-      console.log("Cleaning up auth listener");
-      authListener.subscription.unsubscribe();
-    };
-  }, [navigate, refetchUser, queryClient, isSessionChecked]);
-
-  // Trigger tender scraping if no tenders are found
+  // Trigger tender scraping manually
   const triggerTenderScrape = async () => {
     try {
       toast({
@@ -157,124 +140,162 @@ const Dashboard = () => {
       const { data, error } = await supabase.functions.invoke('scrape-tenders');
       
       if (error) {
-        console.error('Error triggering tender scrape:', error);
+        console.error('Error invoking scrape-tenders function:', error);
         toast({
           title: "Error",
           description: "Failed to update tenders. Please try again.",
           variant: "destructive",
         });
-      } else {
-        console.log('Tender scrape response:', data);
-        toast({
-          title: "Tenders Updated",
-          description: `Found ${data.tenders_scraped || 0} new tenders.`,
-        });
-        refetchTenders();
+        return;
       }
+      
+      console.log('Tender scrape response:', data);
+      
+      if (data.success === false) {
+        toast({
+          title: "Error",
+          description: data.error || "Failed to update tenders. Please try again.",
+          variant: "destructive",
+        });
+        return;
+      }
+      
+      toast({
+        title: "Tenders Updated",
+        description: `Found ${data.tenders_scraped || 0} new tenders.`,
+      });
+      
+      // Refetch the tenders count
+      refetchTenders();
     } catch (error) {
-      console.error('Error triggering tender scrape:', error);
+      console.error('Error in triggerTenderScrape:', error);
       toast({
         title: "Error",
-        description: "Failed to update tenders. Please try again.",
+        description: "Failed to update tenders. Network error or function timeout.",
         variant: "destructive",
       });
     }
   };
 
-  // Show loading state
-  if (!isSessionChecked || userLoading) {
+  // LOADING STATE
+  if (!isInitialized || !sessionChecked || userLoading) {
     return (
       <div className="min-h-screen bg-gray-50">
         <Navigation />
-        <main className="max-w-7xl mx-auto py-6 sm:px-6 lg:px-8">
+        <main className="max-w-7xl mx-auto py-6 px-4 sm:px-6 lg:px-8">
           <div className="flex flex-col items-center justify-center h-64 space-y-4">
             <Loader2 className="h-8 w-8 animate-spin text-primary" />
             <p className="text-gray-500">Loading your dashboard...</p>
+            <p className="text-sm text-gray-400">
+              {!isInitialized ? "Initializing..." : !sessionChecked ? "Verifying session..." : "Loading profile..."}
+            </p>
           </div>
         </main>
       </div>
     );
   }
 
-  // Show error state
-  if (userError) {
+  // ERROR STATE
+  if (userError || !isAuthenticated) {
     return (
       <div className="min-h-screen bg-gray-50">
         <Navigation />
-        <main className="max-w-7xl mx-auto py-6 sm:px-6 lg:px-8">
+        <main className="max-w-7xl mx-auto py-6 px-4 sm:px-6 lg:px-8">
           <Alert variant="destructive" className="mb-4">
             <AlertCircle className="h-4 w-4" />
-            <AlertTitle>Error</AlertTitle>
+            <AlertTitle>Authentication Error</AlertTitle>
             <AlertDescription>
-              Failed to load your profile. {userError.message || "Please try again later."}
+              {userError ? `Failed to load your profile: ${userError.message}` : "You need to be signed in to view this page."}
             </AlertDescription>
           </Alert>
-          <Button onClick={() => refetchUser()} className="mx-auto block">
-            Retry
-          </Button>
+          <div className="flex justify-center mt-4">
+            <Button onClick={() => navigate("/auth")} className="mx-2">
+              Sign In
+            </Button>
+            {userError && (
+              <Button variant="outline" onClick={() => refetchUser()} className="mx-2">
+                Retry
+              </Button>
+            )}
+          </div>
         </main>
       </div>
     );
   }
 
-  // Show not authenticated state
+  // USER DATA MISSING STATE
   if (!userData) {
     return (
       <div className="min-h-screen bg-gray-50">
         <Navigation />
-        <main className="max-w-7xl mx-auto py-6 sm:px-6 lg:px-8">
+        <main className="max-w-7xl mx-auto py-6 px-4 sm:px-6 lg:px-8">
           <div className="text-center">
             <User className="mx-auto h-12 w-12 text-gray-400" />
-            <h2 className="mt-2 text-xl font-semibold">Please sign in to view your dashboard</h2>
-            <Button onClick={() => navigate("/auth")} className="mt-4">
-              Sign In
-            </Button>
+            <h2 className="mt-2 text-xl font-semibold">User Profile Not Found</h2>
+            <p className="mt-2 text-gray-500">We couldn't find your user profile information.</p>
+            <div className="mt-4 flex justify-center gap-4">
+              <Button onClick={() => navigate("/auth")}>
+                Sign In Again
+              </Button>
+              <Button variant="outline" onClick={() => refetchUser()}>
+                Retry
+              </Button>
+            </div>
           </div>
         </main>
       </div>
     );
   }
 
-  console.log("Rendering dashboard with user:", userData.id);
+  // SUCCESS STATE - RENDER DASHBOARD
+  console.log("Rendering dashboard content with user:", userData.id);
 
   return (
     <div className="min-h-screen bg-gray-50">
       <Navigation />
       <TenderNotification />
       
-      <main className="max-w-7xl mx-auto py-6 sm:px-6 lg:px-8">
-        <div className="px-4 py-6 sm:px-0">
-          {tendersError && (
-            <Alert variant="destructive" className="mb-6">
-              <AlertCircle className="h-4 w-4" />
-              <AlertTitle>Database Error</AlertTitle>
-              <AlertDescription>
-                Unable to check available tenders. Please refresh the page or contact support.
-              </AlertDescription>
-            </Alert>
-          )}
-          
-          {!tendersLoading && tendersCount === 0 && (
-            <Alert className="mb-6">
-              <AlertCircle className="h-4 w-4" />
-              <AlertTitle>No Tenders Available</AlertTitle>
-              <AlertDescription className="flex items-center justify-between">
-                <span>We're currently gathering tender data. Please check back soon.</span>
-                <Button size="sm" onClick={triggerTenderScrape} variant="outline" className="ml-2 flex items-center gap-1">
-                  <RefreshCw className="h-3 w-3" />
-                  Update Now
-                </Button>
-              </AlertDescription>
-            </Alert>
-          )}
-          
-          <UserProfileCard userId={userData.id} />
-          
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mt-6">
-            <PointsCard userId={userData.id} />
-            <NotificationPreferencesCard />
-            <SavedTendersCard userId={userData.id} />
-          </div>
+      <main className="max-w-7xl mx-auto py-6 px-4 sm:px-6 lg:px-8">
+        <div className="mb-6">
+          <h1 className="text-2xl font-bold text-gray-900">Dashboard</h1>
+          <p className="text-gray-500">Welcome back! Here's an overview of your account.</p>
+        </div>
+
+        {tendersError && (
+          <Alert variant="destructive" className="mb-6">
+            <AlertCircle className="h-4 w-4" />
+            <AlertTitle>Database Error</AlertTitle>
+            <AlertDescription>
+              Unable to check available tenders. Please refresh the page or contact support.
+            </AlertDescription>
+          </Alert>
+        )}
+        
+        {!tendersLoading && tendersCount === 0 && (
+          <Alert className="mb-6">
+            <AlertCircle className="h-4 w-4" />
+            <AlertTitle>No Tenders Available</AlertTitle>
+            <AlertDescription className="flex justify-between items-center">
+              <span>We're currently gathering tender data for you.</span>
+              <Button 
+                size="sm" 
+                onClick={triggerTenderScrape} 
+                variant="outline" 
+                className="ml-2 flex items-center gap-1"
+              >
+                <RefreshCw className="h-3 w-3" />
+                Update Now
+              </Button>
+            </AlertDescription>
+          </Alert>
+        )}
+        
+        <UserProfileCard userId={userData.id} />
+        
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mt-6">
+          <PointsCard userId={userData.id} />
+          <NotificationPreferencesCard />
+          <SavedTendersCard userId={userData.id} />
         </div>
       </main>
     </div>
