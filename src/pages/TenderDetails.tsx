@@ -121,7 +121,7 @@ const TenderDetails = () => {
                     Expired
                   </Badge>
                 ) : (
-                  <Badge variant="success" className="flex items-center bg-green-500">
+                  <Badge variant="secondary" className="flex items-center bg-green-500">
                     <Check className="h-3 w-3 mr-1" />
                     Active
                   </Badge>

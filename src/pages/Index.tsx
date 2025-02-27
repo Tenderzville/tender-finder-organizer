@@ -23,11 +23,13 @@ const Index = () => {
     deadline: "",
   });
   const [isRefreshing, setIsRefreshing] = useState(false);
+  const [initialScrapeDone, setInitialScrapeDone] = useState(false);
 
   // Function to trigger manual tender scraping
   const refreshTenders = async () => {
     setIsRefreshing(true);
     try {
+      console.log('Calling scrape-tenders function...');
       // Call the scrape-tenders function
       const { data, error } = await supabase.functions.invoke('scrape-tenders');
       
@@ -42,7 +44,7 @@ const Index = () => {
         console.log('Tender scrape response:', data);
         toast({
           title: "Tenders Refreshed",
-          description: `Found ${data.tenders_scraped} new tenders.`,
+          description: `Found ${data.tenders_scraped} new tenders. Total tenders: ${data.total_tenders}`,
         });
         // Refetch the tenders
         refetch();
@@ -56,13 +58,15 @@ const Index = () => {
       });
     } finally {
       setIsRefreshing(false);
+      setInitialScrapeDone(true);
     }
   };
 
   const { 
     data: tenders = [], 
     isLoading,
-    refetch
+    refetch,
+    isError
   } = useQuery({
     queryKey: ["tenders", filters],
     queryFn: async () => {
@@ -112,14 +116,19 @@ const Index = () => {
         }
       }
 
-      const { data, error } = await query;
+      const { data, error, count } = await query;
 
       if (error) {
         console.error("Error fetching tenders:", error);
         throw error;
       }
 
-      console.log(`Retrieved ${data.length} tenders from database`);
+      console.log(`Retrieved ${data?.length || 0} tenders from database`);
+      
+      if (!data || data.length === 0) {
+        console.log('No tenders found with current filters');
+        return [];
+      }
       
       return data.map(tender => ({
         id: tender.id,
@@ -133,20 +142,42 @@ const Index = () => {
         tender_url: tender.tender_url
       }));
     },
+    staleTime: 1000 * 60 * 5, // 5 minutes
   });
 
   // Check if we have tenders on initial load
   useEffect(() => {
-    if (!isLoading && tenders.length === 0) {
-      // If no tenders are found on the initial load, try to scrape some
-      const initialScrape = async () => {
-        console.log("No tenders found, starting initial scrape");
-        await refreshTenders();
-      };
-      
-      initialScrape();
-    }
-  }, [isLoading, tenders.length]);
+    const checkForTenders = async () => {
+      if (!isLoading && !initialScrapeDone) {
+        // Check how many tenders are in the database
+        const { count, error } = await supabase
+          .from("tenders")
+          .select("*", { count: 'exact', head: true });
+        
+        console.log(`Database has ${count || 0} total tenders`);
+        
+        if (!count || count === 0) {
+          // If no tenders are found on the initial load, scrape some
+          console.log("No tenders found in database, starting initial scrape");
+          await refreshTenders();
+        } else {
+          setInitialScrapeDone(true);
+        }
+      }
+    };
+    
+    checkForTenders();
+  }, [isLoading]);
+
+  useEffect(() => {
+    // Force a refresh every hour
+    const intervalId = setInterval(() => {
+      console.log('Running scheduled tender refresh');
+      refreshTenders();
+    }, 1000 * 60 * 60); // 1 hour
+    
+    return () => clearInterval(intervalId);
+  }, []);
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -199,7 +230,9 @@ const Index = () => {
                 <div className="text-center py-8 bg-white rounded-lg shadow">
                   <h3 className="text-lg font-medium text-gray-900">No tenders found</h3>
                   <p className="mt-2 text-sm text-gray-500">
-                    Try adjusting your filters or check back later for new opportunities.
+                    {isError ? 
+                      "There was an error fetching tenders." : 
+                      "Try adjusting your filters or check back later for new opportunities."}
                   </p>
                   <Button 
                     onClick={refreshTenders} 
@@ -214,7 +247,7 @@ const Index = () => {
                     ) : (
                       <>
                         <RefreshCw className="h-4 w-4 mr-2" />
-                        Try Again
+                        {isError ? "Try Again" : "Refresh Tenders"}
                       </>
                     )}
                   </Button>
