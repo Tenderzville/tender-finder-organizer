@@ -1,4 +1,5 @@
-import { useState } from "react";
+
+import { useState, useEffect } from "react";
 import { Navigation } from "@/components/Navigation";
 import { TenderFilters } from "@/components/TenderFilters";
 import { TenderList } from "@/components/tenders/TenderList";
@@ -8,8 +9,12 @@ import { SocialShare } from "@/components/social/SocialShare";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { format } from "date-fns";
+import { Button } from "@/components/ui/button";
+import { Loader2, RefreshCw } from "lucide-react";
+import { useToast } from "@/hooks/use-toast";
 
 const Index = () => {
+  const { toast } = useToast();
   const [filters, setFilters] = useState({
     search: "",
     category: "",
@@ -17,8 +22,48 @@ const Index = () => {
     valueRange: "",
     deadline: "",
   });
+  const [isRefreshing, setIsRefreshing] = useState(false);
 
-  const { data: tenders = [], isLoading } = useQuery({
+  // Function to trigger manual tender scraping
+  const refreshTenders = async () => {
+    setIsRefreshing(true);
+    try {
+      // Call the scrape-tenders function
+      const { data, error } = await supabase.functions.invoke('scrape-tenders');
+      
+      if (error) {
+        console.error('Error triggering tender scrape:', error);
+        toast({
+          title: "Error",
+          description: "Failed to refresh tenders. Please try again.",
+          variant: "destructive",
+        });
+      } else {
+        console.log('Tender scrape response:', data);
+        toast({
+          title: "Tenders Refreshed",
+          description: `Found ${data.tenders_scraped} new tenders.`,
+        });
+        // Refetch the tenders
+        refetch();
+      }
+    } catch (error) {
+      console.error('Error triggering tender scrape:', error);
+      toast({
+        title: "Error",
+        description: "Failed to refresh tenders. Please try again.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsRefreshing(false);
+    }
+  };
+
+  const { 
+    data: tenders = [], 
+    isLoading,
+    refetch
+  } = useQuery({
     queryKey: ["tenders", filters],
     queryFn: async () => {
       console.log("Fetching tenders with filters:", filters);
@@ -32,11 +77,11 @@ const Index = () => {
         query = query.or(`title.ilike.%${filters.search}%,description.ilike.%${filters.search}%`);
       }
 
-      if (filters.category) {
+      if (filters.category && filters.category !== "All") {
         query = query.eq("category", filters.category);
       }
 
-      if (filters.location) {
+      if (filters.location && filters.location !== "All") {
         query = query.eq("location", filters.location);
       }
 
@@ -74,6 +119,8 @@ const Index = () => {
         throw error;
       }
 
+      console.log(`Retrieved ${data.length} tenders from database`);
+      
       return data.map(tender => ({
         id: tender.id,
         title: tender.title,
@@ -83,9 +130,23 @@ const Index = () => {
         value: tender.fees || "Contact for pricing",
         location: tender.location || "International",
         description: tender.description,
+        tender_url: tender.tender_url
       }));
     },
   });
+
+  // Check if we have tenders on initial load
+  useEffect(() => {
+    if (!isLoading && tenders.length === 0) {
+      // If no tenders are found on the initial load, try to scrape some
+      const initialScrape = async () => {
+        console.log("No tenders found, starting initial scrape");
+        await refreshTenders();
+      };
+      
+      initialScrape();
+    }
+  }, [isLoading, tenders.length]);
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -94,7 +155,26 @@ const Index = () => {
       
       <main className="max-w-7xl mx-auto py-6 sm:px-6 lg:px-8">
         <div className="px-4 py-6 sm:px-0">
-          <TenderHeader />
+          <div className="flex justify-between items-center mb-6">
+            <TenderHeader />
+            <Button 
+              onClick={refreshTenders} 
+              disabled={isRefreshing}
+              className="flex items-center gap-2"
+            >
+              {isRefreshing ? (
+                <>
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                  Refreshing...
+                </>
+              ) : (
+                <>
+                  <RefreshCw className="h-4 w-4" />
+                  Refresh Tenders
+                </>
+              )}
+            </Button>
+          </div>
           
           <div className="grid grid-cols-1 lg:grid-cols-4 gap-8">
             <div className="lg:col-span-1">
@@ -106,15 +186,38 @@ const Index = () => {
             
             <div className="lg:col-span-3">
               {isLoading ? (
-                <div className="text-center py-8">Loading tenders...</div>
+                <div className="flex justify-center items-center py-8">
+                  <Loader2 className="h-8 w-8 animate-spin text-primary mr-2" />
+                  <span>Loading tenders...</span>
+                </div>
               ) : tenders.length > 0 ? (
-                <TenderList tenders={tenders} />
+                <>
+                  <p className="mb-4 text-sm text-gray-500">Showing {tenders.length} tender{tenders.length !== 1 ? 's' : ''}</p>
+                  <TenderList tenders={tenders} />
+                </>
               ) : (
                 <div className="text-center py-8 bg-white rounded-lg shadow">
                   <h3 className="text-lg font-medium text-gray-900">No tenders found</h3>
                   <p className="mt-2 text-sm text-gray-500">
                     Try adjusting your filters or check back later for new opportunities.
                   </p>
+                  <Button 
+                    onClick={refreshTenders} 
+                    disabled={isRefreshing}
+                    className="mt-4"
+                  >
+                    {isRefreshing ? (
+                      <>
+                        <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                        Refreshing...
+                      </>
+                    ) : (
+                      <>
+                        <RefreshCw className="h-4 w-4 mr-2" />
+                        Try Again
+                      </>
+                    )}
+                  </Button>
                 </div>
               )}
             </div>
