@@ -1,6 +1,7 @@
+
 import { useEffect } from "react";
 import { useNavigate } from "react-router-dom";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Loader2, AlertCircle, User } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { Navigation } from "@/components/Navigation";
@@ -16,8 +17,9 @@ import { useToast } from "@/hooks/use-toast";
 const Dashboard = () => {
   const navigate = useNavigate();
   const { toast } = useToast();
+  const queryClient = useQueryClient();
 
-  const { data: userData, isLoading, error } = useQuery({
+  const { data: userData, isLoading, error, refetch } = useQuery({
     queryKey: ['user'],
     queryFn: async () => {
       console.log("Fetching user data...");
@@ -34,43 +36,79 @@ const Dashboard = () => {
       console.log("User data fetched successfully:", user);
       return user;
     },
+    retry: 3,
+    retryDelay: 1000,
   });
 
   // Check available tenders
-  const { data: tendersCount } = useQuery({
+  const { data: tendersCount, error: tendersError, isLoading: tendersLoading } = useQuery({
     queryKey: ['tenders-count'],
     queryFn: async () => {
       console.log("Checking available tenders...");
-      const { count, error } = await supabase
-        .from('tenders')
-        .select('*', { count: 'exact' });
-      
-      if (error) {
-        console.error("Error checking tenders:", error);
-        throw error;
+      try {
+        const { count, error } = await supabase
+          .from('tenders')
+          .select('*', { count: 'exact', head: true });
+        
+        if (error) {
+          console.error("Error checking tenders:", error);
+          throw error;
+        }
+        console.log("Available tenders count:", count);
+        return count || 0;
+      } catch (err) {
+        console.error("Failed to check tenders:", err);
+        return 0;
       }
-      console.log("Available tenders count:", count);
-      return count;
     },
     enabled: !!userData,
+    retry: 2,
   });
 
   useEffect(() => {
     const checkAuth = async () => {
-      const { data: { session } } = await supabase.auth.getSession();
-      if (!session) {
-        console.log("No session found, redirecting to auth");
+      try {
+        const { data: { session } } = await supabase.auth.getSession();
+        if (!session) {
+          console.log("No session found, redirecting to auth");
+          toast({
+            title: "Authentication Required",
+            description: "Please sign in to access the dashboard",
+            variant: "destructive",
+          });
+          navigate("/auth");
+        }
+      } catch (error) {
+        console.error("Session check error:", error);
         toast({
-          title: "Authentication Required",
-          description: "Please sign in to access the dashboard",
+          title: "Authentication Error",
+          description: "There was a problem checking your session. Please try again.",
           variant: "destructive",
         });
-        navigate("/auth");
       }
     };
 
     checkAuth();
   }, [navigate, toast]);
+
+  // Handle session changes
+  useEffect(() => {
+    const { data: authListener } = supabase.auth.onAuthStateChange(
+      async (event, session) => {
+        console.log("Auth state changed:", event);
+        if (event === "SIGNED_OUT") {
+          queryClient.clear();
+          navigate("/auth");
+        } else if (event === "SIGNED_IN" && session) {
+          refetch();
+        }
+      }
+    );
+
+    return () => {
+      authListener.subscription.unsubscribe();
+    };
+  }, [navigate, refetch, queryClient]);
 
   if (isLoading) {
     return (
@@ -91,13 +129,16 @@ const Dashboard = () => {
       <div className="min-h-screen bg-gray-50">
         <Navigation />
         <main className="max-w-7xl mx-auto py-6 sm:px-6 lg:px-8">
-          <Alert variant="destructive">
+          <Alert variant="destructive" className="mb-4">
             <AlertCircle className="h-4 w-4" />
             <AlertTitle>Error</AlertTitle>
             <AlertDescription>
-              Failed to load dashboard. Please try again later.
+              Failed to load dashboard. {error.message || "Please try again later."}
             </AlertDescription>
           </Alert>
+          <Button onClick={() => refetch()} className="mx-auto block">
+            Retry
+          </Button>
         </main>
       </div>
     );
@@ -129,7 +170,17 @@ const Dashboard = () => {
       
       <main className="max-w-7xl mx-auto py-6 sm:px-6 lg:px-8">
         <div className="px-4 py-6 sm:px-0">
-          {!tendersCount && (
+          {tendersError && (
+            <Alert variant="destructive" className="mb-6">
+              <AlertCircle className="h-4 w-4" />
+              <AlertTitle>Database Error</AlertTitle>
+              <AlertDescription>
+                Unable to check available tenders. Please refresh the page or contact support.
+              </AlertDescription>
+            </Alert>
+          )}
+          
+          {!tendersLoading && tendersCount === 0 && (
             <Alert className="mb-6">
               <AlertCircle className="h-4 w-4" />
               <AlertTitle>No Tenders Available</AlertTitle>

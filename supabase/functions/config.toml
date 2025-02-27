@@ -1,3 +1,6 @@
 
 project_id = "ohnqfcbplmsypwnpxiga"
 base_path = "/"
+
+[functions.scrape-tenders]
+verify_jwt = false
