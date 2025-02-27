@@ -10,6 +10,7 @@ import { toast } from "@/components/ui/use-toast";
 import { Navigation } from "@/components/Navigation";
 import { UserProfile } from "@/types/user";
 
+// Define notification preferences interface
 interface NotificationPreferences {
   push: boolean;
   email: boolean;
@@ -47,7 +48,7 @@ const Preferences = () => {
 
       // Validate the preferences before returning
       return isValidNotificationPreferences(profile.notification_preferences)
-        ? profile.notification_preferences
+        ? profile.notification_preferences as NotificationPreferences
         : defaultPreferences;
     },
   });
@@ -62,10 +63,15 @@ const Preferences = () => {
         [key]: value,
       };
 
+      // Cast NotificationPreferences to a plain object for compatibility with Json type
+      const preferencesAsJsonObject: Record<string, boolean> = {
+        ...newPreferences
+      };
+
       const { error } = await supabase
         .from('profiles')
         .update({
-          notification_preferences: newPreferences,
+          notification_preferences: preferencesAsJsonObject,
         })
         .eq('user_id', user.id);
 
