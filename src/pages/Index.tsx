@@ -116,7 +116,7 @@ const Index = () => {
         }
       }
 
-      const { data, error, count } = await query;
+      const { data, error } = await query;
 
       if (error) {
         console.error("Error fetching tenders:", error);
@@ -143,6 +143,7 @@ const Index = () => {
       }));
     },
     staleTime: 1000 * 60 * 5, // 5 minutes
+    refetchOnWindowFocus: true, // Refresh when window gets focus
   });
 
   // Check if we have tenders on initial load
@@ -177,6 +178,19 @@ const Index = () => {
     }, 1000 * 60 * 60); // 1 hour
     
     return () => clearInterval(intervalId);
+  }, []);
+
+  // Force an immediate scrape when the component mounts
+  useEffect(() => {
+    // Only run this once on initial mount
+    const runInitialScrape = async () => {
+      if (!initialScrapeDone) {
+        console.log("Running initial tender scrape on page load");
+        await refreshTenders();
+      }
+    };
+    
+    runInitialScrape();
   }, []);
 
   return (
