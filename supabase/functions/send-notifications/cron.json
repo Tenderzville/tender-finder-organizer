@@ -1,0 +1,5 @@
+{
+  "schedule": "0 9 * * *",
+  "enabled": true,
+  "description": "Send tender notifications to users daily at 9 AM"
+}

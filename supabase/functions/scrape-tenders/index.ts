@@ -1,9 +1,8 @@
-
 // This file will be processed by Supabase
-import { serve } from 'https://deno.land/std@0.177.0/http/server.ts';
-import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.42.7';
-import { load } from 'https://esm.sh/cheerio@1.0.0-rc.12';
-import { format, parseISO, isValid, addMonths } from 'https://esm.sh/date-fns@2.30.0';
+import { serve } from "std/http/server.ts";
+import { createClient } from "@supabase/supabase-js";
+import { load } from "cheerio";
+import { format, parseISO, isValid, addMonths } from "date-fns";
 import { scrapeTenders } from './scraper.ts';
 
 const corsHeaders = {

@@ -1,0 +1,8 @@
+{
+  "imports": {
+    "cheerio": "https://esm.sh/cheerio@1.0.0-rc.12",
+    "date-fns": "https://esm.sh/date-fns@2.30.0",
+    "@supabase/supabase-js": "https://esm.sh/@supabase/supabase-js@2.42.7",
+    "std/": "https://deno.land/std@0.168.0/"
+  }
+}
