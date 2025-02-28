@@ -6,6 +6,7 @@ import { TenderList } from "@/components/tenders/TenderList";
 import { TenderHeader } from "@/components/tenders/TenderHeader";
 import { TenderNotification } from "@/components/notifications/TenderNotification";
 import { SocialShare } from "@/components/social/SocialShare";
+import { ScraperStatus } from "@/components/diagnostics/ScraperStatus";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { format } from "date-fns";
@@ -24,6 +25,7 @@ const Index = () => {
   });
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [initialScrapeDone, setInitialScrapeDone] = useState(false);
+  const [showDiagnostics, setShowDiagnostics] = useState(false);
 
   // Function to trigger manual tender scraping
   const refreshTenders = async () => {
@@ -134,7 +136,7 @@ const Index = () => {
         id: tender.id,
         title: tender.title,
         organization: tender.contact_info || "Not specified",
-        deadline: format(new Date(tender.deadline), "PPP"),
+        deadline: tender.deadline ? format(new Date(tender.deadline), "PPP") : "Not specified",
         category: tender.category,
         value: tender.fees || "Contact for pricing",
         location: tender.location || "International",
@@ -188,24 +190,39 @@ const Index = () => {
         <div className="px-4 py-6 sm:px-0">
           <div className="flex justify-between items-center mb-6">
             <TenderHeader />
-            <Button 
-              onClick={refreshTenders} 
-              disabled={isRefreshing}
-              className="flex items-center gap-2"
-            >
-              {isRefreshing ? (
-                <>
-                  <Loader2 className="h-4 w-4 animate-spin" />
-                  Refreshing...
-                </>
-              ) : (
-                <>
-                  <RefreshCw className="h-4 w-4" />
-                  Refresh Tenders
-                </>
-              )}
-            </Button>
+            <div className="flex gap-2">
+              <Button 
+                onClick={refreshTenders} 
+                disabled={isRefreshing}
+                className="flex items-center gap-2"
+              >
+                {isRefreshing ? (
+                  <>
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                    Refreshing...
+                  </>
+                ) : (
+                  <>
+                    <RefreshCw className="h-4 w-4" />
+                    Refresh Tenders
+                  </>
+                )}
+              </Button>
+              
+              <Button 
+                variant="outline" 
+                onClick={() => setShowDiagnostics(!showDiagnostics)}
+              >
+                {showDiagnostics ? "Hide Diagnostics" : "Show Diagnostics"}
+              </Button>
+            </div>
           </div>
+          
+          {showDiagnostics && (
+            <div className="mb-8">
+              <ScraperStatus />
+            </div>
+          )}
           
           <div className="grid grid-cols-1 lg:grid-cols-4 gap-8">
             <div className="lg:col-span-1">
