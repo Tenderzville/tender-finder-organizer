@@ -10,6 +10,7 @@ import { UserProfileCard } from "@/components/dashboard/UserProfile";
 import { PointsCard } from "@/components/dashboard/PointsCard";
 import { NotificationPreferencesCard } from "@/components/dashboard/NotificationPreferences";
 import { SavedTendersCard } from "@/components/dashboard/SavedTenders";
+import { ScraperStatus } from "@/components/dashboard/ScraperStatus";
 import { Button } from "@/components/ui/button";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { useToast } from "@/hooks/use-toast";
@@ -291,6 +292,11 @@ const Dashboard = () => {
         )}
         
         <UserProfileCard userId={userData.id} />
+        
+        {/* Add ScraperStatus as the first card for admin users */}
+        <div className="mt-6 mb-6">
+          <ScraperStatus />
+        </div>
         
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mt-6">
           <PointsCard userId={userData.id} />

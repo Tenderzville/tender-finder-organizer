@@ -1,3 +1,6 @@
+
 project_id = "ohnqfcbplmsypwnpxiga"
 [functions.scrape-tenders]
+verify_jwt = false
+[functions.check-scraper-status]
 verify_jwt = false
