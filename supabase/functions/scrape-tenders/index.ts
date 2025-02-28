@@ -296,13 +296,13 @@ serve(async (req) => {
     await supabase.from('scraping_logs').insert({
       source: 'scheduled',
       status: 'error',
-      error_message: error.message || 'Unknown error'
+      error_message: error instanceof Error ? error.message : 'Unknown error'
     });
     
     return new Response(
       JSON.stringify({ 
         error: 'Failed to scrape tenders',
-        details: error.message || 'Unknown error'
+        details: error instanceof Error ? error.message : 'Unknown error'
       }),
       { 
         status: 500,

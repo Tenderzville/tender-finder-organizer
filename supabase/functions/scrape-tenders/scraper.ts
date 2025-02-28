@@ -27,9 +27,11 @@ export const scrapeTenders = async (supabaseClient: any) => {
     // Kenyan Government Tenders: MyGov
     try {
       await scrapeMyGovKe(scrapedTenders);
+      console.log('Successfully scraped MyGov.ke tenders');
       successfulSources++;
     } catch (error) {
-      errors.push(`MyGov.ke: ${error.message}`);
+      console.error('Error scraping MyGov.ke:', error);
+      errors.push(`MyGov.ke: ${error instanceof Error ? error.message : 'Unknown error'}`);
     }
     
     // Add delay between requests to avoid rate limiting
@@ -38,9 +40,11 @@ export const scrapeTenders = async (supabaseClient: any) => {
     // Kenyan Government Tenders: tenders.go.ke
     try {
       await scrapeKenyaTenders(scrapedTenders);
+      console.log('Successfully scraped tenders.go.ke');
       successfulSources++;
     } catch (error) {
-      errors.push(`tenders.go.ke: ${error.message}`);
+      console.error('Error scraping tenders.go.ke:', error);
+      errors.push(`tenders.go.ke: ${error instanceof Error ? error.message : 'Unknown error'}`);
     }
     
     await new Promise(resolve => setTimeout(resolve, 2000));
@@ -48,9 +52,11 @@ export const scrapeTenders = async (supabaseClient: any) => {
     // First source: UN Development Business
     try {
       await scrapeUNDB(scrapedTenders);
+      console.log('Successfully scraped UNDB tenders');
       successfulSources++;
     } catch (error) {
-      errors.push(`UNDB: ${error.message}`);
+      console.error('Error scraping UNDB:', error);
+      errors.push(`UNDB: ${error instanceof Error ? error.message : 'Unknown error'}`);
     }
     
     await new Promise(resolve => setTimeout(resolve, 2000));
@@ -58,9 +64,11 @@ export const scrapeTenders = async (supabaseClient: any) => {
     // Second source: World Bank
     try {
       await scrapeWorldBank(scrapedTenders);
+      console.log('Successfully scraped World Bank tenders');
       successfulSources++;
     } catch (error) {
-      errors.push(`World Bank: ${error.message}`);
+      console.error('Error scraping World Bank:', error);
+      errors.push(`World Bank: ${error instanceof Error ? error.message : 'Unknown error'}`);
     }
     
     await new Promise(resolve => setTimeout(resolve, 2000));
@@ -68,9 +76,11 @@ export const scrapeTenders = async (supabaseClient: any) => {
     // Third source: Public Tenders
     try {
       await scrapePublicTenders(scrapedTenders);
+      console.log('Successfully scraped Public Tenders');
       successfulSources++;
     } catch (error) {
-      errors.push(`Public Tenders: ${error.message}`);
+      console.error('Error scraping Public Tenders:', error);
+      errors.push(`Public Tenders: ${error instanceof Error ? error.message : 'Unknown error'}`);
     }
     
     // Filter tenders by date criteria
@@ -111,7 +121,7 @@ export const scrapeTenders = async (supabaseClient: any) => {
       await supabaseClient.from('scraping_logs').insert({
         source: 'scheduled',
         status: 'error',
-        error_message: error.message || 'Unknown error in scraper',
+        error_message: error instanceof Error ? error.message : 'Unknown error in scraper',
         records_found: scrapedTenders.length,
         records_inserted: 0
       });
