@@ -27,7 +27,7 @@ function extractTenderDetails(content: string) {
     fees: '',
   };
 
-  // Fix the regex pattern - add closing parenthesis
+  // Fixed regex pattern - adding closing parenthesis
   const requirementsRegex = /requirements?:(.+?)(?:prerequisites|eligibility|deadline|submission|$)/si;
   const prerequisitesRegex = /prerequisites?|eligibility:(.+?)(?:deadline|submission|$)/si;
   const deadlineRegex = /deadline:(.+?)(?:submission|contact|$)/si;
@@ -171,8 +171,9 @@ serve(async (req) => {
     
     console.log(`Found ${existingCount || 0} existing tenders in database`);
     
-    // Get tenders from external sources
-    const scrapedTenders = await scrapeTenders();
+    // Get tenders from external sources using the imported scrapeTenders function
+    // Make sure to pass the supabase client to the function
+    const scrapedTenders = await scrapeTenders(supabase);
     console.log(`Successfully scraped ${scrapedTenders.length} tenders`);
     
     if (scrapedTenders.length === 0) {
