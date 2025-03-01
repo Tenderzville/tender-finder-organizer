@@ -1,11 +1,10 @@
 
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { Loader2, AlertCircle, RefreshCw, ArrowUpRight, ExternalLink, Calendar, MapPin, Tag } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { Separator } from "@/components/ui/separator";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { format, parseISO } from "date-fns";
@@ -16,20 +15,20 @@ export const TenderFeed = () => {
   const { toast } = useToast();
   const navigate = useNavigate();
   const [isRefreshing, setIsRefreshing] = useState(false);
-  const [manuallyFetchedTenders, setManuallyFetchedTenders] = useState(null);
 
+  // Simplified query with better caching and error handling
   const { 
     data, 
     isLoading,
     error,
     refetch
   } = useQuery({
-    queryKey: ["tender-updates"],
+    queryKey: ["dashboard-tenders"],
     queryFn: async () => {
+      console.log("TenderFeed: Fetching latest tenders");
+      
       try {
-        // First check scraper status directly from database
-        console.log("Fetching tender data directly from database");
-        
+        // Direct database approach - most efficient
         const { data: latestTenders, error: tendersError } = await supabase
           .from('tenders')
           .select('*')
@@ -51,7 +50,7 @@ export const TenderFeed = () => {
         }
         
         if (latestTenders && latestTenders.length > 0) {
-          console.log(`Successfully fetched ${latestTenders.length} tenders from database`);
+          console.log(`TenderFeed: Found ${latestTenders.length} tenders in database`);
           return {
             latest_tenders: latestTenders,
             total_tenders: count || 0,
@@ -59,22 +58,10 @@ export const TenderFeed = () => {
           };
         }
         
-        // If no tenders in database, try to call the function
-        console.log("No tenders found in database, trying scraper status function");
-        const { data: statusData, error: statusError } = await supabase.functions.invoke('check-scraper-status');
-        
-        if (statusError) {
-          console.error("Error fetching tender updates from function:", statusError);
-          // Don't throw, return empty data structure
-          return {
-            latest_tenders: [],
-            total_tenders: 0,
-            last_scrape: new Date().toISOString()
-          };
-        }
-        
-        return statusData || { 
-          latest_tenders: [], 
+        // If no tenders in database, return empty state
+        console.log("TenderFeed: No tenders found in database");
+        return {
+          latest_tenders: [],
           total_tenders: 0,
           last_scrape: new Date().toISOString()
         };
@@ -90,51 +77,43 @@ export const TenderFeed = () => {
     },
     staleTime: 1000 * 60 * 5, // 5 minutes
     refetchInterval: 1000 * 60 * 15, // 15 minutes
-    retry: 3
+    retry: 1 // Reduce retries
   });
 
-  // Function to manually fetch tenders if all else fails
-  const fetchTendersDirectly = async () => {
+  const refreshTenderFeed = async () => {
+    setIsRefreshing(true);
+    
     try {
-      console.log("Manually fetching tenders as fallback");
-      const { data: tenders, error } = await supabase
-        .from('tenders')
-        .select('*')
-        .order('created_at', { ascending: false })
-        .limit(5);
+      // Trigger scrape first - but don't wait for it to complete
+      console.log("Triggering tender scrape");
+      supabase.functions.invoke('scrape-tenders', {
+        body: { force: true }
+      }).then(({data, error}) => {
+        if (error) {
+          console.error("Error triggering tender scrape:", error);
+        } else {
+          console.log("Scrape result:", data);
+        }
+      });
       
-      if (error) {
-        console.error("Error in manual tender fetch:", error);
-        return;
-      }
+      // Immediately refetch from database
+      await refetch();
       
-      if (tenders && tenders.length > 0) {
-        console.log(`Manually fetched ${tenders.length} tenders successfully`);
-        setManuallyFetchedTenders(tenders);
-      } else {
-        console.log("No tenders found in manual fetch");
-        // Insert sample tender data as absolutely last resort
-        const sampleTender = {
-          id: 9999,
-          title: "Construction of Rural Health Centers",
-          category: "Construction",
-          location: "Nairobi",
-          deadline: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(),
-          created_at: new Date().toISOString(),
-        };
-        setManuallyFetchedTenders([sampleTender]);
-      }
-    } catch (e) {
-      console.error("Error in manual tender fetch:", e);
+      toast({
+        title: "Feed Refreshed",
+        description: "Latest tender information loaded",
+      });
+    } catch (err) {
+      console.error("Failed to refresh tender feed:", err);
+      toast({
+        title: "Refresh Error",
+        description: "Could not refresh tenders",
+        variant: "destructive",
+      });
+    } finally {
+      setIsRefreshing(false);
     }
   };
-
-  // If main query returns no tenders, try the direct method
-  useEffect(() => {
-    if (!isLoading && (!data?.latest_tenders || data.latest_tenders.length === 0)) {
-      fetchTendersDirectly();
-    }
-  }, [isLoading, data]);
 
   const handleShareOnSocial = async (tenderId: number) => {
     try {
@@ -175,64 +154,6 @@ export const TenderFeed = () => {
     navigate(`/tenders/${tenderId}`);
   };
 
-  const refreshTenderFeed = async () => {
-    setIsRefreshing(true);
-    setManuallyFetchedTenders(null);
-    
-    try {
-      // First trigger a scrape
-      console.log("Triggering tender scrape");
-      const { data: scrapeResult, error: scrapeError } = await supabase.functions.invoke('scrape-tenders', {
-        body: { force: true }
-      });
-      
-      if (scrapeError) {
-        console.error("Error triggering tender scrape:", scrapeError);
-        toast({
-          title: "Scrape Error",
-          description: "Could not refresh tenders from source. Checking database directly.",
-          variant: "destructive",
-        });
-        
-        // Try direct database approach
-        await fetchTendersDirectly();
-      } else {
-        console.log("Scrape result:", scrapeResult);
-        toast({
-          title: "Scrapers Run",
-          description: scrapeResult.tenders_scraped > 0 
-            ? `Found ${scrapeResult.tenders_scraped} new tenders` 
-            : "Checking database for existing tenders",
-        });
-      }
-      
-      // Then refetch our data
-      await refetch();
-      
-      // If still no data, try direct approach
-      if (!data?.latest_tenders || data.latest_tenders.length === 0) {
-        await fetchTendersDirectly();
-      }
-      
-      toast({
-        title: "Feed Refreshed",
-        description: "Latest tender information loaded",
-      });
-    } catch (err) {
-      console.error("Failed to refresh tender feed:", err);
-      toast({
-        title: "Refresh Error",
-        description: "Falling back to database check",
-        variant: "destructive",
-      });
-      
-      // Try direct database approach as fallback
-      await fetchTendersDirectly();
-    } finally {
-      setIsRefreshing(false);
-    }
-  };
-
   const formatDate = (dateStr: string) => {
     try {
       return format(parseISO(dateStr), "PPP");
@@ -241,12 +162,10 @@ export const TenderFeed = () => {
     }
   };
 
-  // Decide which tenders to display
-  const tendersToDisplay = manuallyFetchedTenders || 
-                          (data?.latest_tenders && data.latest_tenders.length > 0 ? 
-                            data.latest_tenders : []);
+  // Simplified render logic with cleaner fallbacks
+  const tendersToDisplay = data?.latest_tenders || [];
 
-  if (isLoading && !manuallyFetchedTenders) {
+  if (isLoading) {
     return (
       <Card>
         <CardHeader>
@@ -255,33 +174,6 @@ export const TenderFeed = () => {
         </CardHeader>
         <CardContent className="flex justify-center p-6">
           <Loader2 className="h-8 w-8 animate-spin text-primary" />
-        </CardContent>
-      </Card>
-    );
-  }
-
-  if (error && !manuallyFetchedTenders) {
-    return (
-      <Card>
-        <CardHeader>
-          <CardTitle>Latest Tenders</CardTitle>
-          <CardDescription>Unable to load tenders</CardDescription>
-        </CardHeader>
-        <CardContent>
-          <Alert variant="destructive">
-            <AlertCircle className="h-4 w-4" />
-            <AlertTitle>Error</AlertTitle>
-            <AlertDescription>
-              Unable to fetch tender updates. Please try again later.
-            </AlertDescription>
-          </Alert>
-          <Button 
-            variant="outline" 
-            className="w-full mt-4"
-            onClick={fetchTendersDirectly}
-          >
-            Fetch Directly From Database
-          </Button>
         </CardContent>
       </Card>
     );
@@ -303,7 +195,17 @@ export const TenderFeed = () => {
       <CardContent className="space-y-4">
         <div>
           <h3 className="text-sm font-medium mb-2">Recently Added</h3>
-          {tendersToDisplay && tendersToDisplay.length > 0 ? (
+          {error && (
+            <Alert variant="destructive" className="mb-4">
+              <AlertCircle className="h-4 w-4" />
+              <AlertTitle>Error</AlertTitle>
+              <AlertDescription>
+                Unable to fetch tender updates. Please try again later.
+              </AlertDescription>
+            </Alert>
+          )}
+          
+          {tendersToDisplay.length > 0 ? (
             <div className="space-y-3">
               {tendersToDisplay.map((tender: any) => (
                 <div key={tender.id} className="bg-muted p-3 rounded-md text-sm">
