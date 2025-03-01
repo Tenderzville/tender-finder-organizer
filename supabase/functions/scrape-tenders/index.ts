@@ -1,312 +1,119 @@
-// This file will be processed by Supabase
-import { serve } from "std/http/server.ts";
-import { createClient } from "@supabase/supabase-js";
-import { load } from "cheerio";
-import { format, parseISO, isValid, addMonths } from "date-fns";
-import { scrapeTenders } from './scraper.ts';
 
-const corsHeaders = {
-  'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
-};
+import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
+import cheerio from 'https://esm.sh/cheerio@1.0.0-rc.12';
+import { extractTendersFromMyGov, extractTendersFromPPIP } from './scraper.ts';
 
-// Create a Supabase client for connecting to database
-const supabaseUrl = Deno.env.get('SUPABASE_URL') || '';
-const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || '';
-const supabase = createClient(supabaseUrl, supabaseKey);
+// Get environment variables
+const SUPABASE_URL = Deno.env.get('SUPABASE_URL') || '';
+const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || '';
 
-// Extract tender details using regular expressions
-function extractTenderDetails(content: string) {
-  // Initialize object with default values
-  const details: Record<string, string> = {
-    requirements: '',
-    prerequisites: '',
-    deadline: '',
-    contact_info: '',
-    fees: '',
-  };
+// Initialize Supabase client
+const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
 
-  // Fixed regex pattern - adding closing parenthesis
-  const requirementsRegex = /requirements?:(.+?)(?:prerequisites|eligibility|deadline|submission|$)/si;
-  const prerequisitesRegex = /prerequisites?|eligibility:(.+?)(?:deadline|submission|$)/si;
-  const deadlineRegex = /deadline:(.+?)(?:submission|contact|$)/si;
-  const contactRegex = /contact:(.+?)(?:fees|cost|$)/si;
-  const feesRegex = /fees?|costs?:(.+?)(?:\n\n|\n$|$)/si;
-
-  // Extract each section
-  const reqMatch = content.match(requirementsRegex);
-  const preMatch = content.match(prerequisitesRegex);
-  const deadlineMatch = content.match(deadlineRegex);
-  const contactMatch = content.match(contactRegex);
-  const feesMatch = content.match(feesRegex);
-
-  // Assign extracted content if found
-  if (reqMatch && reqMatch[1]) details.requirements = reqMatch[1].trim();
-  if (preMatch && preMatch[1]) details.prerequisites = preMatch[1].trim();
-  if (deadlineMatch && deadlineMatch[1]) details.deadline = deadlineMatch[1].trim();
-  if (contactMatch && contactMatch[1]) details.contact_info = contactMatch[1].trim();
-  if (feesMatch && feesMatch[1]) details.fees = feesMatch[1].trim();
-
-  return details;
-}
-
-// Parse and format tender deadline
-function parseTenderDeadline(deadlineText: string) {
-  // Default to 1 month from now if we can't parse the date
-  const defaultDate = addMonths(new Date(), 1);
+// Log to console and database
+async function logScraperActivity(source: string, status: string, recordsFound?: number, recordsInserted?: number, errorMessage?: string) {
+  console.log(`[${source}] Status: ${status}, Found: ${recordsFound || 0}, Inserted: ${recordsInserted || 0}${errorMessage ? `, Error: ${errorMessage}` : ''}`);
   
-  if (!deadlineText) {
-    return format(defaultDate, "yyyy-MM-dd'T'HH:mm:ss");
-  }
-
-  // Try to identify and parse common date formats
-  const dateRegex = /(\d{1,2})[\/\.-](\d{1,2})[\/\.-](\d{2,4})|(\d{4})[\/\.-](\d{1,2})[\/\.-](\d{1,2})|(\d{1,2})(?:st|nd|rd|th)?\s+(?:of\s+)?([a-z]+)(?:\s+|,\s*)(\d{4})|([a-z]+)\s+(\d{1,2})(?:st|nd|rd|th)?,?\s+(\d{4})/i;
-  
-  const match = deadlineText.match(dateRegex);
-  if (match) {
-    let parsedDate;
-    
-    // DD/MM/YYYY format
-    if (match[1] && match[2] && match[3]) {
-      const year = match[3].length === 2 ? `20${match[3]}` : match[3];
-      parsedDate = parseISO(`${year}-${match[2].padStart(2, '0')}-${match[1].padStart(2, '0')}`);
-    } 
-    // YYYY/MM/DD format
-    else if (match[4] && match[5] && match[6]) {
-      parsedDate = parseISO(`${match[4]}-${match[5].padStart(2, '0')}-${match[6].padStart(2, '0')}`);
-    }
-    // DD Month YYYY format
-    else if (match[7] && match[8] && match[9]) {
-      const months: Record<string, string> = {
-        'january': '01', 'february': '02', 'march': '03', 'april': '04',
-        'may': '05', 'june': '06', 'july': '07', 'august': '08',
-        'september': '09', 'october': '10', 'november': '11', 'december': '12'
-      };
-      const month = months[match[8].toLowerCase()];
-      if (month) {
-        parsedDate = parseISO(`${match[9]}-${month}-${match[7].padStart(2, '0')}`);
-      }
-    }
-    // Month DD, YYYY format
-    else if (match[10] && match[11] && match[12]) {
-      const months: Record<string, string> = {
-        'january': '01', 'february': '02', 'march': '03', 'april': '04',
-        'may': '05', 'june': '06', 'july': '07', 'august': '08',
-        'september': '09', 'october': '10', 'november': '11', 'december': '12'
-      };
-      const month = months[match[10].toLowerCase()];
-      if (month) {
-        parsedDate = parseISO(`${match[12]}-${month}-${match[11].padStart(2, '0')}`);
-      }
-    }
-    
-    if (isValid(parsedDate)) {
-      return format(parsedDate, "yyyy-MM-dd'T'HH:mm:ss");
-    }
-  }
-  
-  // If all else fails, return default date
-  return format(defaultDate, "yyyy-MM-dd'T'HH:mm:ss");
-}
-
-// Categorize tender based on its title and description
-function categorizeTender(title: string, description: string) {
-  const text = `${title} ${description}`.toLowerCase();
-  
-  const categories: Record<string, string[]> = {
-    'Construction': ['construction', 'building', 'infrastructure', 'renovation', 'facility'],
-    'IT Services': ['software', 'hardware', 'it ', 'computer', 'technology', 'digital', 'system'],
-    'Healthcare': ['medical', 'health', 'hospital', 'clinic', 'pharmaceutical', 'medicine'],
-    'Education': ['education', 'school', 'university', 'college', 'training', 'learning'],
-    'Transportation': ['transport', 'logistics', 'shipping', 'freight', 'vehicle'],
-    'Energy': ['energy', 'power', 'electricity', 'renewable', 'solar', 'wind'],
-    'Agriculture': ['agriculture', 'farming', 'crop', 'livestock', 'food'],
-    'Financial': ['financial', 'banking', 'insurance', 'accounting', 'audit'],
-    'Telecommunications': ['telecom', 'communication', 'network', 'internet', 'mobile'],
-    'Consulting': ['consulting', 'advisory', 'management', 'strategy'],
-    'Security': ['security', 'surveillance', 'guard', 'protection'],
-    'Legal': ['legal', 'law', 'attorney', 'legislation', 'compliance'],
-    'Manufacturing': ['manufacturing', 'production', 'assembly', 'factory'],
-    'Retail': ['retail', 'wholesale', 'merchandise', 'store', 'shop'],
-    'Research': ['research', 'development', 'innovation', 'r&d']
-  };
-  
-  for (const [category, keywords] of Object.entries(categories)) {
-    if (keywords.some(keyword => text.includes(keyword))) {
-      return category;
-    }
-  }
-  
-  return 'Other';
-}
-
-serve(async (req) => {
-  // Handle CORS preflight requests
-  if (req.method === 'OPTIONS') {
-    return new Response(null, { headers: corsHeaders });
-  }
-
   try {
-    console.log('Starting tender scraping process...');
+    const { error } = await supabase
+      .from('scraping_logs')
+      .insert({
+        source,
+        status,
+        records_found: recordsFound,
+        records_inserted: recordsInserted,
+        error_message: errorMessage
+      });
     
-    // Count existing tenders before scraping
-    const { count: existingCount, error: countError } = await supabase
+    if (error) console.error('Error logging to database:', error);
+  } catch (err) {
+    console.error('Failed to log scraper activity:', err);
+  }
+}
+
+Deno.serve(async (req) => {
+  try {
+    console.log('Starting tender scraper...');
+    
+    // Total counters
+    let totalTendersScraped = 0;
+    let totalTendersInserted = 0;
+    
+    // Run myGov scraper
+    try {
+      console.log('Scraping tenders from MyGov...');
+      const myGovResult = await extractTendersFromMyGov(supabase, cheerio);
+      
+      totalTendersScraped += myGovResult.tendersFound;
+      totalTendersInserted += myGovResult.tendersInserted;
+      
+      await logScraperActivity(
+        'myGov', 
+        myGovResult.success ? 'success' : 'error',
+        myGovResult.tendersFound,
+        myGovResult.tendersInserted,
+        myGovResult.error
+      );
+    } catch (err) {
+      console.error('Error in MyGov scraper:', err);
+      await logScraperActivity('myGov', 'error', 0, 0, err.message);
+    }
+    
+    // Run PPIP scraper
+    try {
+      console.log('Scraping tenders from PPIP...');
+      const ppipResult = await extractTendersFromPPIP(supabase, cheerio);
+      
+      totalTendersScraped += ppipResult.tendersFound;
+      totalTendersInserted += ppipResult.tendersInserted;
+      
+      await logScraperActivity(
+        'PPIP', 
+        ppipResult.success ? 'success' : 'error',
+        ppipResult.tendersFound,
+        ppipResult.tendersInserted,
+        ppipResult.error
+      );
+    } catch (err) {
+      console.error('Error in PPIP scraper:', err);
+      await logScraperActivity('PPIP', 'error', 0, 0, err.message);
+    }
+    
+    // Get total tenders in the database
+    const { count: totalTenders, error: countError } = await supabase
       .from('tenders')
       .select('*', { count: 'exact', head: true });
     
     if (countError) {
-      console.error('Error counting existing tenders:', countError);
-      return new Response(
-        JSON.stringify({ 
-          error: 'Failed to count existing tenders',
-          details: countError
-        }),
-        { 
-          status: 500,
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-        }
-      );
+      console.error('Error counting tenders:', countError);
     }
     
-    console.log(`Found ${existingCount || 0} existing tenders in database`);
+    await logScraperActivity('scheduled', 'completed', totalTendersScraped, totalTendersInserted);
     
-    // Get tenders from external sources using the imported scrapeTenders function
-    // Make sure to pass the supabase client to the function
-    const scrapedTenders = await scrapeTenders(supabase);
-    console.log(`Successfully scraped ${scrapedTenders.length} tenders`);
-    
-    if (scrapedTenders.length === 0) {
-      return new Response(
-        JSON.stringify({ 
-          message: 'No new tenders found',
-          tenders_scraped: 0,
-          total_tenders: existingCount || 0
-        }),
-        { 
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-        }
-      );
-    }
-    
-    // Process and store each tender
-    let insertedCount = 0;
-    const processedTenders = [];
-    
-    for (const tender of scrapedTenders) {
-      // Extract additional details from description
-      let tenderDetails = {};
-      try {
-        if (tender.description) {
-          tenderDetails = extractTenderDetails(tender.description);
-        }
-      } catch (err) {
-        console.error(`Error extracting details from tender: ${tender.title}`, err);
-      }
-      
-      // Parse deadline
-      let formattedDeadline;
-      try {
-        const deadlineText = 
-          tenderDetails?.deadline || 
-          tender.deadline ||
-          '';
-        formattedDeadline = parseTenderDeadline(deadlineText);
-      } catch (err) {
-        console.error(`Error parsing deadline for tender: ${tender.title}`, err);
-        formattedDeadline = format(addMonths(new Date(), 1), "yyyy-MM-dd'T'HH:mm:ss");
-      }
-      
-      // Determine category
-      const category = categorizeTender(tender.title, tender.description || '');
-      
-      // Prepare tender data
-      const tenderData = {
-        title: tender.title,
-        description: tender.description,
-        tender_url: tender.url,
-        deadline: formattedDeadline,
-        category: category,
-        location: tender.location || 'International',
-        requirements: tenderDetails?.requirements || '',
-        prerequisites: tenderDetails?.prerequisites || '',
-        contact_info: tenderDetails?.contact_info || tender.contact || '',
-        fees: tenderDetails?.fees || '',
-      };
-      
-      // Check if tender with this URL already exists
-      const { data: existingTender, error: searchError } = await supabase
-        .from('tenders')
-        .select('*')
-        .eq('tender_url', tenderData.tender_url)
-        .maybeSingle();
-      
-      if (searchError) {
-        console.error(`Error checking if tender exists: ${tenderData.title}`, searchError);
-        continue;
-      }
-      
-      // If tender doesn't exist or has no URL, insert it
-      if (!existingTender || !tenderData.tender_url) {
-        const { data, error } = await supabase
-          .from('tenders')
-          .insert(tenderData)
-          .select();
-        
-        if (error) {
-          console.error(`Error inserting tender: ${tenderData.title}`, error);
-        } else {
-          console.log(`Successfully inserted tender: ${tenderData.title}`);
-          insertedCount++;
-          processedTenders.push(data[0]);
-        }
-      } else {
-        console.log(`Tender already exists: ${tenderData.title}`);
-      }
-    }
-    
-    // Log the scraping operation
-    await supabase.from('scraping_logs').insert({
-      source: 'scheduled',
-      status: 'success',
-      records_found: scrapedTenders.length,
-      records_inserted: insertedCount
-    });
-    
-    // Get updated count
-    const { count: newCount } = await supabase
-      .from('tenders')
-      .select('*', { count: 'exact', head: true });
-    
-    console.log(`Scraping completed. Inserted ${insertedCount} new tenders. Total tenders: ${newCount}`);
-    
+    // Return response
     return new Response(
-      JSON.stringify({ 
-        message: 'Tenders scraped successfully',
-        tenders_scraped: insertedCount,
-        total_tenders: newCount || 0
+      JSON.stringify({
+        tenders_scraped: totalTendersInserted,
+        total_tenders: totalTenders || 0,
+        message: `Scraped ${totalTendersScraped} tenders, inserted ${totalTendersInserted} new tenders`
       }),
       { 
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+        headers: { "Content-Type": "application/json" },
+        status: 200 
       }
     );
   } catch (error) {
-    console.error('Error in scrape-tenders function:', error);
-    
-    // Log the error
-    await supabase.from('scraping_logs').insert({
-      source: 'scheduled',
-      status: 'error',
-      error_message: error instanceof Error ? error.message : 'Unknown error'
-    });
+    console.error('Error in scraper function:', error);
+    await logScraperActivity('scheduled', 'error', 0, 0, error.message);
     
     return new Response(
       JSON.stringify({ 
-        error: 'Failed to scrape tenders',
-        details: error instanceof Error ? error.message : 'Unknown error'
+        error: 'Scraper function failed', 
+        message: error.message 
       }),
       { 
-        status: 500,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+        headers: { "Content-Type": "application/json" },
+        status: 500
       }
     );
   }
