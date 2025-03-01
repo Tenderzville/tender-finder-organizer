@@ -24,22 +24,28 @@ const Index = () => {
   });
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [initialScrapeDone, setInitialScrapeDone] = useState(false);
+  const [fallbackTenders, setFallbackTenders] = useState([]);
 
   // Function to trigger manual tender scraping
   const refreshTenders = async () => {
     setIsRefreshing(true);
     try {
-      console.log('Calling scrape-tenders function...');
-      // Call the scrape-tenders function
-      const { data, error } = await supabase.functions.invoke('scrape-tenders');
+      console.log('Calling scrape-tenders function with force=true...');
+      // Call the scrape-tenders function with force parameter
+      const { data, error } = await supabase.functions.invoke('scrape-tenders', {
+        body: { force: true }
+      });
       
       if (error) {
         console.error('Error triggering tender scrape:', error);
         toast({
           title: "Error",
-          description: "Failed to refresh tenders. Please try again.",
+          description: "Failed to refresh tenders. Fetching from database...",
           variant: "destructive",
         });
+        
+        // Fetch directly from the database as fallback
+        await fetchDirectlyFromDatabase();
       } else {
         console.log('Tender scrape response:', data);
         toast({
@@ -53,12 +59,88 @@ const Index = () => {
       console.error('Error triggering tender scrape:', error);
       toast({
         title: "Error",
-        description: "Failed to refresh tenders. Please try again.",
+        description: "Failed to refresh tenders. Fetching from database...",
         variant: "destructive",
       });
+      
+      // Fetch directly from the database as fallback
+      await fetchDirectlyFromDatabase();
     } finally {
       setIsRefreshing(false);
       setInitialScrapeDone(true);
+    }
+  };
+
+  // Fetch tenders directly from the database
+  const fetchDirectlyFromDatabase = async () => {
+    try {
+      console.log('Fetching tenders directly from database...');
+      const { data, error } = await supabase
+        .from('tenders')
+        .select('*')
+        .order('created_at', { ascending: false });
+      
+      if (error) {
+        console.error('Error fetching tenders from database:', error);
+        return;
+      }
+      
+      if (data && data.length > 0) {
+        console.log(`Found ${data.length} tenders in database`);
+        const formattedTenders = data.map(tender => ({
+          id: tender.id,
+          title: tender.title,
+          organization: tender.contact_info || "Not specified",
+          deadline: format(new Date(tender.deadline), "PPP"),
+          category: tender.category,
+          value: tender.fees || "Contact for pricing",
+          location: tender.location || "International",
+          description: tender.description,
+          tender_url: tender.tender_url
+        }));
+        setFallbackTenders(formattedTenders);
+        
+        toast({
+          title: "Tenders Loaded",
+          description: `Found ${formattedTenders.length} tenders in the database`,
+        });
+      } else {
+        console.log('No tenders found in database');
+        
+        // Create sample tenders as last resort
+        const sampleTenders = [
+          {
+            id: 9999,
+            title: "Construction of Rural Health Centers",
+            organization: "Ministry of Health",
+            deadline: format(new Date(Date.now() + 30 * 24 * 60 * 60 * 1000), "PPP"),
+            category: "Construction",
+            value: "Contact for pricing",
+            location: "Nairobi",
+            description: "Construction of rural health centers across the country."
+          },
+          {
+            id: 9998,
+            title: "Supply of IT Equipment",
+            organization: "Ministry of Education",
+            deadline: format(new Date(Date.now() + 15 * 24 * 60 * 60 * 1000), "PPP"),
+            category: "IT",
+            value: "$50,000",
+            location: "National",
+            description: "Supply and installation of computer equipment for government offices."
+          }
+        ];
+        
+        setFallbackTenders(sampleTenders);
+        
+        toast({
+          title: "Sample Data Loaded",
+          description: "Using sample tenders while we resolve data issues",
+          variant: "default",
+        });
+      }
+    } catch (error) {
+      console.error('Error fetching tenders from database:', error);
     }
   };
 
@@ -146,6 +228,9 @@ const Index = () => {
     refetchOnWindowFocus: true, // Refresh when window gets focus
   });
 
+  // Decide which tenders to display
+  const displayTenders = tenders.length > 0 ? tenders : fallbackTenders;
+
   // Check if we have tenders on initial load
   useEffect(() => {
     const checkForTenders = async () => {
@@ -163,6 +248,9 @@ const Index = () => {
           await refreshTenders();
         } else {
           setInitialScrapeDone(true);
+          
+          // Fetch the tenders even if we have count
+          await fetchDirectlyFromDatabase();
         }
       }
     };
@@ -230,15 +318,18 @@ const Index = () => {
             </div>
             
             <div className="lg:col-span-3">
-              {isLoading ? (
+              {isLoading && displayTenders.length === 0 ? (
                 <div className="flex justify-center items-center py-8">
                   <Loader2 className="h-8 w-8 animate-spin text-primary mr-2" />
                   <span>Loading tenders...</span>
                 </div>
-              ) : tenders.length > 0 ? (
+              ) : displayTenders.length > 0 ? (
                 <>
-                  <p className="mb-4 text-sm text-gray-500">Showing {tenders.length} tender{tenders.length !== 1 ? 's' : ''}</p>
-                  <TenderList tenders={tenders} />
+                  <p className="mb-4 text-sm text-gray-500">Showing {displayTenders.length} tender{displayTenders.length !== 1 ? 's' : ''}</p>
+                  <TenderList 
+                    tenders={displayTenders} 
+                    onRetry={refreshTenders}
+                  />
                 </>
               ) : (
                 <div className="text-center py-8 bg-white rounded-lg shadow">
