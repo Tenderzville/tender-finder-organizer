@@ -1,0 +1,6 @@
+
+{
+  "schedule": "*/30 * * * *",
+  "enabled": true,
+  "description": "Check for and post new tenders to social media every 30 minutes"
+}

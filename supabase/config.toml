@@ -4,3 +4,5 @@ project_id = "ohnqfcbplmsypwnpxiga"
 verify_jwt = false
 [functions.check-scraper-status]
 verify_jwt = false
+[functions.send-social-media]
+verify_jwt = false
