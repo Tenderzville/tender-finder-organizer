@@ -8,8 +8,8 @@
     "skipLibCheck": true,
     "allowSyntheticDefaultImports": true,
     "resolveJsonModule": true,
-    "lib": ["DOM", "ESNext", "deno.window"],
-    "types": ["deno"]
+    "lib": ["DOM", "ESNext"],
+    "types": []
   },
   "include": [
     "./**/*.ts"

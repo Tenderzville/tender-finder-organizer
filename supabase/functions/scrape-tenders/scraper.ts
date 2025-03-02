@@ -1,5 +1,6 @@
 
-import { parse, addDays } from 'https://esm.sh/date-fns@2.30.0';
+import { parse, addDays } from 'https://esm.sh/date-fns@2.30.0'; // Ensure date-fns is correctly imported
+import cheerio, { CheerioAPI } from 'cheerio'; // Import necessary types
 
 // Type for scraper result
 interface ScraperResult {
@@ -10,11 +11,14 @@ interface ScraperResult {
 }
 
 // Function to extract tenders from MyGov (tenders.go.ke)
-export async function extractTendersFromMyGov(supabase, cheerio): Promise<ScraperResult> {
+export async function extractTendersFromMyGov(supabase: any, cheerio: CheerioAPI): Promise<ScraperResult> {
   try {
-    console.log('Starting MyGov extraction...');
+    console.log('Starting MyGov extraction...'); // Enhanced logging for extraction start
     const baseUrl = 'https://tenders.go.ke';
-    const url = `${baseUrl}/Public/Tenders/?pageno=1`;
+    const tendersUrl = `${baseUrl}/all-tenders`;
+    const totalPages = 2; // Number of pages to scrape
+    for (let page = 1; page <= totalPages; page++) {
+        const url = `${tendersUrl}?pageno=${page}`;
     
     // Use fetch with retry logic
     let response;
@@ -49,14 +53,36 @@ export async function extractTendersFromMyGov(supabase, cheerio): Promise<Scrape
       throw new Error(`Failed to fetch after ${maxRetries} attempts. Status: ${response?.status}`);
     }
     
-    const html = await response.text();
+    const pageHtml = await response.text(); // Fetching HTML content from response
+    const $ = cheerio.load(pageHtml);
+    const totalPages = 2; // Number of pages to scrape
+    for (let page = 1; page <= totalPages; page++) {
+        const pageUrl = `${baseUrl}/all-tenders?pageno=${page}`;
+        // Fetch and process each page
+        response = await fetch(pageUrl, {
+            headers: {
+                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36',
+                'Accept': 'text/html,application/xhtml+xml,application/xml',
+                'Accept-Language': 'en-US,en;q=0.9',
+            },
+            redirect: 'follow',
+            method: 'GET',
+        });
+        
+        if (!response.ok) {
+            console.warn(`Failed to fetch page ${page} with status ${response.status}`);
+            continue;
+        }
+        
+        const pageHtml = await response.text();
+        const $ = cheerio.load(pageHtml);
     
     // Extract tenders using cheerio
-    const $ = cheerio.load(html);
-    const tenders = [];
+    // Extract tenders using cheerio
+    const tenders: Array<{ title: string; description: string; contact_info: string; deadline: string; category: string; location: string; tender_url: string; fees: string; requirements: string; }> = []; // Explicit type for tenders
     
     // Extract data from table rows
-    $('table tbody tr').each((index, element) => {
+    $('table tbody tr').each((index: number, element: cheerio.Element) => { // Explicit types for parameters
       try {
         const row = $(element);
         const tenderData = {
@@ -95,7 +121,7 @@ export async function extractTendersFromMyGov(supabase, cheerio): Promise<Scrape
             }
           }
         } catch (err) {
-          console.warn(`Invalid date format for tender ${tenderData.reference}:`, err);
+          console.warn(`Invalid date format for tender ${tenderData.reference}:`, err); // Logging invalid date format
         }
         
         // Only include tenders with a valid future deadline
@@ -120,7 +146,7 @@ export async function extractTendersFromMyGov(supabase, cheerio): Promise<Scrape
       }
     });
     
-    console.log(`Found ${tenders.length} tenders from MyGov`);
+    console.log(`Found ${tenders.length} tenders from MyGov`); // Logging the number of tenders found
     
     // Insert tenders into the database
     let insertedCount = 0;
@@ -166,7 +192,7 @@ export async function extractTendersFromMyGov(supabase, cheerio): Promise<Scrape
       tendersInserted: insertedCount
     };
   } catch (error) {
-    console.error('Error in MyGov scraper:', error);
+    console.error('Error in MyGov scraper:', error); // Enhanced error logging
     return {
       success: false,
       tendersFound: 0,
