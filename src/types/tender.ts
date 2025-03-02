@@ -1,3 +1,4 @@
+
 export type Tender = {
   id: number;
   title: string;
@@ -12,6 +13,7 @@ export type Tender = {
   subcategory: string | null;
   tender_url: string | null;
   location: string;
+  points_required?: number;
 };
 
 export type SavedTender = {
@@ -27,4 +29,10 @@ export type TenderReview = {
   rating: number | null;
   comment: string | null;
   created_at: string;
+};
+
+export type TenderAffirmativeAction = {
+  type: 'youth' | 'women' | 'pwds' | 'none';
+  percentage?: number;
+  details?: string;
 };
