@@ -10,11 +10,63 @@ import { Button } from "@/components/ui/button";
 import { format, parseISO } from "date-fns";
 import { useToast } from "@/hooks/use-toast";
 import { useNavigate } from "react-router-dom";
+import { QualificationTool } from "@/components/tenders/QualificationTool";
+import type { Tender } from "@/types/tender";
+
+// Sample fallback data
+const FALLBACK_TENDERS: Tender[] = [
+  {
+    id: 9001,
+    title: "Road Construction and Maintenance Services",
+    description: "Seeking qualified contractors for road construction and maintenance in Nairobi County. Must have Class A registration and minimum 5 years experience in similar projects.",
+    requirements: "Class A registration required. Annual turnover of at least KES 50M. Must have completed at least 3 similar projects in the last 5 years.",
+    deadline: new Date(Date.now() + 14 * 24 * 60 * 60 * 1000).toISOString(),
+    contact_info: "procurement@nairobi.go.ke",
+    fees: "KES 45,000,000",
+    prerequisites: "Site visit mandatory",
+    created_at: new Date().toISOString(),
+    category: "Construction",
+    subcategory: "Roads",
+    tender_url: "https://tenders.go.ke/tender/123456",
+    location: "Nairobi"
+  },
+  {
+    id: 9002,
+    title: "Medical Supplies and Equipment",
+    description: "Supply and delivery of medical equipment to county hospitals. Looking for medical suppliers with experience in healthcare procurement.",
+    requirements: "Must be registered with Kenya Medical Supplies Authority. Minimum 3 years in business. Must provide product warranties.",
+    deadline: new Date(Date.now() + 10 * 24 * 60 * 60 * 1000).toISOString(),
+    contact_info: "procurement@health.go.ke",
+    fees: "KES 12,500,000",
+    prerequisites: "Samples may be required",
+    created_at: new Date().toISOString(),
+    category: "Healthcare",
+    subcategory: "Medical Equipment",
+    tender_url: "https://tenders.go.ke/tender/123457",
+    location: "Mombasa"
+  },
+  {
+    id: 9003,
+    title: "IT Infrastructure Upgrade",
+    description: "Comprehensive IT infrastructure upgrade for government offices including networking, servers, and workstations.",
+    requirements: "ICT Authority registration required. Must have CCNA certified staff. Previous government contracts preferred.",
+    deadline: new Date(Date.now() + 21 * 24 * 60 * 60 * 1000).toISOString(),
+    contact_info: "ict@treasury.go.ke",
+    fees: "KES 28,750,000",
+    prerequisites: "Security clearance required",
+    created_at: new Date().toISOString(),
+    category: "ICT",
+    subcategory: "Infrastructure",
+    tender_url: "https://tenders.go.ke/tender/123458",
+    location: "Nairobi"
+  }
+];
 
 export const TenderFeed = () => {
   const { toast } = useToast();
   const navigate = useNavigate();
   const [isRefreshing, setIsRefreshing] = useState(false);
+  const [showQualificationTool, setShowQualificationTool] = useState(false);
 
   // Simplified query with better caching and error handling
   const { 
@@ -49,29 +101,34 @@ export const TenderFeed = () => {
           console.error("Error counting tenders:", countError);
         }
         
+        // If we have tenders in the database, return them
         if (latestTenders && latestTenders.length > 0) {
           console.log(`TenderFeed: Found ${latestTenders.length} tenders in database`);
           return {
             latest_tenders: latestTenders,
             total_tenders: count || 0,
-            last_scrape: new Date().toISOString()
+            last_scrape: new Date().toISOString(),
+            source: "database"
           };
         }
         
-        // If no tenders in database, return empty state
-        console.log("TenderFeed: No tenders found in database");
+        // If no tenders in database, use fallback data
+        console.log("TenderFeed: No tenders found in database, using fallback data");
         return {
-          latest_tenders: [],
-          total_tenders: 0,
-          last_scrape: new Date().toISOString()
+          latest_tenders: FALLBACK_TENDERS,
+          total_tenders: FALLBACK_TENDERS.length,
+          last_scrape: new Date().toISOString(),
+          source: "fallback"
         };
       } catch (err) {
         console.error("Failed to fetch tender updates:", err);
-        // Return empty data structure instead of throwing
+        // Return fallback data in case of error
         return {
-          latest_tenders: [],
-          total_tenders: 0,
-          last_scrape: new Date().toISOString()
+          latest_tenders: FALLBACK_TENDERS,
+          total_tenders: FALLBACK_TENDERS.length,
+          last_scrape: new Date().toISOString(),
+          source: "fallback",
+          error: err instanceof Error ? err.message : String(err)
         };
       }
     },
@@ -162,7 +219,7 @@ export const TenderFeed = () => {
     }
   };
 
-  // Simplified render logic with cleaner fallbacks
+  // Use tenders from data or fallback to empty array
   const tendersToDisplay = data?.latest_tenders || [];
 
   if (isLoading) {
@@ -174,6 +231,31 @@ export const TenderFeed = () => {
         </CardHeader>
         <CardContent className="flex justify-center p-6">
           <Loader2 className="h-8 w-8 animate-spin text-primary" />
+        </CardContent>
+      </Card>
+    );
+  }
+
+  // If showing qualification tool and we have tenders
+  if (showQualificationTool && tendersToDisplay.length > 0) {
+    return (
+      <Card>
+        <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+          <div>
+            <CardTitle>Will I Qualify?</CardTitle>
+            <CardDescription>
+              Check your eligibility for available tenders
+            </CardDescription>
+          </div>
+          <Button 
+            variant="outline" 
+            onClick={() => setShowQualificationTool(false)}
+          >
+            Back to Tenders
+          </Button>
+        </CardHeader>
+        <CardContent>
+          <QualificationTool tenders={tendersToDisplay} />
         </CardContent>
       </Card>
     );
@@ -194,13 +276,35 @@ export const TenderFeed = () => {
       </CardHeader>
       <CardContent className="space-y-4">
         <div>
-          <h3 className="text-sm font-medium mb-2">Recently Added</h3>
+          <div className="flex justify-between mb-4">
+            <h3 className="text-sm font-medium">Recently Added</h3>
+            {tendersToDisplay.length > 0 && (
+              <Button 
+                variant="outline" 
+                size="sm" 
+                onClick={() => setShowQualificationTool(true)}
+              >
+                Check My Eligibility
+              </Button>
+            )}
+          </div>
+          
           {error && (
             <Alert variant="destructive" className="mb-4">
               <AlertCircle className="h-4 w-4" />
               <AlertTitle>Error</AlertTitle>
               <AlertDescription>
-                Unable to fetch tender updates. Please try again later.
+                Unable to fetch tender updates. Using sample data for demonstration.
+              </AlertDescription>
+            </Alert>
+          )}
+          
+          {data?.source === "fallback" && !error && (
+            <Alert className="mb-4">
+              <AlertCircle className="h-4 w-4" />
+              <AlertTitle>Using Sample Data</AlertTitle>
+              <AlertDescription>
+                We're currently displaying sample tenders for demonstration purposes.
               </AlertDescription>
             </Alert>
           )}
@@ -244,7 +348,8 @@ export const TenderFeed = () => {
                       Deadline: {tender.deadline ? formatDate(tender.deadline) : "Unknown"}
                     </div>
                     <div>
-                      Posted: {tender.created_at ? formatDate(tender.created_at) : "Recently"}
+                      {tender.fees && `Value: ${tender.fees}`}
+                      {!tender.fees && "Value: Contact for pricing"}
                     </div>
                   </div>
                 </div>
@@ -265,19 +370,31 @@ export const TenderFeed = () => {
         </div>
       </CardContent>
       <CardFooter>
-        <Button 
-          variant="outline" 
-          className="w-full flex items-center justify-center gap-2"
-          onClick={refreshTenderFeed}
-          disabled={isRefreshing}
-        >
-          {isRefreshing ? (
-            <Loader2 className="h-4 w-4 animate-spin" />
-          ) : (
-            <RefreshCw className="h-4 w-4" />
+        <div className="w-full space-y-2">
+          <Button 
+            variant="outline" 
+            className="w-full flex items-center justify-center gap-2"
+            onClick={refreshTenderFeed}
+            disabled={isRefreshing}
+          >
+            {isRefreshing ? (
+              <Loader2 className="h-4 w-4 animate-spin" />
+            ) : (
+              <RefreshCw className="h-4 w-4" />
+            )}
+            {isRefreshing ? "Refreshing..." : "Refresh Tenders"}
+          </Button>
+          
+          {tendersToDisplay.length > 0 && !showQualificationTool && (
+            <Button 
+              variant="default" 
+              className="w-full"
+              onClick={() => setShowQualificationTool(true)}
+            >
+              Will I Qualify? Pre-Check Tool
+            </Button>
           )}
-          {isRefreshing ? "Refreshing..." : "Refresh Tenders"}
-        </Button>
+        </div>
       </CardFooter>
     </Card>
   );

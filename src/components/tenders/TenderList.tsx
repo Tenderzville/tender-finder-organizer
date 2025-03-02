@@ -3,28 +3,19 @@ import { useState } from "react";
 import { TenderCard } from "@/components/TenderCard";
 import { useNavigate } from "react-router-dom";
 import { useToast } from "@/hooks/use-toast";
-import { Loader2 } from "lucide-react";
+import { Loader2, AlertTriangle } from "lucide-react";
 import { Button } from "@/components/ui/button";
-
-interface Tender {
-  id: number;
-  title: string;
-  organization: string;
-  deadline: string;
-  category: string;
-  value: string;
-  location?: string;
-  points_required?: number;
-  tender_url?: string | null;
-}
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import type { Tender } from "@/types/tender";
 
 interface TenderListProps {
   tenders: Tender[];
   isLoading?: boolean;
   onRetry?: () => void;
+  error?: Error | null;
 }
 
-export const TenderList = ({ tenders, isLoading = false, onRetry }: TenderListProps) => {
+export const TenderList = ({ tenders, isLoading = false, onRetry, error }: TenderListProps) => {
   const navigate = useNavigate();
   const { toast } = useToast();
 
@@ -42,6 +33,27 @@ export const TenderList = ({ tenders, isLoading = false, onRetry }: TenderListPr
         <Loader2 className="h-8 w-8 animate-spin text-primary mr-2" />
         <span>Loading tenders...</span>
       </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <Alert variant="destructive" className="mb-4">
+        <AlertTriangle className="h-4 w-4" />
+        <AlertTitle>Error loading tenders</AlertTitle>
+        <AlertDescription className="space-y-4">
+          <p>{error.message || "Unable to load tenders. Please try again later."}</p>
+          {onRetry && (
+            <Button 
+              variant="outline" 
+              size="sm" 
+              onClick={onRetry}
+            >
+              Retry
+            </Button>
+          )}
+        </AlertDescription>
+      </Alert>
     );
   }
 
@@ -69,8 +81,15 @@ export const TenderList = ({ tenders, isLoading = false, onRetry }: TenderListPr
       {tenders.map((tender) => (
         <TenderCard
           key={tender.id}
-          {...tender}
-          pointsRequired={tender.points_required}
+          id={tender.id}
+          title={tender.title}
+          organization={tender.category}
+          deadline={tender.deadline}
+          category={tender.category}
+          value={tender.fees || "Contact for pricing"}
+          location={tender.location}
+          pointsRequired={tender.points_required || 0}
+          tender_url={tender.tender_url}
           onViewDetails={() => handleViewDetails(tender.id)}
         />
       ))}
