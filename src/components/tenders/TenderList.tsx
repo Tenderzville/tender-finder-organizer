@@ -3,7 +3,7 @@ import { useState } from "react";
 import { TenderCard } from "@/components/TenderCard";
 import { useNavigate } from "react-router-dom";
 import { useToast } from "@/hooks/use-toast";
-import { Loader2, AlertTriangle } from "lucide-react";
+import { Loader2, AlertTriangle, ArrowUpRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Switch } from "@/components/ui/switch";
@@ -29,7 +29,11 @@ const translations = {
     retryLoading: "Retry Loading Tenders",
     viewDetails: "View Details",
     languageToggle: "Kiswahili",
-    affirmativeAction: "Special Categories"
+    affirmativeAction: "Special Categories",
+    shareTender: "Share",
+    shareTenderDesc: "Share this tender opportunity",
+    shareEmail: "Share via Email",
+    shareWhatsApp: "Share via WhatsApp"
   },
   sw: {
     loading: "Inapakia zabuni...",
@@ -41,7 +45,11 @@ const translations = {
     retryLoading: "Jaribu Kupakia Zabuni Tena",
     viewDetails: "Angalia Maelezo",
     languageToggle: "English",
-    affirmativeAction: "Vikundi Maalum"
+    affirmativeAction: "Vikundi Maalum",
+    shareTender: "Shiriki",
+    shareTenderDesc: "Shiriki nafasi hii ya zabuni",
+    shareEmail: "Shiriki kupitia Barua pepe",
+    shareWhatsApp: "Shiriki kupitia WhatsApp"
   }
 };
 
@@ -61,6 +69,47 @@ export const TenderList = ({ tenders, isLoading = false, onRetry, error }: Tende
   
   const toggleLanguage = () => {
     setLanguage(prev => prev === 'en' ? 'sw' : 'en');
+  };
+
+  const handleShareByEmail = (tender: Tender) => {
+    // Encode tender information for email
+    const subject = encodeURIComponent(`Tender Opportunity: ${tender.title}`);
+    const body = encodeURIComponent(
+      `Check out this tender opportunity:\n\n` +
+      `Title: ${tender.title}\n` +
+      `Category: ${tender.category}\n` +
+      `Deadline: ${tender.deadline}\n` +
+      `Location: ${tender.location}\n\n` +
+      `View more details at: ${window.location.origin}/tenders/${tender.id}`
+    );
+    
+    // Open email client
+    window.open(`mailto:?subject=${subject}&body=${body}`);
+    
+    toast({
+      title: "Email client opened",
+      description: "Share this tender with others via email",
+    });
+  };
+
+  const handleShareByWhatsApp = (tender: Tender) => {
+    // Encode tender information for WhatsApp
+    const text = encodeURIComponent(
+      `*Tender Opportunity*\n\n` +
+      `Title: ${tender.title}\n` +
+      `Category: ${tender.category}\n` +
+      `Deadline: ${tender.deadline}\n` +
+      `Location: ${tender.location}\n\n` +
+      `View more details at: ${window.location.origin}/tenders/${tender.id}`
+    );
+    
+    // Open WhatsApp
+    window.open(`https://wa.me/?text=${text}`);
+    
+    toast({
+      title: "WhatsApp opened",
+      description: "Share this tender with others via WhatsApp",
+    });
   };
 
   if (isLoading) {
@@ -124,9 +173,6 @@ export const TenderList = ({ tenders, isLoading = false, onRetry, error }: Tende
     tender.category.toLowerCase().includes('agpo')
   );
 
-  console.log("Language:", language);
-  console.log("Affirmative action tenders:", affirmativeActionTenders.length);
-
   return (
     <div className="space-y-8">
       <div className="flex justify-end items-center mb-4">
@@ -160,6 +206,18 @@ export const TenderList = ({ tenders, isLoading = false, onRetry, error }: Tende
                 hasAffirmativeAction={true}
                 affirmativeActionType={tender.affirmative_action?.type || 'none'}
                 language={language}
+                shareActions={[
+                  {
+                    icon: <ArrowUpRight className="h-4 w-4" />,
+                    label: t.shareEmail,
+                    onClick: () => handleShareByEmail(tender)
+                  },
+                  {
+                    icon: <ArrowUpRight className="h-4 w-4" />,
+                    label: t.shareWhatsApp,
+                    onClick: () => handleShareByWhatsApp(tender)
+                  }
+                ]}
               />
             ))}
           </div>
@@ -183,6 +241,18 @@ export const TenderList = ({ tenders, isLoading = false, onRetry, error }: Tende
             hasAffirmativeAction={tender.affirmative_action?.type !== undefined && tender.affirmative_action?.type !== 'none'}
             affirmativeActionType={tender.affirmative_action?.type || 'none'}
             language={language}
+            shareActions={[
+              {
+                icon: <ArrowUpRight className="h-4 w-4" />,
+                label: t.shareEmail,
+                onClick: () => handleShareByEmail(tender)
+              },
+              {
+                icon: <ArrowUpRight className="h-4 w-4" />,
+                label: t.shareWhatsApp,
+                onClick: () => handleShareByWhatsApp(tender)
+              }
+            ]}
           />
         ))}
       </div>

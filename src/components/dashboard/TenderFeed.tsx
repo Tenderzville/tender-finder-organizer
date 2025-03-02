@@ -1,5 +1,5 @@
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { Loader2, AlertCircle, RefreshCw, ArrowUpRight, ExternalLink, Calendar, MapPin, Tag } from "lucide-react";
@@ -13,72 +13,14 @@ import { useNavigate } from "react-router-dom";
 import { QualificationTool } from "@/components/tenders/QualificationTool";
 import type { Tender } from "@/types/tender";
 
-// Sample fallback data
-const FALLBACK_TENDERS: Tender[] = [
-  {
-    id: 9001,
-    title: "Road Construction and Maintenance Services",
-    description: "Seeking qualified contractors for road construction and maintenance in Nairobi County. Must have Class A registration and minimum 5 years experience in similar projects.",
-    requirements: "Class A registration required. Annual turnover of at least KES 50M. Must have completed at least 3 similar projects in the last 5 years.",
-    deadline: new Date(Date.now() + 14 * 24 * 60 * 60 * 1000).toISOString(),
-    contact_info: "procurement@nairobi.go.ke",
-    fees: "KES 45,000,000",
-    prerequisites: "Site visit mandatory",
-    created_at: new Date().toISOString(),
-    category: "Construction",
-    subcategory: "Roads",
-    tender_url: "https://tenders.go.ke/tender/123456",
-    location: "Nairobi",
-    affirmative_action: {
-      type: 'youth',
-      percentage: 30,
-      details: 'This tender has a 30% allocation for youth-owned businesses'
-    }
-  },
-  {
-    id: 9002,
-    title: "Medical Supplies and Equipment",
-    description: "Supply and delivery of medical equipment to county hospitals. Looking for medical suppliers with experience in healthcare procurement.",
-    requirements: "Must be registered with Kenya Medical Supplies Authority. Minimum 3 years in business. Must provide product warranties.",
-    deadline: new Date(Date.now() + 10 * 24 * 60 * 60 * 1000).toISOString(),
-    contact_info: "procurement@health.go.ke",
-    fees: "KES 12,500,000",
-    prerequisites: "Samples may be required",
-    created_at: new Date().toISOString(),
-    category: "Healthcare",
-    subcategory: "Medical Equipment",
-    tender_url: "https://tenders.go.ke/tender/123457",
-    location: "Mombasa",
-    affirmative_action: {
-      type: 'women',
-      percentage: 30,
-      details: 'This tender has a 30% allocation for women-owned businesses'
-    }
-  },
-  {
-    id: 9003,
-    title: "IT Infrastructure Upgrade",
-    description: "Comprehensive IT infrastructure upgrade for government offices including networking, servers, and workstations.",
-    requirements: "ICT Authority registration required. Must have CCNA certified staff. Previous government contracts preferred.",
-    deadline: new Date(Date.now() + 21 * 24 * 60 * 60 * 1000).toISOString(),
-    contact_info: "ict@treasury.go.ke",
-    fees: "KES 28,750,000",
-    prerequisites: "Security clearance required",
-    created_at: new Date().toISOString(),
-    category: "ICT",
-    subcategory: "Infrastructure",
-    tender_url: "https://tenders.go.ke/tender/123458",
-    location: "Nairobi"
-  }
-];
-
 export const TenderFeed = () => {
   const { toast } = useToast();
   const navigate = useNavigate();
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [showQualificationTool, setShowQualificationTool] = useState(false);
+  const [language, setLanguage] = useState<'en' | 'sw'>('en');
 
-  // Simplified query with better caching and error handling
+  // Optimized query with proper error handling and real data prioritization
   const { 
     data, 
     isLoading,
@@ -89,79 +31,52 @@ export const TenderFeed = () => {
     queryFn: async () => {
       console.log("TenderFeed: Fetching latest tenders");
       
-      try {
-        // Direct database approach - most efficient
-        const { data: latestTenders, error: tendersError } = await supabase
-          .from('tenders')
-          .select('*')
-          .order('created_at', { ascending: false })
-          .limit(5);
-        
-        if (tendersError) {
-          console.error("Error fetching tenders from database:", tendersError);
-          throw tendersError;
-        }
-        
-        // Get total count
-        const { count, error: countError } = await supabase
-          .from('tenders')
-          .select('*', { count: 'exact', head: true });
-        
-        if (countError) {
-          console.error("Error counting tenders:", countError);
-        }
-        
-        // If we have tenders in the database, return them
-        if (latestTenders && latestTenders.length > 0) {
-          console.log(`TenderFeed: Found ${latestTenders.length} tenders in database`);
-          return {
-            latest_tenders: latestTenders,
-            total_tenders: count || 0,
-            last_scrape: new Date().toISOString(),
-            source: "database"
-          };
-        }
-        
-        // If no tenders in database, use fallback data
-        console.log("TenderFeed: No tenders found in database, using fallback data");
-        return {
-          latest_tenders: FALLBACK_TENDERS,
-          total_tenders: FALLBACK_TENDERS.length,
-          last_scrape: new Date().toISOString(),
-          source: "fallback"
-        };
-      } catch (err) {
-        console.error("Failed to fetch tender updates:", err);
-        // Return fallback data in case of error
-        return {
-          latest_tenders: FALLBACK_TENDERS,
-          total_tenders: FALLBACK_TENDERS.length,
-          last_scrape: new Date().toISOString(),
-          source: "fallback",
-          error: err instanceof Error ? err.message : String(err)
-        };
+      // Direct database approach - most efficient
+      const { data: latestTenders, error: tendersError } = await supabase
+        .from('tenders')
+        .select('*')
+        .order('created_at', { ascending: false })
+        .limit(5);
+      
+      if (tendersError) {
+        console.error("Error fetching tenders from database:", tendersError);
+        throw tendersError;
       }
+      
+      // Get total count
+      const { count, error: countError } = await supabase
+        .from('tenders')
+        .select('*', { count: 'exact', head: true });
+      
+      if (countError) {
+        console.error("Error counting tenders:", countError);
+      }
+      
+      return {
+        latest_tenders: latestTenders || [],
+        total_tenders: count || 0,
+        last_scrape: new Date().toISOString(),
+        source: "database"
+      };
     },
     staleTime: 1000 * 60 * 5, // 5 minutes
-    refetchInterval: 1000 * 60 * 15, // 15 minutes
-    retry: 1, // Reduce retries
+    refetchInterval: false, // Prevent automatic refetching which causes flickering
+    retry: 1,
     refetchOnWindowFocus: false // Prevent excessive refetches
   });
+
+  // Fetch data on component mount only once
+  useEffect(() => {
+    refetch();
+  }, []);
 
   const refreshTenderFeed = async () => {
     setIsRefreshing(true);
     
     try {
-      // Trigger scrape first - but don't wait for it to complete
-      console.log("Triggering tender scrape");
-      supabase.functions.invoke('scrape-tenders', {
+      // Trigger scrape with force parameter
+      await supabase.functions.invoke('scrape-tenders', {
         body: { force: true }
-      }).then(({data, error}) => {
-        if (error) {
-          console.error("Error triggering tender scrape:", error);
-        } else {
-          console.log("Scrape result:", data);
-        }
       });
       
       // Immediately refetch from database
@@ -185,27 +100,7 @@ export const TenderFeed = () => {
 
   const handleShareOnSocial = async (tenderId: number) => {
     try {
-      toast({
-        title: "Sharing tender",
-        description: "Opening sharing options...",
-      });
-
-      // Open native share dialog if available
-      if (navigator.share) {
-        await navigator.share({
-          title: 'Check out this tender opportunity',
-          text: 'I found this tender that might interest you',
-          url: `${window.location.origin}/tenders/${tenderId}`,
-        });
-        
-        toast({
-          title: "Share Options Opened",
-          description: "Share this tender with others",
-        });
-        return;
-      }
-      
-      // If native sharing not available, use WhatsApp directly
+      // Open WhatsApp directly
       const text = encodeURIComponent(`Check out this tender: ${window.location.origin}/tenders/${tenderId}`);
       window.open(`https://wa.me/?text=${text}`, '_blank');
       
@@ -235,7 +130,7 @@ export const TenderFeed = () => {
     }
   };
 
-  // Use tenders from data or fallback to empty array
+  // Use tenders from data or empty array
   const tendersToDisplay = data?.latest_tenders || [];
 
   if (isLoading) {
@@ -277,30 +172,58 @@ export const TenderFeed = () => {
     );
   }
 
+  // Translations
+  const t = {
+    en: {
+      latestTenders: "Latest Tenders",
+      browse: "Browse and find relevant tenders for your business",
+      recentlyAdded: "Recently Added",
+      checkEligibility: "Check My Eligibility",
+      error: "Error",
+      errorDesc: "Unable to fetch tender updates.",
+      noTenders: "No tenders currently available.",
+      refreshTenders: "Refresh Tenders",
+      refreshing: "Refreshing...",
+      qualifyTool: "Will I Qualify? Pre-Check Tool"
+    },
+    sw: {
+      latestTenders: "Zabuni za Hivi Karibuni",
+      browse: "Vinjari na upate zabuni zinazofaa kwa biashara yako",
+      recentlyAdded: "Zilizoongezwa Karibuni",
+      checkEligibility: "Angalia Ustahiki Wangu",
+      error: "Hitilafu",
+      errorDesc: "Imeshindwa kupata sasisho za zabuni.",
+      noTenders: "Hakuna zabuni zinazopatikana kwa sasa.",
+      refreshTenders: "Sasisha Zabuni",
+      refreshing: "Inasasisha...",
+      qualifyTool: "Nitastahiki? Chombo cha Ukaguzi wa Awali"
+    }
+  }[language];
+
   return (
     <Card>
       <CardHeader>
         <CardTitle className="flex justify-between items-center">
-          <span>Latest Tenders</span>
+          <span>{t.latestTenders}</span>
           <Badge variant={tendersToDisplay.length > 0 ? "default" : "outline"}>
             {tendersToDisplay.length} Available
           </Badge>
         </CardTitle>
         <CardDescription>
-          Browse and find relevant tenders for your business
+          {t.browse}
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">
         <div>
           <div className="flex justify-between mb-4">
-            <h3 className="text-sm font-medium">Recently Added</h3>
+            <h3 className="text-sm font-medium">{t.recentlyAdded}</h3>
             {tendersToDisplay.length > 0 && (
               <Button 
                 variant="outline" 
                 size="sm" 
                 onClick={() => setShowQualificationTool(true)}
               >
-                Check My Eligibility
+                {t.checkEligibility}
               </Button>
             )}
           </div>
@@ -308,19 +231,9 @@ export const TenderFeed = () => {
           {error && (
             <Alert variant="destructive" className="mb-4">
               <AlertCircle className="h-4 w-4" />
-              <AlertTitle>Error</AlertTitle>
+              <AlertTitle>{t.error}</AlertTitle>
               <AlertDescription>
-                Unable to fetch tender updates. Using sample data for demonstration.
-              </AlertDescription>
-            </Alert>
-          )}
-          
-          {data?.source === "fallback" && !error && (
-            <Alert className="mb-4">
-              <AlertCircle className="h-4 w-4" />
-              <AlertTitle>Using Sample Data</AlertTitle>
-              <AlertDescription>
-                We're currently displaying sample tenders for demonstration purposes.
+                {t.errorDesc}
               </AlertDescription>
             </Alert>
           )}
@@ -384,13 +297,13 @@ export const TenderFeed = () => {
             </div>
           ) : (
             <div className="text-center py-6 bg-muted rounded-md">
-              <p className="text-sm text-muted-foreground mb-2">No tenders currently available.</p>
+              <p className="text-sm text-muted-foreground mb-2">{t.noTenders}</p>
               <Button 
                 variant="outline" 
                 size="sm"
                 onClick={refreshTenderFeed}
               >
-                Refresh Tenders
+                {t.refreshTenders}
               </Button>
             </div>
           )}
@@ -409,7 +322,7 @@ export const TenderFeed = () => {
             ) : (
               <RefreshCw className="h-4 w-4" />
             )}
-            {isRefreshing ? "Refreshing..." : "Refresh Tenders"}
+            {isRefreshing ? t.refreshing : t.refreshTenders}
           </Button>
           
           {tendersToDisplay.length > 0 && !showQualificationTool && (
@@ -418,7 +331,7 @@ export const TenderFeed = () => {
               className="w-full"
               onClick={() => setShowQualificationTool(true)}
             >
-              Will I Qualify? Pre-Check Tool
+              {t.qualifyTool}
             </Button>
           )}
         </div>

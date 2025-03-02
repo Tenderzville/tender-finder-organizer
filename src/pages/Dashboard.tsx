@@ -1,7 +1,7 @@
 
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useQuery } from "@tanstack/react-query";
 import { Loader2, AlertCircle, User, RefreshCw } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { Navigation } from "@/components/Navigation";
@@ -19,71 +19,73 @@ import { useAuthState } from "@/hooks/useAuthState";
 const Dashboard = () => {
   const navigate = useNavigate();
   const { toast } = useToast();
-  const queryClient = useQueryClient();
   const { isAuthenticated, isInitialized } = useAuthState();
   const [sessionChecked, setSessionChecked] = useState(false);
+  const [initialCheckDone, setInitialCheckDone] = useState(false);
 
   console.log("Dashboard rendering - Auth state:", { isAuthenticated, isInitialized });
 
-  // Fixed session check to prevent race conditions
+  // Explicit session check using the provided code snippet - more reliable
   useEffect(() => {
-    let isMounted = true;
+    // Skip if we've already done the check
+    if (initialCheckDone) return;
     
     const checkSession = async () => {
-      console.log("Performing explicit session check");
       try {
-        const { data, error } = await supabase.auth.getSession();
+        console.log("Performing explicit session check");
+        const { data: { session }, error: sessionError } = await supabase.auth.getSession();
         
-        if (error) {
-          console.error("Session check error:", error);
-          if (isMounted) {
-            toast({
-              title: "Authentication Error",
-              description: "There was a problem verifying your session. Please sign in again.",
-              variant: "destructive",
-            });
-            navigate("/auth");
-          }
+        if (sessionError) {
+          console.error("Session check error:", sessionError);
+          toast({
+            title: "Authentication Error",
+            description: "There was a problem verifying your session. Please sign in again.",
+            variant: "destructive",
+          });
+          navigate("/auth");
           return;
         }
         
-        if (!data.session) {
+        if (!session) {
           console.log("No active session found in explicit check, redirecting to auth");
-          if (isMounted) {
-            navigate("/auth");
-          }
+          navigate("/auth");
           return;
         }
         
-        console.log("Session verified for user:", data.session.user.id);
-        if (isMounted) {
+        // Check if profile exists
+        const { data: profile, error: profileError } = await supabase
+          .from('profiles')
+          .select('id')
+          .eq('user_id', session.user.id)
+          .maybeSingle();
+
+        if (profileError) {
+          console.error("Profile check error:", profileError);
+          toast({
+            title: "Error",
+            description: "Couldn't verify your profile. Please try again.",
+            variant: "destructive",
+          });
+          return;
+        }
+
+        if (profile) {
+          console.log("Session verified for user:", session.user.id);
           setSessionChecked(true);
+        } else {
+          console.log("No profile found, redirecting to onboarding");
+          navigate("/onboarding", { replace: true });
         }
       } catch (err) {
         console.error("Explicit session check failed:", err);
-        if (isMounted) {
-          navigate("/auth");
-        }
-      }
-    };
-    
-    // Only check session if the auth state is initialized and showing as authenticated
-    if (isInitialized) {
-      if (!isAuthenticated) {
-        console.log("User not authenticated, redirecting to auth");
         navigate("/auth");
-      } else {
-        // We're authenticated according to useAuthState, so do a single explicit check
-        if (!sessionChecked) {
-          checkSession();
-        }
+      } finally {
+        setInitialCheckDone(true);
       }
-    }
-    
-    return () => {
-      isMounted = false;
     };
-  }, [isAuthenticated, isInitialized, navigate, toast, sessionChecked]);
+    
+    checkSession();
+  }, [navigate, toast, initialCheckDone]);
 
   // User data query - only run when session is confirmed
   const { 
@@ -112,7 +114,7 @@ const Dashboard = () => {
     },
     enabled: sessionChecked, // Only run this query after session is confirmed
     retry: 1,
-    staleTime: 60 * 1000, // 1 minute
+    staleTime: 60 * 1000, // 1 minute to prevent frequent refetching
   });
 
   // Tenders count query
@@ -145,9 +147,10 @@ const Dashboard = () => {
     enabled: !!userData, // Only run this query after user data is loaded
     retry: 2,
     staleTime: 5 * 60 * 1000, // 5 minutes
+    refetchInterval: false // Disable auto-refetching to prevent flickering
   });
 
-  // Trigger tender scraping manually - simplified to prevent blocking the UI
+  // Trigger tender scraping manually - optimized to prevent flickering
   const triggerTenderScrape = () => {
     toast({
       title: "Updating Tenders",

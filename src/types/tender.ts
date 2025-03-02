@@ -13,7 +13,7 @@ export type Tender = {
   subcategory: string | null;
   tender_url: string | null;
   location: string;
-  points_required?: number;
+  points_required: number | null;
   affirmative_action?: TenderAffirmativeAction;
 };
 

@@ -54,30 +54,23 @@ export const useAuthState = () => {
           setIsAuthenticated(isAuthed);
         
           if (isAuthed && session) {
-            try {
-              // Check if profile exists
-              const { data: profile, error: profileError } = await supabase
-                .from('profiles')
-                .select('id')
-                .eq('user_id', session.user.id)
-                .maybeSingle();
-              
-              if (profileError) {
-                console.error("[useAuthState] Profile check error:", profileError);
-                if (isMounted) {
-                  setProfileStatus('missing');
-                }
-              } else {
-                const status = profile ? 'exists' : 'missing';
-                console.log("[useAuthState] Profile status:", status);
-                if (isMounted) {
-                  setProfileStatus(status);
-                }
-              }
-            } catch (err) {
-              console.error("[useAuthState] Profile check exception:", err);
+            // Check if profile exists - using maybeSingle to prevent errors
+            const { data: profile, error: profileError } = await supabase
+              .from('profiles')
+              .select('id')
+              .eq('user_id', session.user.id)
+              .maybeSingle();
+            
+            if (profileError) {
+              console.error("[useAuthState] Profile check error:", profileError);
               if (isMounted) {
                 setProfileStatus('missing');
+              }
+            } else {
+              const status = profile ? 'exists' : 'missing';
+              console.log("[useAuthState] Profile status:", status);
+              if (isMounted) {
+                setProfileStatus(status);
               }
             }
           } else {
