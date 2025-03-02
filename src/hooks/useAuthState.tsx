@@ -19,6 +19,16 @@ export const useAuthState = () => {
     let isMounted = true;
     console.log("[useAuthState] Setting up auth state tracker");
     
+    // Set a timeout to prevent infinite loading
+    const timeoutId = setTimeout(() => {
+      if (isMounted && !isInitialized) {
+        console.warn("[useAuthState] Auth initialization timed out");
+        setIsInitialized(true);
+        setIsAuthenticated(false);
+        setProfileStatus('missing');
+      }
+    }, 5000); // 5 second timeout
+    
     const checkAuth = async () => {
       try {
         console.log("[useAuthState] Starting auth check...");
@@ -138,6 +148,7 @@ export const useAuthState = () => {
 
     return () => {
       isMounted = false;
+      clearTimeout(timeoutId);
       console.log("[useAuthState] Cleaning up auth listener");
       authListener.subscription.unsubscribe();
     };
