@@ -1,3 +1,4 @@
+
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
@@ -24,8 +25,10 @@ const Dashboard = () => {
 
   console.log("Dashboard rendering - Auth state:", { isAuthenticated, isInitialized });
 
-  // Force explicit session check to prevent race conditions
+  // Fixed session check to prevent race conditions
   useEffect(() => {
+    let isMounted = true;
+    
     const checkSession = async () => {
       console.log("Performing explicit session check");
       try {
@@ -33,41 +36,56 @@ const Dashboard = () => {
         
         if (error) {
           console.error("Session check error:", error);
-          toast({
-            title: "Authentication Error",
-            description: "There was a problem verifying your session. Please sign in again.",
-            variant: "destructive",
-          });
-          navigate("/auth");
+          if (isMounted) {
+            toast({
+              title: "Authentication Error",
+              description: "There was a problem verifying your session. Please sign in again.",
+              variant: "destructive",
+            });
+            navigate("/auth");
+          }
           return;
         }
         
         if (!data.session) {
           console.log("No active session found in explicit check, redirecting to auth");
-          navigate("/auth");
+          if (isMounted) {
+            navigate("/auth");
+          }
           return;
         }
         
         console.log("Session verified for user:", data.session.user.id);
-        setSessionChecked(true);
+        if (isMounted) {
+          setSessionChecked(true);
+        }
       } catch (err) {
         console.error("Explicit session check failed:", err);
-        navigate("/auth");
+        if (isMounted) {
+          navigate("/auth");
+        }
       }
     };
     
+    // Only check session if the auth state is initialized and showing as authenticated
     if (isInitialized) {
       if (!isAuthenticated) {
         console.log("User not authenticated, redirecting to auth");
         navigate("/auth");
       } else {
-        // Even if authenticated via useAuthState, still do explicit check
-        checkSession();
+        // We're authenticated according to useAuthState, so do a single explicit check
+        if (!sessionChecked) {
+          checkSession();
+        }
       }
     }
-  }, [isAuthenticated, isInitialized, navigate, toast]);
+    
+    return () => {
+      isMounted = false;
+    };
+  }, [isAuthenticated, isInitialized, navigate, toast, sessionChecked]);
 
-  // User data query
+  // User data query - only run when session is confirmed
   const { 
     data: userData, 
     isLoading: userLoading, 
@@ -129,56 +147,56 @@ const Dashboard = () => {
     staleTime: 5 * 60 * 1000, // 5 minutes
   });
 
-  // Trigger tender scraping manually
-  const triggerTenderScrape = async () => {
-    try {
-      toast({
-        title: "Updating Tenders",
-        description: "Fetching the latest tender data...",
-      });
-      
-      const { data, error } = await supabase.functions.invoke('scrape-tenders');
-      
-      if (error) {
-        console.error('Error invoking scrape-tenders function:', error);
+  // Trigger tender scraping manually - simplified to prevent blocking the UI
+  const triggerTenderScrape = () => {
+    toast({
+      title: "Updating Tenders",
+      description: "Fetching the latest tender data...",
+    });
+    
+    supabase.functions.invoke('scrape-tenders')
+      .then(({ data, error }) => {
+        if (error) {
+          console.error('Error invoking scrape-tenders function:', error);
+          toast({
+            title: "Error",
+            description: "Failed to update tenders. Please try again.",
+            variant: "destructive",
+          });
+          return;
+        }
+        
+        console.log('Tender scrape response:', data);
+        
+        if (data?.success === false) {
+          toast({
+            title: "Error",
+            description: data.error || "Failed to update tenders. Please try again.",
+            variant: "destructive",
+          });
+          return;
+        }
+        
+        toast({
+          title: "Tenders Updated",
+          description: `Found ${data?.tenders_scraped || 0} new tenders.`,
+        });
+        
+        // Refetch the tenders count
+        refetchTenders();
+      })
+      .catch(error => {
+        console.error('Error in triggerTenderScrape:', error);
         toast({
           title: "Error",
-          description: "Failed to update tenders. Please try again.",
+          description: "Failed to update tenders. Network error or function timeout.",
           variant: "destructive",
         });
-        return;
-      }
-      
-      console.log('Tender scrape response:', data);
-      
-      if (data.success === false) {
-        toast({
-          title: "Error",
-          description: data.error || "Failed to update tenders. Please try again.",
-          variant: "destructive",
-        });
-        return;
-      }
-      
-      toast({
-        title: "Tenders Updated",
-        description: `Found ${data.tenders_scraped || 0} new tenders.`,
       });
-      
-      // Refetch the tenders count
-      refetchTenders();
-    } catch (error) {
-      console.error('Error in triggerTenderScrape:', error);
-      toast({
-        title: "Error",
-        description: "Failed to update tenders. Network error or function timeout.",
-        variant: "destructive",
-      });
-    }
   };
 
-  // LOADING STATE
-  if (!isInitialized || !sessionChecked || userLoading) {
+  // LOADING STATE - Clear indication of what's happening
+  if (!isInitialized || (!sessionChecked && isAuthenticated) || userLoading) {
     return (
       <div className="min-h-screen bg-gray-50">
         <Navigation />

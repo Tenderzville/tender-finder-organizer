@@ -14,9 +14,10 @@ export const useAuthState = () => {
   const navigate = useNavigate();
   const { toast } = useToast();
 
-  // Initialize auth state
+  // Initialize auth state - optimized to prevent race conditions
   useEffect(() => {
     let isMounted = true;
+    console.log("[useAuthState] Setting up auth state tracker");
     
     const checkAuth = async () => {
       try {
@@ -75,6 +76,7 @@ export const useAuthState = () => {
             }
           }
           
+          // Mark initialization complete at the end
           setIsInitialized(true);
         }
       } catch (error) {
@@ -120,7 +122,7 @@ export const useAuthState = () => {
           console.log("[useAuthState] New profile status after auth change:", newStatus);
           setProfileStatus(newStatus);
 
-          // Navigation logic
+          // Only handle navigation if we're fully initialized
           if (isInitialized) {
             if (!profile && window.location.pathname !== '/onboarding') {
               console.log("[useAuthState] No profile found, navigating to onboarding");
@@ -136,12 +138,14 @@ export const useAuthState = () => {
 
     return () => {
       isMounted = false;
+      console.log("[useAuthState] Cleaning up auth listener");
       authListener.subscription.unsubscribe();
     };
   }, [navigate]);
 
   const handleSignOut = async () => {
     try {
+      console.log("[useAuthState] Signing out user");
       const { error } = await supabase.auth.signOut();
       if (error) throw error;
       

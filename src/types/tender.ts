@@ -14,6 +14,7 @@ export type Tender = {
   tender_url: string | null;
   location: string;
   points_required?: number;
+  affirmative_action?: TenderAffirmativeAction;
 };
 
 export type SavedTender = {

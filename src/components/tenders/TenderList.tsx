@@ -105,17 +105,21 @@ export const TenderList = ({ tenders, isLoading = false, onRetry, error }: Tende
       return;
     }
     
-    // In a real implementation, this would call an API to send the email
-    // For demonstration, we'll just show a success toast
+    const subject = encodeURIComponent(`Tender Opportunity: ${tender.title}`);
+    const body = encodeURIComponent(`Check out this tender opportunity:\n\nTitle: ${tender.title}\nDeadline: ${tender.deadline}\nCategory: ${tender.category}\nLocation: ${tender.location}\n\nView more details at: ${window.location.origin}/tenders/${tender.id}`);
+    
+    // Open default email client
+    window.open(`mailto:${shareEmail}?subject=${subject}&body=${body}`, '_blank');
+    
     toast({
       title: t.emailSent,
-      description: `Tender "${tender.title}" shared to ${shareEmail}`,
+      description: `Email client opened for sharing tender to ${shareEmail}`,
     });
     setShareEmail("");
   };
   
   const handleWhatsAppShare = (tender: Tender) => {
-    const text = encodeURIComponent(`Check out this tender: ${tender.title} - Deadline: ${tender.deadline}`);
+    const text = encodeURIComponent(`Check out this tender opportunity:\n\nTitle: ${tender.title}\nDeadline: ${tender.deadline}\nCategory: ${tender.category}\nLocation: ${tender.location}\n\nView more details at: ${window.location.origin}/tenders/${tender.id}`);
     window.open(`https://wa.me/?text=${text}`, '_blank');
   };
 
@@ -168,8 +172,11 @@ export const TenderList = ({ tenders, isLoading = false, onRetry, error }: Tende
     );
   }
 
-  // Filter for affirmative action tenders (simplified example - in production, would use actual data)
+  // Filter for affirmative action tenders
   const youthWomenTenders = tenders.filter(tender => 
+    tender.affirmative_action?.type === 'youth' || 
+    tender.affirmative_action?.type === 'women' ||
+    tender.affirmative_action?.type === 'pwds' ||
     tender.title.toLowerCase().includes('youth') || 
     tender.title.toLowerCase().includes('women') ||
     tender.description?.toLowerCase().includes('youth') || 

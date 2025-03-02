@@ -28,7 +28,12 @@ const FALLBACK_TENDERS: Tender[] = [
     category: "Construction",
     subcategory: "Roads",
     tender_url: "https://tenders.go.ke/tender/123456",
-    location: "Nairobi"
+    location: "Nairobi",
+    affirmative_action: {
+      type: 'youth',
+      percentage: 30,
+      details: 'This tender has a 30% allocation for youth-owned businesses'
+    }
   },
   {
     id: 9002,
@@ -43,7 +48,12 @@ const FALLBACK_TENDERS: Tender[] = [
     category: "Healthcare",
     subcategory: "Medical Equipment",
     tender_url: "https://tenders.go.ke/tender/123457",
-    location: "Mombasa"
+    location: "Mombasa",
+    affirmative_action: {
+      type: 'women',
+      percentage: 30,
+      details: 'This tender has a 30% allocation for women-owned businesses'
+    }
   },
   {
     id: 9003,
@@ -134,7 +144,8 @@ export const TenderFeed = () => {
     },
     staleTime: 1000 * 60 * 5, // 5 minutes
     refetchInterval: 1000 * 60 * 15, // 15 minutes
-    retry: 1 // Reduce retries
+    retry: 1, // Reduce retries
+    refetchOnWindowFocus: false // Prevent excessive refetches
   });
 
   const refreshTenderFeed = async () => {
@@ -176,27 +187,32 @@ export const TenderFeed = () => {
     try {
       toast({
         title: "Sharing tender",
-        description: "Sending to social media channels...",
+        description: "Opening sharing options...",
       });
 
-      const { data: result, error } = await supabase.functions.invoke('send-social-media', {
-        body: { tenderId }
-      });
-
-      if (error) {
-        console.error("Error sharing tender:", error);
-        toast({
-          title: "Sharing Failed",
-          description: `Could not share tender: ${error.message}`,
-          variant: "destructive",
+      // Open native share dialog if available
+      if (navigator.share) {
+        await navigator.share({
+          title: 'Check out this tender opportunity',
+          text: 'I found this tender that might interest you',
+          url: `${window.location.origin}/tenders/${tenderId}`,
         });
-      } else {
-        console.log("Social media sharing result:", result);
+        
         toast({
-          title: "Tender Shared",
-          description: `Successfully shared to ${result.twitter ? 'Twitter' : ''}${result.twitter && result.telegram ? ' and ' : ''}${result.telegram ? 'Telegram' : ''}`,
+          title: "Share Options Opened",
+          description: "Share this tender with others",
         });
+        return;
       }
+      
+      // If native sharing not available, use WhatsApp directly
+      const text = encodeURIComponent(`Check out this tender: ${window.location.origin}/tenders/${tenderId}`);
+      window.open(`https://wa.me/?text=${text}`, '_blank');
+      
+      toast({
+        title: "Share via WhatsApp",
+        description: "WhatsApp share link opened",
+      });
     } catch (err) {
       console.error("Failed to share tender:", err);
       toast({
@@ -311,7 +327,7 @@ export const TenderFeed = () => {
           
           {tendersToDisplay.length > 0 ? (
             <div className="space-y-3">
-              {tendersToDisplay.map((tender: any) => (
+              {tendersToDisplay.map((tender: Tender) => (
                 <div key={tender.id} className="bg-muted p-3 rounded-md text-sm">
                   <div className="flex justify-between items-start">
                     <h4 className="font-medium mb-1">{tender.title}</h4>
@@ -320,7 +336,7 @@ export const TenderFeed = () => {
                         variant="ghost" 
                         size="icon"
                         onClick={() => handleShareOnSocial(tender.id)}
-                        title="Share on social media"
+                        title="Share tender"
                       >
                         <ArrowUpRight className="h-4 w-4" />
                       </Button>
@@ -334,6 +350,17 @@ export const TenderFeed = () => {
                       </Button>
                     </div>
                   </div>
+                  
+                  {tender.affirmative_action && (
+                    <div className="mt-1 mb-2">
+                      <Badge variant="outline" className="bg-green-50 text-green-700 hover:bg-green-100 border-green-200">
+                        {tender.affirmative_action.type === 'youth' ? 'Youth Opportunity' : 
+                          tender.affirmative_action.type === 'women' ? 'Women Opportunity' : 
+                          tender.affirmative_action.type === 'pwds' ? 'PWDs Opportunity' : 'Special Category'}
+                      </Badge>
+                    </div>
+                  )}
+                  
                   <div className="grid grid-cols-2 gap-2 mt-2 text-xs">
                     <div className="flex items-center">
                       <Tag className="h-3 w-3 mr-1" />
