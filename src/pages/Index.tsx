@@ -1,5 +1,5 @@
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { Navigation } from "@/components/Navigation";
 import { TenderFilters } from "@/components/TenderFilters";
 import { TenderList } from "@/components/tenders/TenderList";
@@ -12,6 +12,7 @@ import { format } from "date-fns";
 import { Button } from "@/components/ui/button";
 import { Loader2, RefreshCw } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
+import { SupplierCollaborationHub } from "@/components/collaboration/SupplierCollaborationHub";
 
 const Index = () => {
   const { toast } = useToast();
@@ -25,9 +26,22 @@ const Index = () => {
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [initialScrapeDone, setInitialScrapeDone] = useState(false);
   const [fallbackTenders, setFallbackTenders] = useState([]);
+  // Add state to prevent frequent re-renders
+  const [stableFilters, setStableFilters] = useState(filters);
+  
+  // Debounce filter changes to reduce flickering
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setStableFilters(filters);
+    }, 500);
+    
+    return () => clearTimeout(timer);
+  }, [filters]);
 
-  // Function to trigger manual tender scraping
-  const refreshTenders = async () => {
+  // Memoize the refreshTenders function to prevent recreation on each render
+  const refreshTenders = useCallback(async () => {
+    if (isRefreshing) return; // Prevent multiple simultaneous refreshes
+    
     setIsRefreshing(true);
     try {
       console.log('Calling scrape-tenders function with force=true...');
@@ -69,10 +83,10 @@ const Index = () => {
       setIsRefreshing(false);
       setInitialScrapeDone(true);
     }
-  };
+  }, [isRefreshing]);
 
-  // Fetch tenders directly from the database
-  const fetchDirectlyFromDatabase = async () => {
+  // Memoize the fetchDirectlyFromDatabase function
+  const fetchDirectlyFromDatabase = useCallback(async () => {
     try {
       console.log('Fetching tenders directly from database...');
       const { data, error } = await supabase
@@ -142,7 +156,7 @@ const Index = () => {
     } catch (error) {
       console.error('Error fetching tenders from database:', error);
     }
-  };
+  }, []);
 
   const { 
     data: tenders = [], 
@@ -150,32 +164,32 @@ const Index = () => {
     refetch,
     isError
   } = useQuery({
-    queryKey: ["tenders", filters],
+    queryKey: ["tenders", stableFilters],
     queryFn: async () => {
-      console.log("Fetching tenders with filters:", filters);
+      console.log("Fetching tenders with filters:", stableFilters);
       
       let query = supabase
         .from("tenders")
         .select("*")
         .order("created_at", { ascending: false });
 
-      if (filters.search) {
-        query = query.or(`title.ilike.%${filters.search}%,description.ilike.%${filters.search}%`);
+      if (stableFilters.search) {
+        query = query.or(`title.ilike.%${stableFilters.search}%,description.ilike.%${stableFilters.search}%`);
       }
 
-      if (filters.category && filters.category !== "All") {
-        query = query.eq("category", filters.category);
+      if (stableFilters.category && stableFilters.category !== "All") {
+        query = query.eq("category", stableFilters.category);
       }
 
-      if (filters.location && filters.location !== "All") {
-        query = query.eq("location", filters.location);
+      if (stableFilters.location && stableFilters.location !== "All") {
+        query = query.eq("location", stableFilters.location);
       }
 
-      if (filters.deadline) {
+      if (stableFilters.deadline) {
         const now = new Date();
         let endDate;
         
-        switch (filters.deadline) {
+        switch (stableFilters.deadline) {
           case "today":
             endDate = new Date(now.setHours(23, 59, 59, 999));
             query = query.lte("deadline", endDate.toISOString());
@@ -221,22 +235,29 @@ const Index = () => {
         value: tender.fees || "Contact for pricing",
         location: tender.location || "International",
         description: tender.description,
-        tender_url: tender.tender_url
+        tender_url: tender.tender_url,
+        affirmative_action: tender.affirmative_action
       }));
     },
     staleTime: 1000 * 60 * 5, // 5 minutes
-    refetchOnWindowFocus: true, // Refresh when window gets focus
+    refetchOnWindowFocus: false, // Disable automatic refetch to reduce flickering
+    refetchOnReconnect: false, // Disable automatic refetch on reconnect
+    refetchOnMount: false, // Disable automatic refetch on component mount
+    retry: 1, // Limit retries to reduce flickering
+    gcTime: 1000 * 60 * 10, // Keep data in cache for 10 minutes
   });
 
   // Decide which tenders to display
   const displayTenders = tenders.length > 0 ? tenders : fallbackTenders;
 
-  // Check if we have tenders on initial load
+  // Check if we have tenders on initial load - only once
   useEffect(() => {
+    let isMounted = true;
+    
     const checkForTenders = async () => {
-      if (!isLoading && !initialScrapeDone) {
+      if (!initialScrapeDone && isMounted) {
         // Check how many tenders are in the database
-        const { count, error } = await supabase
+        const { count } = await supabase
           .from("tenders")
           .select("*", { count: 'exact', head: true });
         
@@ -246,7 +267,7 @@ const Index = () => {
           // If no tenders are found on the initial load, scrape some
           console.log("No tenders found in database, starting initial scrape");
           await refreshTenders();
-        } else {
+        } else if (isMounted) {
           setInitialScrapeDone(true);
           
           // Fetch the tenders even if we have count
@@ -256,30 +277,46 @@ const Index = () => {
     };
     
     checkForTenders();
-  }, [isLoading]);
+    
+    return () => {
+      isMounted = false;
+    };
+  }, [initialScrapeDone]);
 
+  // Force a refresh every hour, but only if component is mounted
   useEffect(() => {
-    // Force a refresh every hour
+    let isMounted = true;
     const intervalId = setInterval(() => {
-      console.log('Running scheduled tender refresh');
-      refreshTenders();
+      if (isMounted) {
+        console.log('Running scheduled tender refresh');
+        refreshTenders();
+      }
     }, 1000 * 60 * 60); // 1 hour
     
-    return () => clearInterval(intervalId);
-  }, []);
+    return () => {
+      isMounted = false;
+      clearInterval(intervalId);
+    };
+  }, [refreshTenders]);
 
-  // Force an immediate scrape when the component mounts
+  // Run initial scrape exactly once when the component mounts
   useEffect(() => {
+    let isMounted = true;
+    
     // Only run this once on initial mount
     const runInitialScrape = async () => {
-      if (!initialScrapeDone) {
+      if (!initialScrapeDone && isMounted) {
         console.log("Running initial tender scrape on page load");
         await refreshTenders();
       }
     };
     
     runInitialScrape();
-  }, []);
+    
+    return () => {
+      isMounted = false;
+    };
+  }, [initialScrapeDone, refreshTenders]);
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -308,6 +345,8 @@ const Index = () => {
               )}
             </Button>
           </div>
+          
+          <SupplierCollaborationHub />
           
           <div className="grid grid-cols-1 lg:grid-cols-4 gap-8">
             <div className="lg:col-span-1">

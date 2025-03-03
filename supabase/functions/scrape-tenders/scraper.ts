@@ -1,128 +1,165 @@
-import { XPathSelect } from "./utils.ts";
-import type { TenderData } from "./types.ts";
 
-// Default empty function - add proper scraping logic here
-export function scrapeMygov(html: string): TenderData[] {
+import cheerio from "cheerio";
+import { format, addDays, parseISO } from "date-fns";
+import { TenderData } from "./types.ts";
+
+// Function to scrape mygov.go.ke/all-tenders
+export async function scrapeMygov(): Promise<TenderData[]> {
   try {
-    console.log("Starting MyGov scraper");
+    console.log("Starting scrape from mygov.go.ke/all-tenders");
     
-    // Parse HTML
-    const parser = new XPathSelect(html);
+    const response = await fetch("https://mygov.go.ke/all-tenders");
+    if (!response.ok) {
+      throw new Error(`Failed to fetch mygov.go.ke: ${response.status}`);
+    }
     
-    // Mock tenders for testing - this would be replaced with actual scraping logic
-    const tenders: TenderData[] = [
-      {
-        title: "Construction of Rural Health Centers",
-        description: "Construction of 5 rural health centers in underserved communities",
-        requirements: "Valid construction license, 5+ years experience in healthcare construction",
-        deadline: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(),
-        contact_info: "Ministry of Health, procurement@health.gov",
-        fees: "$500,000 - $750,000",
-        category: "Construction",
-        location: "Rural Counties",
-        affirmative_action: {
-          type: "youth",
-          percentage: 30
+    const html = await response.text();
+    const $ = cheerio.load(html);
+    const tenders: TenderData[] = [];
+    
+    $('#datatable tbody tr').each((index, element) => {
+      const title = $(element).find('td.views-field-title').text().trim();
+      const procuringEntity = $(element).find('td.views-field-field-ten').text().trim();
+      const documentUrl = $(element).find('td.views-field-field-tender-documents a').attr('href') || '';
+      const closingDate = $(element).find('td.views-field-field-tender-closing-date').text().trim();
+      
+      // Skip empty entries
+      if (!title) return;
+      
+      // Parse the date (assuming DD/MM/YYYY format)
+      let deadline = new Date();
+      if (closingDate) {
+        const parts = closingDate.split('/');
+        if (parts.length === 3) {
+          deadline = new Date(`${parts[2]}-${parts[1]}-${parts[0]}`);
         }
-      },
-      {
-        title: "Supply of IT Equipment to Schools",
-        description: "Supply of laptops, tablets and networking equipment to 50 schools",
-        requirements: "Authorized IT equipment supplier, ability to provide 3-year warranty",
-        deadline: new Date(Date.now() + 14 * 24 * 60 * 60 * 1000).toISOString(),
-        contact_info: "Ministry of Education, procurement@education.gov",
-        fees: "$200,000",
-        category: "IT",
-        location: "National",
-        affirmative_action: {
-          type: "women",
-          percentage: 20
-        }
-      },
-      {
-        title: "Road Maintenance Services",
-        description: "Maintenance of 150km of rural roads in the western region",
-        requirements: "Category A road construction and maintenance contractor",
-        deadline: new Date(Date.now() + 21 * 24 * 60 * 60 * 1000).toISOString(),
-        contact_info: "Ministry of Transport, roads@transport.gov",
-        fees: "$1,200,000",
-        category: "Infrastructure",
-        location: "Western Region",
       }
-    ];
+      
+      tenders.push({
+        title,
+        description: title,
+        requirements: "See tender document for requirements",
+        deadline: deadline.toISOString(),
+        contact_info: procuringEntity,
+        fees: null,
+        prerequisites: null,
+        category: "Government",
+        subcategory: null,
+        tender_url: documentUrl,
+        location: "Kenya",
+        points_required: 0
+      });
+    });
     
-    console.log(`Found ${tenders.length} mock tenders`);
+    console.log(`Found ${tenders.length} tenders from mygov.go.ke`);
     return tenders;
   } catch (error) {
-    console.error("Error in MyGov scraper:", error);
+    console.error("Error scraping mygov.go.ke:", error);
     return [];
   }
 }
 
-export async function scrapeGovernmentTenders(): Promise<TenderData[]> {
-  console.log("Starting government tender scraper");
-  
-  // Mock government tenders for testing
-  const tenders: TenderData[] = [
-    {
-      title: "Medical Supplies for County Hospitals",
-      description: "Supply of essential medical supplies and equipment to county hospitals",
-      requirements: "Must be registered with the Pharmacy and Poisons Board",
-      deadline: new Date(Date.now() + 10 * 24 * 60 * 60 * 1000).toISOString(),
-      contact_info: "County Health Department, health@county.gov",
-      fees: "$300,000",
-      category: "Medical",
-      location: "Various Counties",
-    },
-    {
-      title: "Agricultural Extension Services",
-      description: "Provision of agricultural extension services to small-scale farmers",
-      requirements: "Degree in Agriculture, 3+ years experience in extension services",
-      deadline: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(),
-      contact_info: "Ministry of Agriculture, agri@agriculture.gov",
-      fees: "$150,000",
-      category: "Agriculture",
-      location: "Rural Areas",
-      affirmative_action: {
-        type: "pwds",
-        percentage: 10
-      }
+// Function to scrape tenders.go.ke/tenders
+export async function scrapeTendersGoKe(): Promise<TenderData[]> {
+  try {
+    console.log("Starting scrape from tenders.go.ke/tenders");
+    
+    const response = await fetch("https://tenders.go.ke/tenders");
+    if (!response.ok) {
+      throw new Error(`Failed to fetch tenders.go.ke: ${response.status}`);
     }
-  ];
-  
-  return tenders;
+    
+    const html = await response.text();
+    const $ = cheerio.load(html);
+    const tenders: TenderData[] = [];
+    
+    // Adjust the selector based on the actual structure of tenders.go.ke
+    $('.tender-listing, .tender-item').each((index, element) => {
+      const title = $(element).find('.tender-title, h3').text().trim();
+      const description = $(element).find('.tender-description, .description').text().trim() || title;
+      const entity = $(element).find('.procuring-entity, .entity').text().trim();
+      const dateText = $(element).find('.closing-date, .deadline').text().trim();
+      const category = $(element).find('.category').text().trim() || "Government";
+      const link = $(element).find('a').attr('href') || '';
+      
+      // Skip empty entries
+      if (!title) return;
+      
+      // Default deadline (2 weeks from now)
+      let deadline = addDays(new Date(), 14);
+      
+      // Try to parse date if available
+      if (dateText) {
+        // This is a simplistic date parser, adjust based on actual format
+        const dateMatch = dateText.match(/(\d{1,2})[\/\-\.](\d{1,2})[\/\-\.](\d{2,4})/);
+        if (dateMatch) {
+          const day = parseInt(dateMatch[1]);
+          const month = parseInt(dateMatch[2]);
+          const year = parseInt(dateMatch[3]) < 100 
+            ? parseInt(dateMatch[3]) + 2000 
+            : parseInt(dateMatch[3]);
+          deadline = new Date(year, month - 1, day);
+        }
+      }
+      
+      // Construct full URL if it's a relative path
+      let fullUrl = link;
+      if (link && !link.startsWith('http')) {
+        fullUrl = `https://tenders.go.ke${link.startsWith('/') ? '' : '/'}${link}`;
+      }
+      
+      tenders.push({
+        title,
+        description,
+        requirements: "See tender document for requirements",
+        deadline: deadline.toISOString(),
+        contact_info: entity,
+        fees: null,
+        prerequisites: null,
+        category,
+        subcategory: null,
+        tender_url: fullUrl,
+        location: "Kenya",
+        points_required: 0
+      });
+    });
+    
+    console.log(`Found ${tenders.length} tenders from tenders.go.ke`);
+    return tenders;
+  } catch (error) {
+    console.error("Error scraping tenders.go.ke:", error);
+    return [];
+  }
 }
 
-export async function scrapeTederingBoard(): Promise<TenderData[]> {
-  console.log("Starting tendering board scraper");
+// Fallback function to generate sample data if scraping fails
+export function generateSampleTenders(): TenderData[] {
+  console.log("Generating sample tenders as fallback");
+  const tenders: TenderData[] = [];
   
-  // Mock procurement tenders for testing
-  const tenders: TenderData[] = [
-    {
-      title: "Consulting Services for Public Financial Management",
-      description: "Consulting services for strengthening public financial management",
-      requirements: "Certified financial consultants with public sector experience",
-      deadline: new Date(Date.now() + 20 * 24 * 60 * 60 * 1000).toISOString(),
-      contact_info: "Public Procurement Authority, info@ppa.gov",
-      fees: "$500,000",
-      category: "Consulting",
-      location: "Capital City",
-    },
-    {
-      title: "Security Services for Government Buildings",
-      description: "Provision of security services for government buildings and installations",
-      requirements: "Licensed security firm, proven track record in high-security environments",
-      deadline: new Date(Date.now() + 15 * 24 * 60 * 60 * 1000).toISOString(),
-      contact_info: "Ministry of Interior, security@interior.gov",
-      fees: "$800,000",
-      category: "Security",
-      location: "National",
-      affirmative_action: {
-        type: "youth",
-        percentage: 15
-      }
-    }
-  ];
+  const categories = ["Construction", "IT", "Supplies", "Services", "Consultancy"];
+  const locations = ["Nairobi", "Mombasa", "Kisumu", "National"];
+  
+  for (let i = 1; i <= 10; i++) {
+    const category = categories[Math.floor(Math.random() * categories.length)];
+    const location = locations[Math.floor(Math.random() * locations.length)];
+    const deadline = addDays(new Date(), 7 + Math.floor(Math.random() * 30));
+    
+    tenders.push({
+      title: `Sample Tender ${i}: ${category} Project`,
+      description: `This is a sample tender for a ${category.toLowerCase()} project in ${location}.`,
+      requirements: "Sample requirements. See tender document for details.",
+      deadline: deadline.toISOString(),
+      contact_info: `Ministry of ${category}`,
+      fees: Math.random() > 0.5 ? `KES ${Math.floor(Math.random() * 1000000)}` : null,
+      prerequisites: null,
+      category,
+      subcategory: null,
+      tender_url: "https://example.com/tender",
+      location,
+      points_required: 0
+    });
+  }
   
   return tenders;
 }
