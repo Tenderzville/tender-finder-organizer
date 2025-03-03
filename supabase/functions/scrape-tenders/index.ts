@@ -1,169 +1,241 @@
 
-import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
-import { createClient } from "@supabase/supabase-js";
-import { scrapeMygov, scrapeTendersGoKe, generateSampleTenders } from "./scraper.ts";
-import { TenderData } from "./types.ts";
+// Follow Deno's URL imports pattern for Edge Functions
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2.42.7";
+import { corsHeaders } from "../_shared/cors.ts";
+import { format, addDays } from "date-fns";
+import { scrapeMyGov, scrapeTendersGo } from "./scraper.ts";
+import type { Tender } from "./types.ts";
 
-// CORS headers for browser requests
-const corsHeaders = {
-  "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
-};
+// Create a single supabase client for interacting with your database
+const supabaseUrl = Deno.env.get("SUPABASE_URL") || "";
+const supabaseKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") || "";
+const supabase = createClient(supabaseUrl, supabaseKey);
 
-serve(async (req) => {
+Deno.serve(async (req) => {
   // Handle CORS preflight requests
   if (req.method === "OPTIONS") {
-    return new Response(null, { headers: corsHeaders });
+    return new Response(null, {
+      headers: corsHeaders,
+    });
   }
 
   try {
-    // Parse request to check for force parameter
-    const { force = false } = await req.json().catch(() => ({}));
-    console.log(`Scrape-tenders function called with force=${force}`);
-
-    // Initialize Supabase client
-    const supabaseUrl = Deno.env.get("SUPABASE_URL") || "";
-    const supabaseKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") || "";
-    const supabase = createClient(supabaseUrl, supabaseKey);
-
-    // Check if we need to scrape (based on last scrape time or force parameter)
-    const { data: lastScrape } = await supabase
-      .from("scrape_logs")
-      .select("created_at")
-      .order("created_at", { ascending: false })
-      .limit(1);
-
-    const lastScrapeTime = lastScrape?.[0]?.created_at
-      ? new Date(lastScrape[0].created_at)
-      : new Date(0);
-    const currentTime = new Date();
-    const timeSinceLastScrape = currentTime.getTime() - lastScrapeTime.getTime();
-    const hoursSinceLastScrape = timeSinceLastScrape / (1000 * 60 * 60);
-
-    // Only scrape if forced or it's been more than 6 hours since last scrape
-    if (!force && hoursSinceLastScrape < 6) {
-      console.log(`Last scrape was ${hoursSinceLastScrape.toFixed(2)} hours ago. Skipping.`);
+    console.log("Starting scrape-tenders function");
+    
+    // Parse request to get force parameter
+    let force = false;
+    if (req.method === "POST") {
+      const body = await req.json();
+      force = body?.force === true;
+      console.log(`Force parameter: ${force}`);
+    }
+    
+    // Check if we've already scraped recently (within last 30 minutes)
+    // Skip this check if force is true
+    if (!force) {
+      const { data: lastScrape } = await supabase
+        .from("scraping_logs")
+        .select("created_at, status")
+        .eq("source", "mygov.go.ke")
+        .order("created_at", { ascending: false })
+        .limit(1);
       
-      // Get total tenders count
-      const { count } = await supabase
-        .from("tenders")
-        .select("*", { count: "exact", head: true });
+      if (lastScrape && lastScrape.length > 0) {
+        const lastScrapeTime = new Date(lastScrape[0].created_at);
+        const thirtyMinutesAgo = new Date(Date.now() - 30 * 60 * 1000);
+        
+        if (lastScrapeTime > thirtyMinutesAgo && lastScrape[0].status === "success") {
+          console.log("Skipping scrape - already scraped within last 30 minutes");
+          return new Response(
+            JSON.stringify({
+              message: "Skipping scrape - already scraped within last 30 minutes",
+              last_scrape: lastScrape[0].created_at
+            }),
+            {
+              headers: { ...corsHeaders, "Content-Type": "application/json" },
+              status: 200,
+            }
+          );
+        }
+      }
+    }
+    
+    console.log("Beginning scrape operations");
+
+    // Create a log entry for this scrape
+    const { data: logEntry, error: logError } = await supabase
+      .from("scraping_logs")
+      .insert({
+        source: "mygov.go.ke",
+        status: "in_progress",
+        records_found: 0
+      })
+      .select()
+      .single();
+    
+    if (logError) {
+      console.error("Error creating log entry:", logError);
+      throw new Error("Failed to create scraping log entry");
+    }
+    
+    const logId = logEntry.id;
+    console.log(`Created scraping log with ID ${logId}`);
+    
+    // Scrape MyGov tenders
+    console.log("Scraping MyGov tenders...");
+    const myGovTenders = await scrapeMyGov();
+    console.log(`Scraped ${myGovTenders.length} tenders from MyGov`);
+    
+    // Scrape Tenders.go.ke (Uncomment when implemented)
+    console.log("Scraping Tenders.go.ke...");
+    const tendersGoTenders = await scrapeTendersGo();
+    console.log(`Scraped ${tendersGoTenders.length} tenders from Tenders.go.ke`);
+    
+    // Combine and process all scraped tenders
+    const allTenders = [...myGovTenders, ...tendersGoTenders];
+    console.log(`Total tenders scraped: ${allTenders.length}`);
+    
+    if (allTenders.length === 0) {
+      // Update log with no records found
+      await supabase
+        .from("scraping_logs")
+        .update({
+          status: "success",
+          records_found: 0,
+          records_inserted: 0
+        })
+        .eq("id", logId);
       
       return new Response(
         JSON.stringify({
-          message: "Scrape skipped (recently run)",
-          tenders_scraped: 0,
-          total_tenders: count || 0,
-          last_scrape: lastScrapeTime.toISOString(),
+          message: "No tenders found during scrape",
+          tenders_scraped: 0
         }),
-        { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        {
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+          status: 200,
+        }
       );
     }
-
-    // Log the start of the scraping process
-    console.log("Starting tender scraping process");
-    await supabase
-      .from("scrape_logs")
-      .insert({
-        source: "all",
-        status: "started",
-        records_found: null,
-        records_inserted: null,
-      });
-
-    // Scrape from multiple sources
-    console.log("Scraping from mygov.go.ke");
-    const mygovTenders = await scrapeMygov();
     
-    console.log("Scraping from tenders.go.ke");
-    const tendersGoKeTenders = await scrapeTendersGoKe();
-    
-    // Combine all tenders
-    let allTenders: TenderData[] = [...mygovTenders, ...tendersGoKeTenders];
-    
-    // Use sample data as fallback if no tenders found
-    if (allTenders.length === 0) {
-      console.log("No tenders found from any source, using sample data");
-      allTenders = generateSampleTenders();
-    }
-
-    console.log(`Total tenders scraped: ${allTenders.length}`);
-
-    // Insert tenders into database
+    // Process and insert tenders
     let insertedCount = 0;
     for (const tender of allTenders) {
-      // Check if tender already exists (by title and deadline)
-      const { data: existingTenders } = await supabase
-        .from("tenders")
-        .select("id")
-        .eq("title", tender.title)
-        .eq("deadline", tender.deadline);
-
-      // Skip if tender already exists
-      if (existingTenders && existingTenders.length > 0) {
-        console.log(`Tender "${tender.title}" already exists, skipping`);
-        continue;
-      }
-
-      // Insert new tender
-      const { error } = await supabase.from("tenders").insert(tender);
-      if (error) {
-        console.error(`Error inserting tender "${tender.title}":`, error);
-      } else {
+      try {
+        // Check if tender already exists by URL or title
+        const { data: existingTenders } = await supabase
+          .from("tenders")
+          .select("id")
+          .or(`title.eq."${tender.title}",tender_url.eq."${tender.tender_url}"`)
+          .limit(1);
+        
+        if (existingTenders && existingTenders.length > 0) {
+          console.log(`Tender already exists: ${tender.title}`);
+          continue;
+        }
+        
+        // Determine affirmative action status based on content analysis
+        let affirmativeAction = null;
+        const lowerTitle = tender.title.toLowerCase();
+        const lowerDesc = (tender.description || "").toLowerCase();
+        
+        if (
+          lowerTitle.includes("youth") || 
+          lowerDesc.includes("youth") || 
+          lowerTitle.includes("agpo") || 
+          lowerDesc.includes("agpo")
+        ) {
+          affirmativeAction = { 
+            type: "youth", 
+            percentage: 30,
+            details: "30% procurement preference for youth-owned businesses"
+          };
+        } else if (
+          lowerTitle.includes("women") || 
+          lowerDesc.includes("women")
+        ) {
+          affirmativeAction = {
+            type: "women",
+            percentage: 30,
+            details: "30% procurement preference for women-owned businesses"
+          };
+        } else if (
+          lowerTitle.includes("pwd") || 
+          lowerDesc.includes("pwd") || 
+          lowerTitle.includes("persons with disabilities") || 
+          lowerDesc.includes("persons with disabilities")
+        ) {
+          affirmativeAction = {
+            type: "pwds",
+            percentage: 30,
+            details: "30% procurement preference for businesses owned by persons with disabilities"
+          };
+        } else {
+          affirmativeAction = { type: "none" };
+        }
+        
+        // Generate a deadline 14-30 days in the future if not specified
+        const deadline = tender.deadline ? new Date(tender.deadline) : addDays(new Date(), 14 + Math.floor(Math.random() * 16));
+        
+        // Insert the tender with affirmative action info
+        const { error: insertError } = await supabase
+          .from("tenders")
+          .insert({
+            ...tender,
+            deadline,
+            category: tender.category || "Government",
+            affirmative_action: affirmativeAction
+          });
+        
+        if (insertError) {
+          console.error(`Error inserting tender "${tender.title}":`, insertError);
+          continue;
+        }
+        
         insertedCount++;
+      } catch (err) {
+        console.error(`Error processing tender "${tender.title}":`, err);
       }
     }
-
-    // Log completion of scraping process
+    
+    console.log(`Inserted ${insertedCount} new tenders`);
+    
+    // Update log with final stats
     await supabase
-      .from("scrape_logs")
-      .insert({
-        source: "all",
+      .from("scraping_logs")
+      .update({
         status: "success",
         records_found: allTenders.length,
-        records_inserted: insertedCount,
-      });
-
-    // Get total tenders count
+        records_inserted: insertedCount
+      })
+      .eq("id", logId);
+    
+    // Get total tender count
     const { count } = await supabase
       .from("tenders")
       .select("*", { count: "exact", head: true });
-
-    // Return success response
+    
     return new Response(
       JSON.stringify({
-        message: "Tender scraping completed successfully",
+        message: "Scrape completed successfully",
         tenders_scraped: insertedCount,
-        total_tenders: count || 0,
-        last_scrape: new Date().toISOString(),
+        total_tenders: count || 0
       }),
-      { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      {
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+        status: 200,
+      }
     );
   } catch (error) {
     console.error("Error in scrape-tenders function:", error);
     
-    // Log error
-    const supabaseUrl = Deno.env.get("SUPABASE_URL") || "";
-    const supabaseKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") || "";
-    const supabase = createClient(supabaseUrl, supabaseKey);
-    
-    await supabase
-      .from("scrape_logs")
-      .insert({
-        source: "all",
-        status: "error",
-        error_message: error.message,
-      });
-
-    // Return error response
     return new Response(
       JSON.stringify({
-        message: "Error processing tender scrape",
-        error: error.message,
+        error: error.message || "An error occurred during the scrape operation"
       }),
       {
-        status: 500,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
+        status: 500,
       }
     );
   }

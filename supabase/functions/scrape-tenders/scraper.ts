@@ -1,165 +1,209 @@
 
-import cheerio from "cheerio";
-import { format, addDays, parseISO } from "date-fns";
-import { TenderData } from "./types.ts";
+import { DOMParser } from "https://deno.land/x/deno_dom@v0.1.38/deno-dom-wasm.ts";
+import type { Tender } from "./types.ts";
 
-// Function to scrape mygov.go.ke/all-tenders
-export async function scrapeMygov(): Promise<TenderData[]> {
+/**
+ * Scrapes tenders from mygov.go.ke
+ */
+export async function scrapeMyGov(): Promise<Partial<Tender>[]> {
+  console.log("Starting to scrape MyGov website...");
   try {
-    console.log("Starting scrape from mygov.go.ke/all-tenders");
+    const response = await fetch("https://mygov.go.ke/all-tenders", {
+      headers: {
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36"
+      }
+    });
     
-    const response = await fetch("https://mygov.go.ke/all-tenders");
     if (!response.ok) {
-      throw new Error(`Failed to fetch mygov.go.ke: ${response.status}`);
+      throw new Error(`Failed to fetch MyGov page: ${response.status} ${response.statusText}`);
     }
     
     const html = await response.text();
-    const $ = cheerio.load(html);
-    const tenders: TenderData[] = [];
+    console.log(`Fetched MyGov HTML content (${html.length} bytes)`);
     
-    $('#datatable tbody tr').each((index, element) => {
-      const title = $(element).find('td.views-field-title').text().trim();
-      const procuringEntity = $(element).find('td.views-field-field-ten').text().trim();
-      const documentUrl = $(element).find('td.views-field-field-tender-documents a').attr('href') || '';
-      const closingDate = $(element).find('td.views-field-field-tender-closing-date').text().trim();
-      
-      // Skip empty entries
-      if (!title) return;
-      
-      // Parse the date (assuming DD/MM/YYYY format)
-      let deadline = new Date();
-      if (closingDate) {
-        const parts = closingDate.split('/');
-        if (parts.length === 3) {
-          deadline = new Date(`${parts[2]}-${parts[1]}-${parts[0]}`);
+    const doc = new DOMParser().parseFromString(html, "text/html");
+    if (!doc) {
+      throw new Error("Failed to parse HTML document");
+    }
+    
+    const tenders: Partial<Tender>[] = [];
+    const rows = doc.querySelectorAll("#datatable tbody tr");
+    
+    console.log(`Found ${rows.length} rows in the tenders table`);
+    
+    rows.forEach((row) => {
+      try {
+        const noCell = row.querySelector("td.views-field-counter");
+        const titleCell = row.querySelector("td.views-field-title");
+        const entityCell = row.querySelector("td.views-field-field-ten");
+        const documentCell = row.querySelector("td.views-field-field-tender-documents a");
+        const closingDateCell = row.querySelector("td.views-field-field-tender-closing-date");
+        
+        if (!titleCell) {
+          console.log("Skipping row without title cell");
+          return;
         }
+        
+        const title = titleCell.textContent.trim();
+        const entity = entityCell ? entityCell.textContent.trim() : "Not specified";
+        const documentUrl = documentCell ? documentCell.getAttribute("href") : null;
+        const closingDateText = closingDateCell ? closingDateCell.textContent.trim() : "";
+        
+        // Parse closing date
+        let deadline = null;
+        if (closingDateText) {
+          try {
+            // Handle various date formats
+            const dateParts = closingDateText.split(/[\s\/\-\.]+/);
+            if (dateParts.length >= 3) {
+              const day = parseInt(dateParts[0], 10);
+              const month = parseInt(dateParts[1], 10) - 1; // JS months are 0-indexed
+              const year = parseInt(dateParts[2], 10);
+              deadline = new Date(year, month, day);
+            }
+          } catch (e) {
+            console.error(`Failed to parse date: ${closingDateText}`, e);
+          }
+        }
+        
+        // Extract more details from the title
+        let category = "Government";
+        if (title.toLowerCase().includes("construction")) {
+          category = "Construction";
+        } else if (title.toLowerCase().includes("supply") || title.toLowerCase().includes("goods")) {
+          category = "Supplies";
+        } else if (title.toLowerCase().includes("service")) {
+          category = "Services";
+        } else if (title.toLowerCase().includes("consultancy")) {
+          category = "Consultancy";
+        }
+        
+        // Create tender object
+        const tender: Partial<Tender> = {
+          title,
+          contact_info: entity,
+          tender_url: documentUrl,
+          deadline: deadline ? deadline.toISOString() : null,
+          category,
+          description: `Tender from ${entity}. Please check the tender document for more details.`,
+          location: "Kenya"
+        };
+        
+        tenders.push(tender);
+      } catch (err) {
+        console.error("Error processing row:", err);
       }
-      
-      tenders.push({
-        title,
-        description: title,
-        requirements: "See tender document for requirements",
-        deadline: deadline.toISOString(),
-        contact_info: procuringEntity,
-        fees: null,
-        prerequisites: null,
-        category: "Government",
-        subcategory: null,
-        tender_url: documentUrl,
-        location: "Kenya",
-        points_required: 0
-      });
     });
     
-    console.log(`Found ${tenders.length} tenders from mygov.go.ke`);
+    console.log(`Successfully scraped ${tenders.length} tenders from MyGov`);
     return tenders;
   } catch (error) {
-    console.error("Error scraping mygov.go.ke:", error);
+    console.error("Error scraping MyGov:", error);
     return [];
   }
 }
 
-// Function to scrape tenders.go.ke/tenders
-export async function scrapeTendersGoKe(): Promise<TenderData[]> {
+/**
+ * Scrapes tenders from tenders.go.ke
+ */
+export async function scrapeTendersGo(): Promise<Partial<Tender>[]> {
+  console.log("Starting to scrape Tenders.go.ke website...");
   try {
-    console.log("Starting scrape from tenders.go.ke/tenders");
+    const response = await fetch("https://tenders.go.ke/tenders", {
+      headers: {
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36"
+      }
+    });
     
-    const response = await fetch("https://tenders.go.ke/tenders");
     if (!response.ok) {
-      throw new Error(`Failed to fetch tenders.go.ke: ${response.status}`);
+      throw new Error(`Failed to fetch Tenders.go.ke page: ${response.status} ${response.statusText}`);
     }
     
     const html = await response.text();
-    const $ = cheerio.load(html);
-    const tenders: TenderData[] = [];
+    console.log(`Fetched Tenders.go.ke HTML content (${html.length} bytes)`);
     
-    // Adjust the selector based on the actual structure of tenders.go.ke
-    $('.tender-listing, .tender-item').each((index, element) => {
-      const title = $(element).find('.tender-title, h3').text().trim();
-      const description = $(element).find('.tender-description, .description').text().trim() || title;
-      const entity = $(element).find('.procuring-entity, .entity').text().trim();
-      const dateText = $(element).find('.closing-date, .deadline').text().trim();
-      const category = $(element).find('.category').text().trim() || "Government";
-      const link = $(element).find('a').attr('href') || '';
-      
-      // Skip empty entries
-      if (!title) return;
-      
-      // Default deadline (2 weeks from now)
-      let deadline = addDays(new Date(), 14);
-      
-      // Try to parse date if available
-      if (dateText) {
-        // This is a simplistic date parser, adjust based on actual format
-        const dateMatch = dateText.match(/(\d{1,2})[\/\-\.](\d{1,2})[\/\-\.](\d{2,4})/);
-        if (dateMatch) {
-          const day = parseInt(dateMatch[1]);
-          const month = parseInt(dateMatch[2]);
-          const year = parseInt(dateMatch[3]) < 100 
-            ? parseInt(dateMatch[3]) + 2000 
-            : parseInt(dateMatch[3]);
-          deadline = new Date(year, month - 1, day);
+    const doc = new DOMParser().parseFromString(html, "text/html");
+    if (!doc) {
+      throw new Error("Failed to parse HTML document");
+    }
+    
+    const tenders: Partial<Tender>[] = [];
+    
+    // Adjust selector based on actual page structure
+    const tenderItems = doc.querySelectorAll(".tender-item, .tenders-list tr, .tender-listing");
+    
+    console.log(`Found ${tenderItems.length} tender items on the page`);
+    
+    tenderItems.forEach((item, index) => {
+      try {
+        // Adjust these selectors based on the actual structure of the page
+        const titleElement = item.querySelector(".tender-title, h3, .title");
+        const orgElement = item.querySelector(".organization, .entity, .procuring-entity");
+        const deadlineElement = item.querySelector(".deadline, .closing-date, .end-date");
+        const linkElement = item.querySelector("a");
+        
+        if (!titleElement) {
+          console.log(`Skipping item ${index} without title element`);
+          return;
         }
+        
+        const title = titleElement.textContent.trim();
+        const organization = orgElement ? orgElement.textContent.trim() : "Not specified";
+        const deadlineText = deadlineElement ? deadlineElement.textContent.trim() : "";
+        const link = linkElement ? linkElement.getAttribute("href") : null;
+        
+        // Parse deadline
+        let deadline = null;
+        if (deadlineText) {
+          try {
+            // Extract date parts from text like "Closing Date: 15/04/2023"
+            const dateMatch = deadlineText.match(/(\d{1,2})[\/\-\.](\d{1,2})[\/\-\.](\d{2,4})/);
+            if (dateMatch) {
+              const day = parseInt(dateMatch[1], 10);
+              const month = parseInt(dateMatch[2], 10) - 1; // JS months are 0-indexed
+              let year = parseInt(dateMatch[3], 10);
+              // Handle 2-digit years
+              if (year < 100) {
+                year += year < 50 ? 2000 : 1900;
+              }
+              deadline = new Date(year, month, day);
+            }
+          } catch (e) {
+            console.error(`Failed to parse date: ${deadlineText}`, e);
+          }
+        }
+        
+        // Determine category
+        let category = "Government";
+        if (title.toLowerCase().includes("construction") || title.toLowerCase().includes("build")) {
+          category = "Construction";
+        } else if (title.toLowerCase().includes("supply") || title.toLowerCase().includes("goods")) {
+          category = "Supplies";
+        } else if (title.toLowerCase().includes("service")) {
+          category = "Services";
+        }
+        
+        // Create tender object
+        const tender: Partial<Tender> = {
+          title,
+          contact_info: organization,
+          tender_url: link ? (link.startsWith("http") ? link : `https://tenders.go.ke${link}`) : null,
+          deadline: deadline ? deadline.toISOString() : null,
+          category,
+          description: `Tender from ${organization}. Please check the tender document for more details.`,
+          location: "Kenya"
+        };
+        
+        tenders.push(tender);
+      } catch (err) {
+        console.error(`Error processing tender item ${index}:`, err);
       }
-      
-      // Construct full URL if it's a relative path
-      let fullUrl = link;
-      if (link && !link.startsWith('http')) {
-        fullUrl = `https://tenders.go.ke${link.startsWith('/') ? '' : '/'}${link}`;
-      }
-      
-      tenders.push({
-        title,
-        description,
-        requirements: "See tender document for requirements",
-        deadline: deadline.toISOString(),
-        contact_info: entity,
-        fees: null,
-        prerequisites: null,
-        category,
-        subcategory: null,
-        tender_url: fullUrl,
-        location: "Kenya",
-        points_required: 0
-      });
     });
     
-    console.log(`Found ${tenders.length} tenders from tenders.go.ke`);
+    console.log(`Successfully scraped ${tenders.length} tenders from Tenders.go.ke`);
     return tenders;
   } catch (error) {
-    console.error("Error scraping tenders.go.ke:", error);
+    console.error("Error scraping Tenders.go.ke:", error);
     return [];
   }
-}
-
-// Fallback function to generate sample data if scraping fails
-export function generateSampleTenders(): TenderData[] {
-  console.log("Generating sample tenders as fallback");
-  const tenders: TenderData[] = [];
-  
-  const categories = ["Construction", "IT", "Supplies", "Services", "Consultancy"];
-  const locations = ["Nairobi", "Mombasa", "Kisumu", "National"];
-  
-  for (let i = 1; i <= 10; i++) {
-    const category = categories[Math.floor(Math.random() * categories.length)];
-    const location = locations[Math.floor(Math.random() * locations.length)];
-    const deadline = addDays(new Date(), 7 + Math.floor(Math.random() * 30));
-    
-    tenders.push({
-      title: `Sample Tender ${i}: ${category} Project`,
-      description: `This is a sample tender for a ${category.toLowerCase()} project in ${location}.`,
-      requirements: "Sample requirements. See tender document for details.",
-      deadline: deadline.toISOString(),
-      contact_info: `Ministry of ${category}`,
-      fees: Math.random() > 0.5 ? `KES ${Math.floor(Math.random() * 1000000)}` : null,
-      prerequisites: null,
-      category,
-      subcategory: null,
-      tender_url: "https://example.com/tender",
-      location,
-      points_required: 0
-    });
-  }
-  
-  return tenders;
 }

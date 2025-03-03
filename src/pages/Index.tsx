@@ -13,6 +13,7 @@ import { Button } from "@/components/ui/button";
 import { Loader2, RefreshCw } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { SupplierCollaborationHub } from "@/components/collaboration/SupplierCollaborationHub";
+import type { TenderAffirmativeAction } from "@/types/tender";
 
 const Index = () => {
   const { toast } = useToast();
@@ -110,7 +111,8 @@ const Index = () => {
           value: tender.fees || "Contact for pricing",
           location: tender.location || "International",
           description: tender.description,
-          tender_url: tender.tender_url
+          tender_url: tender.tender_url,
+          affirmative_action: tender.affirmative_action as TenderAffirmativeAction
         }));
         setFallbackTenders(formattedTenders);
         
@@ -131,7 +133,8 @@ const Index = () => {
             category: "Construction",
             value: "Contact for pricing",
             location: "Nairobi",
-            description: "Construction of rural health centers across the country."
+            description: "Construction of rural health centers across the country.",
+            affirmative_action: { type: 'youth', percentage: 30 } as TenderAffirmativeAction
           },
           {
             id: 9998,
@@ -141,7 +144,8 @@ const Index = () => {
             category: "IT",
             value: "$50,000",
             location: "National",
-            description: "Supply and installation of computer equipment for government offices."
+            description: "Supply and installation of computer equipment for government offices.",
+            affirmative_action: { type: 'none' } as TenderAffirmativeAction
           }
         ];
         
@@ -236,7 +240,7 @@ const Index = () => {
         location: tender.location || "International",
         description: tender.description,
         tender_url: tender.tender_url,
-        affirmative_action: tender.affirmative_action
+        affirmative_action: tender.affirmative_action as TenderAffirmativeAction
       }));
     },
     staleTime: 1000 * 60 * 5, // 5 minutes
