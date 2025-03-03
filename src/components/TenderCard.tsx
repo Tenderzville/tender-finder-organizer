@@ -2,109 +2,13 @@
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Calendar, Globe, Briefcase, Bell, ExternalLink, Share } from "lucide-react";
-import { useState } from "react";
-import { useToast } from "@/hooks/use-toast";
-import { 
-  Sheet, 
-  SheetContent, 
-  SheetDescription, 
-  SheetHeader, 
-  SheetTitle, 
-  SheetTrigger,
-  SheetFooter,
-  SheetClose
-} from "@/components/ui/sheet";
-import { Input } from "@/components/ui/input";
-
-interface ShareAction {
-  icon: React.ReactNode;
-  label: string;
-  onClick: () => void;
-}
-
-interface TenderCardProps {
-  id: number;
-  title: string;
-  organization: string;
-  deadline: string;
-  category: string;
-  value: string;
-  location?: string;
-  pointsRequired?: number;
-  tender_url?: string | null;
-  onViewDetails: () => void;
-  hasAffirmativeAction?: boolean;
-  affirmativeActionType?: 'youth' | 'women' | 'pwds' | 'none';
-  language?: 'en' | 'sw';
-  shareActions?: ShareAction[];
-}
-
-const formatCurrency = (value: string, location?: string): string => {
-  if (!value || value === "Contact for pricing") return value;
-  
-  const numericValue = value.replace(/[^0-9.]/g, '');
-  if (!numericValue) return value;
-  
-  const currencyFormats: { [key: string]: { symbol: string, position: 'before' | 'after' } } = {
-    'Kenya': { symbol: 'KSh', position: 'before' },
-    'USA': { symbol: '$', position: 'before' },
-    'UK': { symbol: '£', position: 'before' },
-    'EU': { symbol: '€', position: 'before' },
-  };
-
-  const format = location && currencyFormats[location] 
-    ? currencyFormats[location] 
-    : { symbol: '$', position: 'before' };
-
-  return format.position === 'before' 
-    ? `${format.symbol}${numericValue}`
-    : `${numericValue}${format.symbol}`;
-};
-
-// Translation data
-const translations = {
-  en: {
-    viewDetails: "View Details",
-    shareTitle: "Share Tender",
-    shareDesc: "Share this tender with others",
-    email: "Email",
-    whatsapp: "WhatsApp",
-    sendEmail: "Send Email",
-    shareWhatsapp: "Share via WhatsApp",
-    close: "Close",
-    yourEmail: "Your Email",
-    emailSent: "Email sent successfully",
-    emailError: "Failed to send email",
-    deadline: "Deadline",
-    value: "Value",
-    requiredPoints: "Required Points",
-    youth: "Youth Opportunity",
-    women: "Women Opportunity", 
-    pwds: "PWDs Opportunity",
-    special: "Special Category"
-  },
-  sw: {
-    viewDetails: "Angalia Maelezo",
-    shareTitle: "Shiriki Zabuni",
-    shareDesc: "Shiriki zabuni hii na wengine",
-    email: "Barua pepe",
-    whatsapp: "WhatsApp",
-    sendEmail: "Tuma Barua pepe",
-    shareWhatsapp: "Shiriki kupitia WhatsApp",
-    close: "Funga",
-    yourEmail: "Barua pepe yako",
-    emailSent: "Barua pepe imetumwa",
-    emailError: "Imeshindwa kutuma barua pepe",
-    deadline: "Tarehe ya mwisho",
-    value: "Thamani",
-    requiredPoints: "Pointi Zinazohitajika",
-    youth: "Nafasi ya Vijana",
-    women: "Nafasi ya Wanawake", 
-    pwds: "Nafasi ya Walemavu",
-    special: "Kikundi Maalum"
-  }
-};
+import { Calendar, Globe, Briefcase } from "lucide-react";
+import { NotificationButton } from "@/components/tenders/NotificationButton";
+import { ShareSheet } from "@/components/tenders/ShareSheet";
+import { ExternalLinkButton } from "@/components/tenders/ExternalLinkButton";
+import { formatCurrency } from "@/utils/formatters";
+import { tenderCardTranslations } from "@/utils/translations";
+import { TenderCardProps } from "@/types/tenderCard";
 
 export const TenderCard = ({
   id,
@@ -122,66 +26,8 @@ export const TenderCard = ({
   language = 'en',
   shareActions = [],
 }: TenderCardProps) => {
-  const { toast } = useToast();
-  const [notifying, setNotifying] = useState(false);
-  const [shareEmail, setShareEmail] = useState("");
   const formattedValue = formatCurrency(value, location);
-  const t = translations[language];
-
-  const handleNotify = (e: React.MouseEvent) => {
-    e.stopPropagation();
-    setNotifying(true);
-    
-    // Simulating notification setting
-    setTimeout(() => {
-      setNotifying(false);
-      toast({
-        title: "Notification Set",
-        description: `You'll be notified about updates to this tender.`,
-      });
-    }, 1000);
-  };
-
-  const openExternalUrl = (e: React.MouseEvent) => {
-    e.stopPropagation();
-    if (tender_url) {
-      // If URL doesn't start with http, add it
-      const url = tender_url.startsWith('http') ? tender_url : `https://${tender_url}`;
-      window.open(url, '_blank');
-      toast({
-        title: "Opening External Link",
-        description: "Opening the original tender page in a new tab.",
-      });
-    }
-  };
-
-  const handleEmailShare = () => {
-    if (!shareEmail) {
-      toast({
-        title: "Error",
-        description: "Please enter an email address",
-        variant: "destructive"
-      });
-      return;
-    }
-    
-    const subject = encodeURIComponent(`Tender Opportunity: ${title}`);
-    const body = encodeURIComponent(`Check out this tender opportunity:\n\nTitle: ${title}\nDeadline: ${deadline}\nCategory: ${category}\nLocation: ${location || 'International'}\n\nView more details at: ${window.location.origin}/tenders/${id}`);
-    
-    // Open default email client
-    window.open(`mailto:${shareEmail}?subject=${subject}&body=${body}`, '_blank');
-    
-    toast({
-      title: t.emailSent,
-      description: `Email client opened for sharing tender to ${shareEmail}`,
-    });
-    setShareEmail("");
-  };
-  
-  const handleWhatsAppShare = () => {
-    const text = encodeURIComponent(`Check out this tender opportunity:\n\nTitle: ${title}\nDeadline: ${deadline}\nCategory: ${category}\nLocation: ${location || 'International'}\n\nView more details at: ${window.location.origin}/tenders/${id}`);
-    window.open(`https://wa.me/?text=${text}`, '_blank');
-  };
+  const t = tenderCardTranslations[language];
 
   return (
     <Card className="w-full hover:shadow-lg transition-shadow">
@@ -191,76 +37,17 @@ export const TenderCard = ({
             {category}
           </Badge>
           <div className="flex gap-1">
-            <Button 
-              variant="ghost" 
-              size="icon" 
-              className="h-8 w-8"
-              onClick={handleNotify}
-              disabled={notifying}
-            >
-              <Bell className={`h-4 w-4 ${notifying ? 'animate-pulse' : ''}`} />
-            </Button>
-            <Sheet>
-              <SheetTrigger asChild>
-                <Button variant="ghost" size="icon" className="h-8 w-8">
-                  <Share className="h-4 w-4" />
-                </Button>
-              </SheetTrigger>
-              <SheetContent>
-                <SheetHeader>
-                  <SheetTitle>{t.shareTitle}</SheetTitle>
-                  <SheetDescription>
-                    {t.shareDesc}
-                  </SheetDescription>
-                </SheetHeader>
-                <div className="py-4 space-y-4">
-                  <div className="space-y-2">
-                    <h3 className="text-sm font-medium">{t.email}</h3>
-                    <div className="flex space-x-2">
-                      <Input 
-                        placeholder={t.yourEmail} 
-                        value={shareEmail} 
-                        onChange={(e) => setShareEmail(e.target.value)}
-                      />
-                      <Button onClick={handleEmailShare}>
-                        {t.sendEmail}
-                      </Button>
-                    </div>
-                  </div>
-                  
-                  <div className="space-y-2">
-                    <h3 className="text-sm font-medium">{t.whatsapp}</h3>
-                    <Button onClick={handleWhatsAppShare} className="bg-green-600 hover:bg-green-700">
-                      {t.shareWhatsapp}
-                    </Button>
-                  </div>
-
-                  {shareActions.length > 0 && (
-                    <div className="space-y-2 pt-2 border-t">
-                      <h3 className="text-sm font-medium">More options</h3>
-                      <div className="flex flex-col space-y-2">
-                        {shareActions.map((action, index) => (
-                          <Button 
-                            key={index} 
-                            variant="outline" 
-                            className="justify-start"
-                            onClick={action.onClick}
-                          >
-                            {action.icon}
-                            <span className="ml-2">{action.label}</span>
-                          </Button>
-                        ))}
-                      </div>
-                    </div>
-                  )}
-                </div>
-                <SheetFooter>
-                  <SheetClose asChild>
-                    <Button variant="outline">{t.close}</Button>
-                  </SheetClose>
-                </SheetFooter>
-              </SheetContent>
-            </Sheet>
+            <NotificationButton tenderId={id} tenderTitle={title} />
+            <ShareSheet 
+              id={id}
+              title={title}
+              deadline={deadline}
+              category={category}
+              location={location}
+              language={language}
+              shareActions={shareActions}
+              translations={t}
+            />
           </div>
         </div>
         <CardTitle className="text-lg font-semibold line-clamp-2">{title}</CardTitle>
@@ -302,11 +89,7 @@ export const TenderCard = ({
         <Button onClick={onViewDetails} className="flex-1">
           {t.viewDetails}
         </Button>
-        {tender_url && (
-          <Button variant="outline" size="icon" onClick={openExternalUrl}>
-            <ExternalLink className="h-4 w-4" />
-          </Button>
-        )}
+        {tender_url && <ExternalLinkButton url={tender_url} />}
       </CardFooter>
     </Card>
   );
