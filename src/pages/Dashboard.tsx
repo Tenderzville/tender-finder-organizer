@@ -1,5 +1,5 @@
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import { Loader2, AlertCircle, User, RefreshCw } from "lucide-react";
@@ -10,7 +10,8 @@ import { UserProfileCard } from "@/components/dashboard/UserProfile";
 import { PointsCard } from "@/components/dashboard/PointsCard";
 import { NotificationPreferencesCard } from "@/components/dashboard/NotificationPreferences";
 import { SavedTendersCard } from "@/components/dashboard/SavedTenders";
-import { TenderFeed } from "@/components/dashboard/TenderFeed";
+import { TenderFeed } from "@/components/tenders/TenderFeed";
+import { SupplierCollaborationHub } from "@/components/collaboration/SupplierCollaborationHub";
 import { Button } from "@/components/ui/button";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { useToast } from "@/hooks/use-toast";
@@ -21,73 +22,80 @@ const Dashboard = () => {
   const { toast } = useToast();
   const { isAuthenticated, isInitialized } = useAuthState();
   const [sessionChecked, setSessionChecked] = useState(false);
-  const [initialCheckDone, setInitialCheckDone] = useState(false);
+  const [stableView, setStableView] = useState(false);
+  
+  // Add a stable view timer to prevent flickering
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setStableView(true);
+    }, 600);
+    
+    return () => clearTimeout(timer);
+  }, []);
 
   console.log("Dashboard rendering - Auth state:", { isAuthenticated, isInitialized });
 
-  // Explicit session check using the provided code snippet - more reliable
-  useEffect(() => {
-    // Skip if we've already done the check
-    if (initialCheckDone) return;
-    
-    const checkSession = async () => {
-      try {
-        console.log("Performing explicit session check");
-        const { data: { session }, error: sessionError } = await supabase.auth.getSession();
-        
-        if (sessionError) {
-          console.error("Session check error:", sessionError);
-          toast({
-            title: "Authentication Error",
-            description: "There was a problem verifying your session. Please sign in again.",
-            variant: "destructive",
-          });
-          navigate("/auth");
-          return;
-        }
-        
-        if (!session) {
-          console.log("No active session found in explicit check, redirecting to auth");
-          navigate("/auth");
-          return;
-        }
-        
-        // Check if profile exists
-        const { data: profile, error: profileError } = await supabase
-          .from('profiles')
-          .select('id')
-          .eq('user_id', session.user.id)
-          .maybeSingle();
-
-        if (profileError) {
-          console.error("Profile check error:", profileError);
-          toast({
-            title: "Error",
-            description: "Couldn't verify your profile. Please try again.",
-            variant: "destructive",
-          });
-          return;
-        }
-
-        if (profile) {
-          console.log("Session verified for user:", session.user.id);
-          setSessionChecked(true);
-        } else {
-          console.log("No profile found, redirecting to onboarding");
-          navigate("/onboarding", { replace: true });
-        }
-      } catch (err) {
-        console.error("Explicit session check failed:", err);
+  // Explicit session check - only run once and using useCallback to prevent recreation
+  const checkSession = useCallback(async () => {
+    try {
+      console.log("Performing explicit session check");
+      const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+      
+      if (sessionError) {
+        console.error("Session check error:", sessionError);
+        toast({
+          title: "Authentication Error",
+          description: "There was a problem verifying your session. Please sign in again.",
+          variant: "destructive",
+        });
         navigate("/auth");
-      } finally {
-        setInitialCheckDone(true);
+        return;
       }
-    };
-    
-    checkSession();
-  }, [navigate, toast, initialCheckDone]);
+      
+      if (!session) {
+        console.log("No active session found in explicit check, redirecting to auth");
+        navigate("/auth");
+        return;
+      }
+      
+      // Check if profile exists
+      const { data: profile, error: profileError } = await supabase
+        .from('profiles')
+        .select('id')
+        .eq('user_id', session.user.id)
+        .maybeSingle();
 
-  // User data query - only run when session is confirmed
+      if (profileError) {
+        console.error("Profile check error:", profileError);
+        toast({
+          title: "Error",
+          description: "Couldn't verify your profile. Please try again.",
+          variant: "destructive",
+        });
+        return;
+      }
+
+      if (profile) {
+        console.log("Session verified for user:", session.user.id);
+        setSessionChecked(true);
+      } else {
+        console.log("No profile found, redirecting to onboarding");
+        navigate("/onboarding", { replace: true });
+      }
+    } catch (err) {
+      console.error("Explicit session check failed:", err);
+      navigate("/auth");
+    }
+  }, [navigate, toast]);
+  
+  // Run session check only once on mount
+  useEffect(() => {
+    if (!sessionChecked && isAuthenticated) {
+      checkSession();
+    }
+  }, [checkSession, sessionChecked, isAuthenticated]);
+
+  // User data query - only run when session is confirmed and with optimized settings
   const { 
     data: userData, 
     isLoading: userLoading, 
@@ -114,10 +122,12 @@ const Dashboard = () => {
     },
     enabled: sessionChecked, // Only run this query after session is confirmed
     retry: 1,
-    staleTime: 60 * 1000, // 1 minute to prevent frequent refetching
+    staleTime: 5 * 60 * 1000, // 5 minutes to prevent frequent refetching
+    gcTime: 10 * 60 * 1000, // 10 minutes - keep data in cache longer
+    refetchOnWindowFocus: false,
   });
 
-  // Tenders count query
+  // Tenders count query with optimized settings to prevent flickering
   const { 
     data: tendersCount, 
     error: tendersError, 
@@ -147,11 +157,13 @@ const Dashboard = () => {
     enabled: !!userData, // Only run this query after user data is loaded
     retry: 2,
     staleTime: 5 * 60 * 1000, // 5 minutes
-    refetchInterval: false // Disable auto-refetching to prevent flickering
+    refetchInterval: false, // Disable auto-refetching to prevent flickering
+    gcTime: 10 * 60 * 1000, // Cache data for longer
+    refetchOnWindowFocus: false,
   });
 
   // Trigger tender scraping manually - optimized to prevent flickering
-  const triggerTenderScrape = () => {
+  const triggerTenderScrape = useCallback(() => {
     toast({
       title: "Updating Tenders",
       description: "Fetching the latest tender data...",
@@ -185,8 +197,10 @@ const Dashboard = () => {
           description: `Found ${data?.tenders_scraped || 0} new tenders.`,
         });
         
-        // Refetch the tenders count
-        refetchTenders();
+        // Add a delay before refetching to prevent flickering
+        setTimeout(() => {
+          refetchTenders();
+        }, 500);
       })
       .catch(error => {
         console.error('Error in triggerTenderScrape:', error);
@@ -196,10 +210,11 @@ const Dashboard = () => {
           variant: "destructive",
         });
       });
-  };
+  }, [refetchTenders, toast]);
 
   // LOADING STATE - Clear indication of what's happening
-  if (!isInitialized || (!sessionChecked && isAuthenticated) || userLoading) {
+  // Don't show this if stableView is true to prevent flickering
+  if ((!stableView || !isInitialized || (!sessionChecked && isAuthenticated) || userLoading)) {
     return (
       <div className="min-h-screen bg-gray-50">
         <Navigation />
@@ -313,8 +328,11 @@ const Dashboard = () => {
         
         <UserProfileCard userId={userData.id} />
         
-        {/* Add TenderFeed as the first card for admin users */}
-        <div className="mt-6 mb-6">
+        {/* Add Supplier Collaboration Hub */}
+        <SupplierCollaborationHub />
+        
+        {/* TenderFeed card */}
+        <div className="mb-6">
           <TenderFeed />
         </div>
         
