@@ -17,6 +17,12 @@ import {
 } from "@/components/ui/sheet";
 import { Input } from "@/components/ui/input";
 
+interface ShareAction {
+  icon: React.ReactNode;
+  label: string;
+  onClick: () => void;
+}
+
 interface TenderCardProps {
   id: number;
   title: string;
@@ -31,6 +37,7 @@ interface TenderCardProps {
   hasAffirmativeAction?: boolean;
   affirmativeActionType?: 'youth' | 'women' | 'pwds' | 'none';
   language?: 'en' | 'sw';
+  shareActions?: ShareAction[];
 }
 
 const formatCurrency = (value: string, location?: string): string => {
@@ -113,6 +120,7 @@ export const TenderCard = ({
   hasAffirmativeAction = false,
   affirmativeActionType = 'none',
   language = 'en',
+  shareActions = [],
 }: TenderCardProps) => {
   const { toast } = useToast();
   const [notifying, setNotifying] = useState(false);
@@ -226,6 +234,25 @@ export const TenderCard = ({
                       {t.shareWhatsapp}
                     </Button>
                   </div>
+
+                  {shareActions.length > 0 && (
+                    <div className="space-y-2 pt-2 border-t">
+                      <h3 className="text-sm font-medium">More options</h3>
+                      <div className="flex flex-col space-y-2">
+                        {shareActions.map((action, index) => (
+                          <Button 
+                            key={index} 
+                            variant="outline" 
+                            className="justify-start"
+                            onClick={action.onClick}
+                          >
+                            {action.icon}
+                            <span className="ml-2">{action.label}</span>
+                          </Button>
+                        ))}
+                      </div>
+                    </div>
+                  )}
                 </div>
                 <SheetFooter>
                   <SheetClose asChild>
