@@ -1,4 +1,3 @@
-
 import { useState, useEffect, useCallback, useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
@@ -12,13 +11,14 @@ import { useToast } from "@/hooks/use-toast";
 import { useNavigate } from "react-router-dom";
 import { QualificationTool } from "@/components/tenders/QualificationTool";
 import type { Tender } from "@/types/tender";
+import { parseTenderAffirmativeAction } from "@/types/tender";
 
 export const TenderFeed = () => {
   const { toast } = useToast();
   const navigate = useNavigate();
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [showQualificationTool, setShowQualificationTool] = useState(false);
-  const [language, setLanguage] = useState<'en' | 'sw'>('en');
+  const [language, setLanguage<'en' | 'sw'>>('en');
   const [forceStableView, setForceStableView] = useState(false);
 
   // Anti-flicker technique - force a minimum "loading" display time 
@@ -64,8 +64,15 @@ export const TenderFeed = () => {
         console.error("Error counting tenders:", countError);
       }
       
+      // Map the raw database records to the Tender type with proper affirmative_action handling
+      const formattedTenders = latestTenders?.map(tender => ({
+        ...tender,
+        // Use the parser to safely handle the affirmative_action JSON
+        affirmative_action: parseTenderAffirmativeAction(tender.affirmative_action)
+      })) || [];
+      
       return {
-        latest_tenders: latestTenders || [],
+        latest_tenders: formattedTenders,
         total_tenders: count || 0,
         last_scrape: new Date().toISOString(),
         source: "database"
@@ -174,7 +181,11 @@ export const TenderFeed = () => {
   }, []);
 
   // Use tenders from data or empty array - memoized to prevent recreation
-  const tendersToDisplay = useMemo(() => data?.latest_tenders || [], [data]);
+  const tendersToDisplay = useMemo(() => {
+    // Ensure we properly type the tenders as Tender[]
+    const tenders = data?.latest_tenders || [];
+    return tenders as Tender[];
+  }, [data]);
 
   // Translations - memoized to prevent recreation on every render
   const t = useMemo(() => ({

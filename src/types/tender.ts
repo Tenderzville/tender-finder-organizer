@@ -1,3 +1,4 @@
+
 export type Tender = {
   id: number;
   title: string;
@@ -37,3 +38,42 @@ export type TenderAffirmativeAction = {
   details?: string;
 };
 
+// Helper function to safely parse the JSON affirmative_action field from database
+export function parseTenderAffirmativeAction(value: any): TenderAffirmativeAction {
+  // Default value if parsing fails
+  const defaultValue: TenderAffirmativeAction = { type: 'none' };
+  
+  if (!value) return defaultValue;
+  
+  try {
+    // If it's already an object (not a string)
+    if (typeof value === 'object') {
+      // Validate that it has the required 'type' property
+      if (value.type && 
+          (value.type === 'youth' || 
+           value.type === 'women' || 
+           value.type === 'pwds' || 
+           value.type === 'none')) {
+        return value as TenderAffirmativeAction;
+      }
+      return defaultValue;
+    }
+    
+    // If it's a string, try to parse it
+    if (typeof value === 'string') {
+      const parsed = JSON.parse(value);
+      if (parsed.type && 
+          (parsed.type === 'youth' || 
+           parsed.type === 'women' || 
+           parsed.type === 'pwds' || 
+           parsed.type === 'none')) {
+        return parsed as TenderAffirmativeAction;
+      }
+    }
+    
+    return defaultValue;
+  } catch (error) {
+    console.error("Error parsing affirmative action:", error);
+    return defaultValue;
+  }
+}

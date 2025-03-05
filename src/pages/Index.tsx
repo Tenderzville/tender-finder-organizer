@@ -13,6 +13,7 @@ import { Loader2, RefreshCw } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { SupplierCollaborationHub } from "@/components/collaboration/SupplierCollaborationHub";
 import type { TenderAffirmativeAction } from "@/types/tender";
+import { parseTenderAffirmativeAction } from "@/types/tender";
 
 const Index = () => {
   const { toast } = useToast();
@@ -239,7 +240,7 @@ const Index = () => {
         location: tender.location || "International",
         description: tender.description,
         tender_url: tender.tender_url,
-        affirmative_action: tender.affirmative_action as TenderAffirmativeAction
+        affirmative_action: parseTenderAffirmativeAction(tender.affirmative_action)
       }));
     },
     staleTime: 1000 * 60 * 5, // 5 minutes

@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
@@ -12,6 +11,7 @@ import { useToast } from "@/hooks/use-toast";
 import { useNavigate } from "react-router-dom";
 import { QualificationTool } from "@/components/tenders/QualificationTool";
 import type { Tender } from "@/types/tender";
+import { parseTenderAffirmativeAction } from "@/types/tender";
 
 export const TenderFeed = () => {
   const { toast } = useToast();
@@ -52,8 +52,15 @@ export const TenderFeed = () => {
         console.error("Error counting tenders:", countError);
       }
       
+      // Map the raw database records to the Tender type with proper affirmative_action handling
+      const formattedTenders = latestTenders?.map(tender => ({
+        ...tender,
+        // Use the parser to safely handle the affirmative_action JSON
+        affirmative_action: parseTenderAffirmativeAction(tender.affirmative_action)
+      })) || [];
+      
       return {
-        latest_tenders: latestTenders || [],
+        latest_tenders: formattedTenders,
         total_tenders: count || 0,
         last_scrape: new Date().toISOString(),
         source: "database"
@@ -131,46 +138,7 @@ export const TenderFeed = () => {
   };
 
   // Use tenders from data or empty array
-  const tendersToDisplay = data?.latest_tenders || [];
-
-  if (isLoading) {
-    return (
-      <Card>
-        <CardHeader>
-          <CardTitle>Latest Tenders</CardTitle>
-          <CardDescription>Loading tender information...</CardDescription>
-        </CardHeader>
-        <CardContent className="flex justify-center p-6">
-          <Loader2 className="h-8 w-8 animate-spin text-primary" />
-        </CardContent>
-      </Card>
-    );
-  }
-
-  // If showing qualification tool and we have tenders
-  if (showQualificationTool && tendersToDisplay.length > 0) {
-    return (
-      <Card>
-        <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-          <div>
-            <CardTitle>Will I Qualify?</CardTitle>
-            <CardDescription>
-              Check your eligibility for available tenders
-            </CardDescription>
-          </div>
-          <Button 
-            variant="outline" 
-            onClick={() => setShowQualificationTool(false)}
-          >
-            Back to Tenders
-          </Button>
-        </CardHeader>
-        <CardContent>
-          <QualificationTool tenders={tendersToDisplay} />
-        </CardContent>
-      </Card>
-    );
-  }
+  const tendersToDisplay = data?.latest_tenders as Tender[] || [];
 
   // Translations
   const t = {
