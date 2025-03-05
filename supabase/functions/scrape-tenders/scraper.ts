@@ -1,6 +1,6 @@
 
-import { format, addDays } from "date-fns";
-import { fetchSourceWithRetry, parseDate } from "./utils.ts";
+import { format, addDays } from "https://esm.sh/date-fns@2.30.0";
+import { fetchSourceWithRetry, parseDate, XPathSelect } from "./utils.ts";
 import type { Tender } from "./types.ts";
 
 // Utility to extract text from HTML

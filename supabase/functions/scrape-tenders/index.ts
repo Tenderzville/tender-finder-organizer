@@ -2,7 +2,7 @@
 // Follow Deno's URL imports pattern for Edge Functions
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.42.7";
 import { corsHeaders } from "../_shared/cors.ts";
-import { format, addDays } from "date-fns";
+import { format, addDays } from "https://esm.sh/date-fns@2.30.0";
 import { scrapeMyGov, scrapeTendersGo } from "./scraper.ts";
 import type { Tender } from "./types.ts";
 
