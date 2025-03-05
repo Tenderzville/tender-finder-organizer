@@ -294,6 +294,7 @@ export type Database = {
       }
       tenders: {
         Row: {
+          affirmative_action: Json | null
           category: string
           contact_info: string | null
           created_at: string | null
@@ -312,6 +313,7 @@ export type Database = {
           title: string
         }
         Insert: {
+          affirmative_action?: Json | null
           category?: string
           contact_info?: string | null
           created_at?: string | null
@@ -330,6 +332,7 @@ export type Database = {
           title: string
         }
         Update: {
+          affirmative_action?: Json | null
           category?: string
           contact_info?: string | null
           created_at?: string | null

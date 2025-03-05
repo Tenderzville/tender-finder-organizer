@@ -1,4 +1,3 @@
-
 export type Tender = {
   id: number;
   title: string;
@@ -37,3 +36,4 @@ export type TenderAffirmativeAction = {
   percentage?: number;
   details?: string;
 };
+
