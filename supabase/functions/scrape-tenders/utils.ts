@@ -25,8 +25,13 @@ export function parseDate(dateText: string): string | null {
     
     // If invalid, try DD/MM/YYYY format
     if (isNaN(parsedDate.getTime())) {
-      const [day, month, year] = dateText.split(/[\/\-\.]/);
-      parsedDate = new Date(parseInt(year), parseInt(month) - 1, parseInt(day));
+      const parts = dateText.split(/[\/\-\.]/);
+      if (parts.length >= 3) {
+        const day = parseInt(parts[0]);
+        const month = parseInt(parts[1]) - 1; // JavaScript months are 0-indexed
+        const year = parseInt(parts[2]);
+        parsedDate = new Date(year, month, day);
+      }
     }
     
     // Verify the date is valid
@@ -71,4 +76,46 @@ export async function fetchSourceWithRetry(url: string, retries = 3): Promise<st
     }
   }
   throw new Error(`Failed to fetch ${url} after ${retries} attempts`);
+}
+
+// Helper to extract content using XPath-like selectors (simplified)
+export function XPathSelect(html: string, selector: string): string {
+  // This is a very simple implementation and won't handle complex XPath
+  // In a real solution, you'd use a proper HTML parser
+  try {
+    const parts = selector.split('/');
+    let currentContent = html;
+    
+    for (const part of parts) {
+      if (!part || part === '') continue;
+      
+      if (part.includes('[')) {
+        // Handle indexed elements like div[2]
+        const tagName = part.split('[')[0];
+        const index = parseInt(part.split('[')[1]) || 0;
+        
+        const matches = currentContent.split(`<${tagName}`).slice(1);
+        if (matches.length > index) {
+          currentContent = matches[index];
+        } else {
+          return '';
+        }
+      } else {
+        // Simple tag selection
+        const splits = currentContent.split(`<${part}`).slice(1);
+        if (splits.length > 0) {
+          currentContent = splits[0];
+        } else {
+          return '';
+        }
+      }
+    }
+    
+    // Extract text content (very simplified)
+    const result = currentContent.split('>')[1]?.split('<')[0] || '';
+    return result.trim();
+  } catch (e) {
+    console.error('Error in XPathSelect:', e);
+    return '';
+  }
 }

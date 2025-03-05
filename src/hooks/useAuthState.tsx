@@ -19,15 +19,15 @@ export const useAuthState = () => {
     let isMounted = true;
     console.log("[useAuthState] Setting up auth state tracker");
     
-    // Set a timeout to prevent infinite loading
+    // Increase timeout to 15 seconds to give more time for auth
     const timeoutId = setTimeout(() => {
       if (isMounted && !isInitialized) {
         console.warn("[useAuthState] Auth initialization timed out");
+        // Don't automatically set isAuthenticated to false
+        // This prevents auto-redirecting to login page
         setIsInitialized(true);
-        setIsAuthenticated(false);
-        setProfileStatus('missing');
       }
-    }, 5000); // 5 second timeout
+    }, 15000); // 15 second timeout instead of 5 seconds
     
     const checkAuth = async () => {
       try {

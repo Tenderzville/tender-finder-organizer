@@ -49,7 +49,8 @@ Deno.serve(async (req) => {
           return new Response(
             JSON.stringify({
               message: "Skipping scrape - already scraped within last 30 minutes",
-              last_scrape: lastScrape[0].created_at
+              last_scrape: lastScrape[0].created_at,
+              success: true
             }),
             {
               headers: { ...corsHeaders, "Content-Type": "application/json" },
@@ -86,7 +87,7 @@ Deno.serve(async (req) => {
     const myGovTenders = await scrapeMyGov();
     console.log(`Scraped ${myGovTenders.length} tenders from MyGov`);
     
-    // Scrape Tenders.go.ke (Uncomment when implemented)
+    // Scrape Tenders.go.ke
     console.log("Scraping Tenders.go.ke...");
     const tendersGoTenders = await scrapeTendersGo();
     console.log(`Scraped ${tendersGoTenders.length} tenders from Tenders.go.ke`);
@@ -109,7 +110,8 @@ Deno.serve(async (req) => {
       return new Response(
         JSON.stringify({
           message: "No tenders found during scrape",
-          tenders_scraped: 0
+          tenders_scraped: 0,
+          success: true
         }),
         {
           headers: { ...corsHeaders, "Content-Type": "application/json" },
@@ -219,7 +221,8 @@ Deno.serve(async (req) => {
       JSON.stringify({
         message: "Scrape completed successfully",
         tenders_scraped: insertedCount,
-        total_tenders: count || 0
+        total_tenders: count || 0,
+        success: true
       }),
       {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
@@ -231,7 +234,8 @@ Deno.serve(async (req) => {
     
     return new Response(
       JSON.stringify({
-        error: error.message || "An error occurred during the scrape operation"
+        error: error.message || "An error occurred during the scrape operation",
+        success: false
       }),
       {
         headers: { ...corsHeaders, "Content-Type": "application/json" },

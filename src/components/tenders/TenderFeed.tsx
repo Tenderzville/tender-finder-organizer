@@ -1,4 +1,3 @@
-
 import { useState, useEffect, useCallback, useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
@@ -118,26 +117,42 @@ export const TenderFeed = () => {
     setForceStableView(true); // Prevent flickering during refresh
     
     try {
+      // Show a toast to indicate the process is starting
+      toast({
+        title: "Refreshing Tenders",
+        description: "Starting the tender scraping process...",
+      });
+      
       // Trigger scrape with force parameter
-      await supabase.functions.invoke('scrape-tenders', {
+      const { data: result, error: invokeError } = await supabase.functions.invoke('scrape-tenders', {
         body: { force: true }
       });
       
+      if (invokeError) {
+        throw invokeError;
+      }
+      
+      console.log("Scrape function response:", result);
+      
+      if (result.success === false) {
+        throw new Error(result.error || "Unknown error occurred during scraping");
+      }
+      
       // Add a small delay to ensure the database has time to update
-      await new Promise(resolve => setTimeout(resolve, 300));
+      await new Promise(resolve => setTimeout(resolve, 1500));
       
       // Immediately refetch from database
       await refetch();
       
       toast({
         title: "Feed Refreshed",
-        description: "Latest tender information loaded",
+        description: `Found ${result.tenders_scraped || 0} new tenders`,
       });
     } catch (err) {
       console.error("Failed to refresh tender feed:", err);
       toast({
         title: "Refresh Error",
-        description: "Could not refresh tenders",
+        description: "Could not refresh tenders. Please try again later.",
         variant: "destructive",
       });
     } finally {
