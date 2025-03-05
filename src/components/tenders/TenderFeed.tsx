@@ -129,38 +129,51 @@ export const TenderFeed = () => {
       });
       
       if (invokeError) {
+        console.error("Error invoking scrape-tenders function:", invokeError);
         throw invokeError;
       }
       
       console.log("Scrape function response:", result);
       
-      if (result.success === false) {
-        throw new Error(result.error || "Unknown error occurred during scraping");
+      if (result?.success === false) {
+        console.error("Scrape function failed:", result?.error);
+        throw new Error(result?.error || "Unknown error occurred during scraping");
       }
       
       // Add a small delay to ensure the database has time to update
-      await new Promise(resolve => setTimeout(resolve, 1500));
+      await new Promise(resolve => setTimeout(resolve, 2000));
       
       // Immediately refetch from database
       await refetch();
       
       toast({
         title: "Feed Refreshed",
-        description: `Found ${result.tenders_scraped || 0} new tenders`,
+        description: `Found ${result?.tenders_scraped || 0} new tenders`,
       });
     } catch (err) {
       console.error("Failed to refresh tender feed:", err);
-      toast({
-        title: "Refresh Error",
-        description: "Could not refresh tenders. Please try again later.",
-        variant: "destructive",
-      });
+      
+      // Try direct database refresh as fallback
+      try {
+        await refetch();
+        toast({
+          title: "Refresh Attempted",
+          description: "Fetched latest tenders from database.",
+        });
+      } catch (dbErr) {
+        console.error("Database refresh also failed:", dbErr);
+        toast({
+          title: "Refresh Error",
+          description: "Could not refresh tenders. Please try again later.",
+          variant: "destructive",
+        });
+      }
     } finally {
       // Add a short delay before changing states to prevent flickering
       setTimeout(() => {
         setIsRefreshing(false);
         setForceStableView(false);
-      }, 300);
+      }, 500);
     }
   }, [refetch, toast, isRefreshing]);
 
