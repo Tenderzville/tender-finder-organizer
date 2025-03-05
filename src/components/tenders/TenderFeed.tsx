@@ -1,3 +1,4 @@
+
 import { useState, useEffect, useCallback, useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
@@ -18,7 +19,7 @@ export const TenderFeed = () => {
   const navigate = useNavigate();
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [showQualificationTool, setShowQualificationTool] = useState(false);
-  const [language, setLanguage<'en' | 'sw'>>('en');
+  const [language, setLanguage] = useState<'en' | 'sw'>('en');
   const [forceStableView, setForceStableView] = useState(false);
 
   // Anti-flicker technique - force a minimum "loading" display time 
