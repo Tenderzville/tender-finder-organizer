@@ -1,18 +1,38 @@
-
 import { DOMParser } from "https://deno.land/x/deno_dom@v0.1.38/deno-dom-wasm.ts";
 
-// Retry mechanism for fetching sources
-export async function fetchSourceWithRetry(url: string, maxRetries = 3): Promise<string> {
+// Retry mechanism for fetching sources with optional proxy support
+export async function fetchSourceWithRetry(url: string, proxyUrl?: string, maxRetries = 3): Promise<string> {
   let retries = 0;
   
   while (retries < maxRetries) {
     try {
-      console.log(`Fetching URL: ${url} (attempt ${retries + 1})`);
-      const response = await fetch(url, {
-        headers: {
-          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36',
-        },
-      });
+      console.log(`Fetching URL: ${url} (attempt ${retries + 1})${proxyUrl ? ' via proxy' : ''}`);
+      
+      // Basic headers to mimic a browser
+      const headers = {
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36',
+        'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
+        'Accept-Language': 'en-US,en;q=0.9',
+        'Cache-Control': 'no-cache',
+        'Pragma': 'no-cache',
+      };
+      
+      let response;
+      
+      if (proxyUrl) {
+        // Use proxy if available
+        response = await fetch(proxyUrl, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            ...headers
+          },
+          body: JSON.stringify({ url })
+        });
+      } else {
+        // Direct fetch without proxy
+        response = await fetch(url, { headers });
+      }
       
       if (!response.ok) {
         throw new Error(`HTTP error! Status: ${response.status}`);
@@ -45,7 +65,7 @@ export function parseDate(dateStr: string): Date | null {
   if (!isNaN(date.getTime())) return date;
   
   // Try DD/MM/YYYY format
-  const ddmmyyyy = /(\d{1,2})[\/\-\.](\d{1,2})[\/\-\.](\d{4})/;
+  const ddmmyyyy = /(\d{1,2})[\/\.-]?(\d{1,2})[\/\.-]?(\d{4})/;
   const ddmmyyyyMatch = dateStr.match(ddmmyyyy);
   if (ddmmyyyyMatch) {
     return new Date(
@@ -98,4 +118,35 @@ export function XPathSelect(html: string, xpath: string): string[] {
     console.error(`XPath selection error: ${error.message}`);
     return [];
   }
+}
+
+// Function to extract keywords from a string
+export function extractKeywords(text: string): string[] {
+  if (!text) return [];
+  
+  // Remove common stop words and punctuation
+  const stopWords = ['a', 'an', 'the', 'and', 'or', 'but', 'for', 'with', 'in', 'on', 'at', 'by', 'to', 'of'];
+  
+  // Convert to lowercase and remove punctuation
+  const cleaned = text.toLowerCase().replace(/[^\w\s]/g, ' ');
+  
+  // Split into words and filter
+  const words = cleaned.split(/\s+/).filter(word => 
+    word.length > 2 && !stopWords.includes(word)
+  );
+  
+  // Deduplicate words
+  return [...new Set(words)];
+}
+
+// Function to generate Google search URL for tenders
+export function generateTenderSearchUrl(keywords: string[], days = 7): string {
+  // Add tender-specific terms
+  const searchTerms = [...keywords, 'tender', 'procurement', 'bid', 'rfp'];
+  
+  // Create a time filter for recent results
+  const timeFilter = days > 0 ? `&tbs=qdr:d${days}` : '';
+  
+  // Generate the search URL
+  return `https://www.google.com/search?q=${encodeURIComponent(searchTerms.join(' '))}${timeFilter}`;
 }
