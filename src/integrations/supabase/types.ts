@@ -89,6 +89,48 @@ export type Database = {
         }
         Relationships: []
       }
+      scraping_jobs: {
+        Row: {
+          completed_at: string | null
+          created_at: string
+          error_message: string | null
+          id: string
+          max_retries: number
+          priority: number
+          retry_count: number
+          source: string
+          started_at: string | null
+          status: string
+          url: string
+        }
+        Insert: {
+          completed_at?: string | null
+          created_at?: string
+          error_message?: string | null
+          id?: string
+          max_retries?: number
+          priority?: number
+          retry_count?: number
+          source: string
+          started_at?: string | null
+          status?: string
+          url: string
+        }
+        Update: {
+          completed_at?: string | null
+          created_at?: string
+          error_message?: string | null
+          id?: string
+          max_retries?: number
+          priority?: number
+          retry_count?: number
+          source?: string
+          started_at?: string | null
+          status?: string
+          url?: string
+        }
+        Relationships: []
+      }
       scraping_logs: {
         Row: {
           created_at: string | null
@@ -118,6 +160,35 @@ export type Database = {
           status?: string
         }
         Relationships: []
+      }
+      scraping_results: {
+        Row: {
+          created_at: string
+          id: string
+          job_id: string | null
+          tender_data: Json
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          job_id?: string | null
+          tender_data: Json
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          job_id?: string | null
+          tender_data?: Json
+        }
+        Relationships: [
+          {
+            foreignKeyName: "scraping_results_job_id_fkey"
+            columns: ["job_id"]
+            isOneToOne: false
+            referencedRelation: "scraping_jobs"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       social_shares: {
         Row: {
@@ -422,6 +493,26 @@ export type Database = {
           tender_id: number
         }
         Returns: boolean
+      }
+      complete_scraping_job: {
+        Args: {
+          p_job_id: string
+          p_status: string
+          p_error_message?: string
+        }
+        Returns: undefined
+      }
+      get_next_scraping_job: {
+        Args: Record<PropertyKey, never>
+        Returns: {
+          id: string
+          source: string
+          url: string
+        }[]
+      }
+      initialize_scraping_jobs: {
+        Args: Record<PropertyKey, never>
+        Returns: undefined
       }
       remove_expired_tenders: {
         Args: Record<PropertyKey, never>
