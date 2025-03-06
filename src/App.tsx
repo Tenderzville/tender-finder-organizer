@@ -14,6 +14,7 @@ import NotFound from "./pages/NotFound";
 import GetStarted from "./pages/GetStarted";
 import Dashboard from "./pages/Dashboard";
 import Preferences from "./pages/Preferences";
+import Services from "./pages/Services";
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -66,6 +67,7 @@ const App = () => (
               <Preferences />
             </ProtectedRoute>
           } />
+          <Route path="/services" element={<Services />} />
           <Route path="/get-started" element={<GetStarted />} />
           <Route path="/onboarding" element={<Onboarding />} />
           <Route path="/tenders/:id" element={

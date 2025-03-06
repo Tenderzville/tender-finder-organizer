@@ -1,3 +1,4 @@
+
 import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { useAuthState } from "@/hooks/useAuthState";
@@ -31,21 +32,37 @@ export const Navigation = () => {
                     Dashboard
                   </Button>
                   <Button
-                    onClick={() => navigate("/dashboard")}
+                    onClick={() => navigate("/tenders")}
                     variant="ghost"
                     className="text-gray-900 inline-flex items-center px-1 pt-1 text-sm font-medium"
                   >
                     Tenders
                   </Button>
+                  <Button
+                    onClick={() => navigate("/services")}
+                    variant="ghost"
+                    className="text-gray-900 inline-flex items-center px-1 pt-1 text-sm font-medium"
+                  >
+                    Services
+                  </Button>
                 </>
               ) : (
-                <Button
-                  onClick={() => navigate("/dashboard")}
-                  variant="ghost"
-                  className="text-gray-900 inline-flex items-center px-1 pt-1 text-sm font-medium"
-                >
-                  Browse Tenders
-                </Button>
+                <>
+                  <Button
+                    onClick={() => navigate("/dashboard")}
+                    variant="ghost"
+                    className="text-gray-900 inline-flex items-center px-1 pt-1 text-sm font-medium"
+                  >
+                    Browse Tenders
+                  </Button>
+                  <Button
+                    onClick={() => navigate("/services")}
+                    variant="ghost"
+                    className="text-gray-900 inline-flex items-center px-1 pt-1 text-sm font-medium"
+                  >
+                    Services
+                  </Button>
+                </>
               )}
             </div>
           </div>

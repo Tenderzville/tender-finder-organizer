@@ -7,18 +7,8 @@ const supabaseUrl = Deno.env.get("SUPABASE_URL") || "";
 const supabaseKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") || "";
 const supabase = createClient(supabaseUrl, supabaseKey);
 
-// Start scheduler for tender scraping
-Deno.serve(async (req) => {
-  // Handle CORS preflight requests
-  if (req.method === "OPTIONS") {
-    return new Response(null, {
-      headers: corsHeaders,
-    });
-  }
-
+async function processPendingJobs() {
   try {
-    console.log("Starting scheduler for scrape-tenders function");
-    
     // Get pending jobs
     const { data: pendingJobs, error } = await supabase
       .from('scraping_jobs')
@@ -66,19 +56,7 @@ Deno.serve(async (req) => {
           throw new Error(`Error triggering scrape-tenders function: ${response.status} ${errorText}`);
         }
         
-        const result = await response.json();
-        console.log("Job scheduling result:", result);
-        
-        return new Response(
-          JSON.stringify({
-            message: "Scrape job successfully scheduled",
-            job_id: newJobs[0].id,
-            success: true
-          }),
-          {
-            headers: { ...corsHeaders, "Content-Type": "application/json" },
-          }
-        );
+        return { success: true, jobId: newJobs[0].id };
       }
     } else {
       // Call the scrape-tenders function with the first job ID
@@ -98,24 +76,47 @@ Deno.serve(async (req) => {
         throw new Error(`Error triggering scrape-tenders function: ${response.status} ${errorText}`);
       }
       
-      const result = await response.json();
-      console.log("Job scheduling result:", result);
-      
-      return new Response(
-        JSON.stringify({
-          message: "Scrape job successfully scheduled",
-          job_id: pendingJobs[0].id,
-          success: true
-        }),
-        {
-          headers: { ...corsHeaders, "Content-Type": "application/json" },
-        }
-      );
+      return { success: true, jobId: pendingJobs[0].id };
     }
     
+    return { success: true, message: "No jobs to schedule at this time" };
+  } catch (error) {
+    console.error("Error in job processing:", error);
+    return { 
+      success: false, 
+      error: error.message || "An error occurred during job processing" 
+    };
+  }
+}
+
+// Start scheduler for tender scraping
+Deno.serve(async (req) => {
+  // Handle CORS preflight requests
+  if (req.method === "OPTIONS") {
+    return new Response(null, {
+      headers: corsHeaders,
+    });
+  }
+
+  try {
+    console.log("Starting scheduler for scrape-tenders function");
+    
+    // Start the background processing using EdgeRuntime.waitUntil
+    const backgroundProcessPromise = processPendingJobs();
+    
+    // Use the EdgeRuntime API to continue processing in the background
+    // This allows us to return a response to the client immediately
+    // while the processing continues in the background
+    EdgeRuntime.waitUntil(
+      backgroundProcessPromise.catch(err => {
+        console.error("Background process error:", err);
+      })
+    );
+    
+    // Return a quick response while processing continues in the background
     return new Response(
       JSON.stringify({
-        message: "No jobs to schedule at this time",
+        message: "Scrape job scheduling started in background",
         success: true
       }),
       {
