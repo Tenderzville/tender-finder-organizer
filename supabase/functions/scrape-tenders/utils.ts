@@ -1,7 +1,7 @@
 import { DOMParser } from "https://deno.land/x/deno_dom@v0.1.38/deno-dom-wasm.ts";
 
 // Retry mechanism for fetching sources with optional proxy support
-export async function fetchSourceWithRetry(url: string, proxyUrl?: string, maxRetries = 3): Promise<string> {
+export async function fetchSourceWithRetry(url: string, proxyUrl?: string, options?: RequestInit, maxRetries = 3): Promise<string> {
   let retries = 0;
   
   while (retries < maxRetries) {
@@ -9,7 +9,7 @@ export async function fetchSourceWithRetry(url: string, proxyUrl?: string, maxRe
       console.log(`Fetching URL: ${url} (attempt ${retries + 1})${proxyUrl ? ' via proxy' : ''}`);
       
       // Basic headers to mimic a browser
-      const headers = {
+      const defaultHeaders = {
         'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36',
         'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
         'Accept-Language': 'en-US,en;q=0.9',
@@ -25,13 +25,28 @@ export async function fetchSourceWithRetry(url: string, proxyUrl?: string, maxRe
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
-            ...headers
+            ...(options?.headers || defaultHeaders)
           },
-          body: JSON.stringify({ url })
+          body: JSON.stringify({ url, ...options }),
         });
       } else {
-        // Direct fetch without proxy
-        response = await fetch(url, { headers });
+        // Direct fetch without proxy, merging provided options with defaults
+        const mergedOptions: RequestInit = {
+          headers: {
+            ...defaultHeaders,
+            ...(options?.headers || {})
+          },
+          ...options
+        };
+        // If options has headers, they'll override the default headers we just set
+        if (options?.headers) {
+          mergedOptions.headers = {
+            ...defaultHeaders,
+            ...options.headers
+          };
+        }
+        
+        response = await fetch(url, mergedOptions);
       }
       
       if (!response.ok) {

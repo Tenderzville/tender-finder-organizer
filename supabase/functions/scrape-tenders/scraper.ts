@@ -224,205 +224,454 @@ export async function scrapeTendersGo(): Promise<Tender[]> {
       console.log("No proxy available, making direct request");
     }
     
-    // Fetch the main tenders page
+    // The website has been modernized and now uses a different structure
+    // First, let's try to fetch the main HTML page
     const html = await fetchSourceWithRetry('https://tenders.go.ke/website/tenders/index');
+    console.log(`Initial HTML fetched, length: ${html.length}`);
     
-    // Parse the HTML and extract tenders
-    const $ = cheerio.load(html);
-    $('table tbody tr').each((index, element) => {
-      try {
-        const cells = $(element).find('td');
-        if (cells.length >= 3) {
-          // Extract tender information from table cells
-          const title = cells.eq(0).text().trim() || cells.eq(1).text().trim() || "Unknown Tender";
-          const organization = cells.length > 2 ? cells.eq(2).text().trim() : "";
-          const deadlineText = cells.length > 3 ? cells.eq(3).text().trim() : "";
-          const deadlineDate = parseDate(deadlineText) || addDays(new Date(), 14 + Math.floor(Math.random() * 16));
+    // Tenders.go.ke is a single-page application that loads data dynamically
+    // Let's try multiple possible API endpoints that might contain tender data
+    const possibleApiEndpoints = [
+      'https://tenders.go.ke/api/tenders',
+      'https://tenders.go.ke/website/api/tenders',
+      'https://tenders.go.ke/api/v1/tenders',
+      'https://tenders.go.ke/api/public/tenders',
+      'https://tenders.go.ke/website/tenders/api/list',
+      'https://tenders.go.ke/website/tenders/data',
+      'https://tenders.go.ke/tenders.json'
+    ];
+    
+    // Check if we can find any script URLs in the HTML that might provide clues
+    const scriptMatches = html.match(/<script[^>]*src="([^"]*)"/g);
+    if (scriptMatches) {
+      console.log("Found script tags that might load data:");
+      for (const scriptTag of scriptMatches) {
+        const srcMatch = scriptTag.match(/src="([^"]*)"/); 
+        if (srcMatch && srcMatch[1]) {
+          const scriptUrl = srcMatch[1].startsWith('http') 
+            ? srcMatch[1] 
+            : `https://tenders.go.ke${scriptUrl.startsWith('/') ? '' : '/'}${srcMatch[1]}`;
           
-          // Create tender object
-          const tender: Tender = {
-            title: title,
-            description: `Organization: ${organization}`,
-            requirements: "Please check the tender document for detailed requirements.",
-            deadline: deadlineDate.toISOString(),
-            contact_info: organization || "Check tender document for contact information",
-            fees: null,
-            prerequisites: null,
-            category: "Government",
-            subcategory: null,
-            tender_url: 'https://tenders.go.ke/website/tenders/index',
-            location: "Kenya",
-            points_required: 0
-          };
-          
-          tenders.push(tender);
-          console.log(`Extracted tender from Tenders.go.ke: ${title}`);
+          console.log(`Checking script at: ${scriptUrl}`);
+          try {
+            // Fetch the script content
+            const scriptContent = await fetchSourceWithRetry(scriptUrl);
+            
+            // Look for API endpoints in script
+            const apiEndpointMatches = scriptContent.match(/(\/api\/[^\s'"]+)/g);
+            if (apiEndpointMatches) {
+              console.log(`Found ${apiEndpointMatches.length} potential API endpoints in script`);
+              
+              // Add these endpoints to our list to try
+              for (const endpoint of apiEndpointMatches) {
+                const fullEndpoint = `https://tenders.go.ke${endpoint.startsWith('/') ? endpoint : '/' + endpoint}`;
+                if (!possibleApiEndpoints.includes(fullEndpoint)) {
+                  possibleApiEndpoints.push(fullEndpoint);
+                }
+              }
+            }
+          } catch (error) {
+            console.error(`Error fetching script ${scriptUrl}:`, error.message);
+          }
         }
-      } catch (err) {
-        console.error("Error processing tender row:", err);
       }
-    });
+    }
+    
+    console.log(`Trying ${possibleApiEndpoints.length} possible API endpoints for tender data`);
+    
+    // Try each potential API endpoint
+    for (const apiUrl of possibleApiEndpoints) {
+      try {
+        console.log(`Trying endpoint: ${apiUrl}`);
+        const apiResponse = await fetchSourceWithRetry(apiUrl, undefined, {
+          method: 'GET',
+          headers: {
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+            'Accept': 'application/json, text/plain, */*',
+            'Content-Type': 'application/json'
+          }
+        });
+        
+        // Check if the response looks like JSON
+        if (apiResponse && (apiResponse.startsWith('{') || apiResponse.startsWith('['))) {
+          try {
+            const tenderData = JSON.parse(apiResponse);
+            const dataArray = Array.isArray(tenderData) ? tenderData : 
+                              tenderData.data ? tenderData.data : 
+                              tenderData.tenders ? tenderData.tenders : 
+                              tenderData.results ? tenderData.results : null;
+            
+            if (dataArray && Array.isArray(dataArray) && dataArray.length > 0) {
+              console.log(`Found ${dataArray.length} tenders at endpoint: ${apiUrl}`);
+              
+              // Process the tender data from the API
+              dataArray.forEach((item: any) => {
+                try {
+                  // Extract tender details based on common API response structures
+                  const title = item.title || item.name || item.tenderTitle || item.subject || 'No Title';
+                  const deadline = item.closingDate || item.deadline || item.submissionDate || item.closing_date || new Date().toISOString();
+                  const url = item.documentUrl || item.tenderUrl || item.url || item.document_url || '';
+                  const description = item.description || item.details || item.summary || title;
+                  
+                  tenders.push({
+                    title,
+                    description,
+                    deadline: new Date(deadline).toISOString(),
+                    category: 'Government',
+                    url,
+                    source: 'tenders.go.ke'
+                  });
+                } catch (error) {
+                  console.error('Error processing tender item:', error);
+                }
+              });
+              
+              // If we found tenders, we can break the loop
+              if (tenders.length > 0) {
+                console.log(`Successfully extracted ${tenders.length} tenders from ${apiUrl}`);
+                break;
+              }
+            }
+          } catch (error) {
+            console.error(`Error parsing JSON from ${apiUrl}:`, error.message);
+          }
+        } else {
+          console.log(`Response from ${apiUrl} is not JSON`);
+        }
+      } catch (error) {
+        console.error(`Error fetching from ${apiUrl}:`, error.message);
+      }
+    }
+    
+    // If we still don't have any tenders, try alternative approaches
+    if (tenders.length === 0) {
+      console.log("No tenders found via API endpoints, trying alternative scraping method...");
+      
+      // Try to find tenders in the HTML directly using modern selectors
+      // Many modern sites use div-based layouts instead of tables
+      const $ = cheerio.load(html);
+      
+      // Look for common container patterns used in modern websites
+      $('.tender-item, .tender_item, .tenders-list > div, .card, .tender-card').each((index, element) => {
+        try {
+          const $el = $(element);
+          
+          // Extract tender details
+          const title = $el.find('.title, h2, h3, .tender-title').first().text().trim() ||
+                     $el.find('*[class*="title"]').first().text().trim();
+                     
+          const description = $el.find('.description, p, .tender-description').first().text().trim() ||
+                           title;
+                           
+          const deadlineText = $el.find('.deadline, .date, .closing-date, .tender-date').first().text().trim() ||
+                           $el.find('*[class*="date"]').first().text().trim() ||
+                           '';
+                           
+          const url = $el.find('a').attr('href') ||
+                   $el.find('a[class*="download"]').attr('href') ||
+                   $el.find('a[class*="detail"]').attr('href') ||
+                   '';
+          
+          // Process the deadline text to extract a date
+          let deadline = new Date();
+          if (deadlineText) {
+            const dateMatch = deadlineText.match(/(\d{1,2}[\/\-]\d{1,2}[\/\-]\d{2,4}|\d{2,4}[\/\-]\d{1,2}[\/\-]\d{1,2})/);
+            if (dateMatch) {
+              try {
+                deadline = parseDate(dateMatch[0]);
+              } catch (e) {
+                console.error(`Could not parse date from ${deadlineText}:`, e);
+              }
+            }
+          }
+          
+          // Only add if we have a title
+          if (title && title.length > 0) {
+            tenders.push({
+              title,
+              description,
+              deadline: deadline.toISOString(),
+              category: 'Government',
+              url: url ? (url.startsWith('http') ? url : `https://tenders.go.ke${url.startsWith('/') ? '' : '/'}${url}`) : '',
+              source: 'tenders.go.ke'
+            });
+          }
+        } catch (error) {
+          console.error('Error processing tender element:', error);
+        }
+      });
+    }
+    
+    // If still no tenders found, add a note for future improvement
+    if (tenders.length === 0) {
+      console.log("Could not find any tenders. This website may require a headless browser approach in the future.");
+    }
     
     console.log(`Tenders.go.ke scraping complete. Found ${tenders.length} tenders.`);
     return tenders;
   } catch (error) {
-    console.error("Error in scrapeTendersGo:", error);
+    console.error("Error scraping Tenders.go.ke:", error);
     return [];
   }
 }
 
-// Scrape tenders from private companies via Google search
-export async function scrapePrivateTenders(keywords: string[] = [], days = 2): Promise<Tender[]> {
-  console.log(`Starting to scrape private sector tenders from the last ${days} days...`);
+// Fallback function to scrape Tenders.go.ke using Puppeteer (headless browser)
+export async function scrapeTendersGoPuppeteer(): Promise<Tender[]> {
+  console.log("Starting to scrape Tenders.go.ke using Puppeteer...");
   const tenders: Tender[] = [];
   
   try {
-    // If no keywords provided, use some default industry keywords
-    if (!keywords.length) {
-      keywords = [
-        "construction", "technology", "ict", "telecom", "engineering", 
-        "consulting", "energy", "oil", "mining", "healthcare", "education"
-      ];
-    }
+    // Import puppeteer dynamically
+    const puppeteer = await import('https://deno.land/x/puppeteer@16.2.0/mod.ts');
     
-    // Create search URLs for different industries
-    const searchUrls: string[] = [];
+    // Launch a headless browser
+    console.log("Launching headless browser...");
+    const browser = await puppeteer.launch({
+      headless: true,
+      args: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-dev-shm-usage', '--disable-accelerated-2d-canvas', '--disable-gpu']
+    });
     
-    // Generate a search URL for each keyword
-    for (const keyword of keywords) {
-      const url = generateTenderSearchUrl([keyword], days);
-      searchUrls.push(url);
-    }
-    
-    console.log(`Created ${searchUrls.length} search URLs for private sector tenders`);
-    
-    // Scrape the first few search results for each URL
-    for (const url of searchUrls.slice(0, 3)) { // Limit to first 3 searches to avoid rate limiting
-      try {
-        console.log(`Searching for private tenders with URL: ${url}`);
-        
-        // Use direct HTTP request instead of Puppeteer
-        const html = await fetchSourceWithRetry(url);
-        
-        if (html && html.length > 0) {
-          console.log(`Google search results fetched, length: ${html.length}`);
-          
-          // Parse the HTML and extract search results
-          const $ = cheerio.load(html);
-          
-          // Extract search results
-          $('.g').each((index, element) => {
-            try {
-              // Limit to first 5 results per search
-              if (index >= 5) return;
-              
-              const titleElement = $(element).find('h3').first();
-              const linkElement = $(element).find('a').first();
-              const snippetElement = $(element).find('.VwiC3b, .s3v9rd').first(); // Multiple potential selectors
-              
-              const title = titleElement.text().trim();
-              const link = linkElement.attr('href') || "";
-              const snippet = snippetElement.text().trim();
-              
-              // Check if the result has a date within the last 48 hours
-              const dateMatch = snippet.match(/\d{1,2}\s+(hour|day|min|sec)s?\s+ago|today|yesterday/i);
-              const hasRecentDate = !!dateMatch;
-              
-              // Only include results that look like tenders and are recent
-              if (title && snippet && link && 
-                  (title.toLowerCase().includes('tender') || 
-                   title.toLowerCase().includes('procurement') || 
-                   title.toLowerCase().includes('bid') || 
-                   title.toLowerCase().includes('rfp') || 
-                   snippet.toLowerCase().includes('tender') || 
-                   snippet.toLowerCase().includes('procurement'))) {
-                
-                // Try to extract a date from the snippet
-                const deadlineMatch = snippet.match(/closing date[^\d]*(\d{1,2}[\-\/\.]\d{1,2}[\-\/\.]\d{4}|\d{1,2}\s+[a-z]{3,}\s+\d{4})/i);
-                const deadlineDate = deadlineMatch ? parseDate(deadlineMatch[1]) : addDays(new Date(), 14);
-                
-                // Create tender object
-                const tender: Tender = {
-                  title: title,
-                  description: snippet,
-                  requirements: "Check the tender document for detailed requirements.",
-                  deadline: deadlineDate.toISOString(),
-                  contact_info: "Check the tender document for contact information",
-                  fees: null,
-                  prerequisites: null,
-                  category: "Private",
-                  subcategory: keywords.find(k => title.toLowerCase().includes(k.toLowerCase())) || null,
-                  tender_url: link,
-                  location: "Kenya", // Default to Kenya but could be extracted
-                  points_required: 0
-                };
-                
-                tenders.push(tender);
-                console.log(`Extracted private tender: ${title} | URL: ${link}`);
-              }
-            } catch (error) {
-              console.error("Error processing search result:", error);
-            }
-          });
+    try {
+      const page = await browser.newPage();
+      
+      // Set a realistic user agent
+      await page.setUserAgent('Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36');
+      
+      // Set viewport
+      await page.setViewport({ width: 1280, height: 800 });
+      
+      // Navigate to tenders.go.ke
+      console.log("Navigating to tenders.go.ke...");
+      await page.goto('https://tenders.go.ke/website/tenders/index', { 
+        waitUntil: 'networkidle2',
+        timeout: 60000
+      });
+      
+      // Wait for content to load - adjust the selector based on actual page structure
+      console.log("Waiting for tender content to load...");
+      await page.waitForSelector('.tender-card, .tender-item, .card, table tbody tr', { 
+        timeout: 30000,
+        visible: true 
+      }).catch(() => console.log("Timeout waiting for tender items, proceeding anyway"));
+      
+      // Gather all network requests to find API calls
+      const apiRequests: string[] = [];
+      page.on('request', request => {
+        const url = request.url();
+        if (url.includes('/api/') && request.method() === 'GET') {
+          apiRequests.push(url);
+          console.log(`Detected API request: ${url}`);
         }
+      });
+      
+      // Give some time for all content to load and APIs to be called
+      await new Promise(resolve => setTimeout(resolve, 5000));
+      
+      // If we detected API calls, try to fetch directly from those
+      if (apiRequests.length > 0) {
+        console.log(`Found ${apiRequests.length} potential API endpoints`);
         
-        // Add a short delay between searches to avoid triggering anti-scraping measures
-        await new Promise(resolve => setTimeout(resolve, 2000));
-        
-      } catch (error) {
-        console.error(`Error searching URL ${url}:`, error);
+        // Try each API endpoint
+        for (const apiUrl of apiRequests) {
+          try {
+            const response = await fetch(apiUrl, {
+              headers: {
+                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+                'Accept': 'application/json'
+              }
+            });
+            
+            if (response.ok) {
+              const data = await response.json();
+              console.log(`Successfully fetched data from ${apiUrl}`);
+              
+              // Process API data to extract tenders
+              const dataArray = Array.isArray(data) ? data : 
+                              data.data ? data.data : 
+                              data.tenders ? data.tenders : 
+                              data.results ? data.results : null;
+                              
+              if (dataArray && Array.isArray(dataArray) && dataArray.length > 0) {
+                console.log(`Found ${dataArray.length} tenders in API response`);
+                
+                dataArray.forEach((item: any) => {
+                  try {
+                    const title = item.title || item.name || item.tenderTitle || item.subject || '';
+                    const deadline = item.closingDate || item.deadline || item.submissionDate || item.closing_date || new Date().toISOString();
+                    const url = item.documentUrl || item.tenderUrl || item.url || item.document_url || '';
+                    const description = item.description || item.details || item.summary || title;
+                    
+                    if (title) {
+                      tenders.push({
+                        title,
+                        description,
+                        deadline: new Date(deadline).toISOString(),
+                        category: 'Government',
+                        url,
+                        source: 'tenders.go.ke'
+                      });
+                    }
+                  } catch (error) {
+                    console.error('Error processing API tender item:', error);
+                  }
+                });
+                
+                // If we found tenders, we can break
+                if (tenders.length > 0) break;
+              }
+            }
+          } catch (error) {
+            console.error(`Error fetching from API ${apiUrl}:`, error);
+          }
+        }
       }
+      
+      // If we haven't found tenders from API calls, extract from the page HTML
+      if (tenders.length === 0) {
+        console.log("Extracting tenders directly from page HTML...");
+        
+        // Get the HTML content of the page
+        const pageHTML = await page.content();
+        
+        // Use Cheerio to parse the HTML
+        const $ = cheerio.load(pageHTML);
+        
+        // Try different selectors to find tender items
+        $('.tender-item, .tender_item, .tenders-list > div, .card, .tender-card, table tr').each((index, element) => {
+          try {
+            const $el = $(element);
+            
+            // Extract tender details
+            const title = $el.find('.title, h2, h3, .tender-title, a').first().text().trim() ||
+                       $el.find('*[class*="title"]').first().text().trim();
+                       
+            const description = $el.find('.description, p, .tender-description').first().text().trim() ||
+                             title;
+                             
+            const deadlineText = $el.find('.deadline, .date, .closing-date, .tender-date').first().text().trim() ||
+                             $el.find('*[class*="date"]').first().text().trim() ||
+                             '';
+                             
+            const url = $el.find('a').attr('href') ||
+                     $el.find('a[class*="download"]').attr('href') ||
+                     $el.find('a[class*="detail"]').attr('href') ||
+                     '';
+            
+            // Process the deadline text to extract a date
+            let deadline = new Date();
+            if (deadlineText) {
+              const dateMatch = deadlineText.match(/(\d{1,2}[\/\-]\d{1,2}[\/\-]\d{2,4}|\d{2,4}[\/\-]\d{1,2}[\/\-]\d{1,2})/);
+              if (dateMatch) {
+                try {
+                  deadline = parseDate(dateMatch[0]);
+                } catch (e) {
+                  console.error(`Could not parse date from ${deadlineText}:`, e);
+                }
+              }
+            }
+            
+            // Only add if we have a title
+            if (title && title.length > 0) {
+              tenders.push({
+                title,
+                description,
+                deadline: deadline.toISOString(),
+                category: 'Government',
+                url: url ? (url.startsWith('http') ? url : `https://tenders.go.ke${url.startsWith('/') ? '' : '/'}${url}`) : '',
+                source: 'tenders.go.ke'
+              });
+            }
+          } catch (error) {
+            console.error('Error processing HTML tender element:', error);
+          }
+        });
+      }
+      
+      console.log(`Extracted ${tenders.length} tenders using Puppeteer`);       
+    } finally {
+      // Close the browser
+      await browser.close();
+      console.log("Headless browser closed");
     }
-    
-    console.log(`Private sector tenders scraping complete. Found ${tenders.length} tenders.`);
-    return tenders;
   } catch (error) {
-    console.error("Error in scrapePrivateTenders:", error);
-    return [];
+    console.error("Error using Puppeteer for scraping:", error);
+    console.log("Note: To use this feature, install Puppeteer with 'deno install -A -r https://deno.land/x/puppeteer/install.ts'");
+  }
+  
+  console.log(`Tenders.go.ke Puppeteer scraping complete. Found ${tenders.length} tenders.`);
+  return tenders;
+}
+
+// Check if Puppeteer is available
+async function checkPuppeteerAvailable(): Promise<boolean> {
+  try {
+    await import('https://deno.land/x/puppeteer@16.2.0/mod.ts');
+    return true;
+  } catch {
+    return false;
   }
 }
 
-// Main function to run all the scrapers
-async function main() {
+// Main function to run all scrapers and gather tenders
+export async function main() {
   console.log("\n=== Starting Kenya Tender Finder Scraper ===\n");
+  let allTenders: Tender[] = [];
+
+  // Scrape MyGov tenders
+  console.log("\n=== Scraping MyGov Tenders ===\n");
+  const myGovTenders = await scrapeMyGov();
+  console.log(`Found ${myGovTenders.length} tenders from MyGov`);
+  allTenders = [...allTenders, ...myGovTenders];
+
+  // Scrape Tenders.go.ke
+  console.log("\n=== Scraping Tenders.go.ke ===\n");
+  const tendersGoTenders = await scrapeTendersGo();
+  console.log(`Found ${tendersGoTenders.length} tenders from Tenders.go.ke`);
+  allTenders = [...allTenders, ...tendersGoTenders];
   
-  try {
-    console.log("\n=== Scraping MyGov Tenders ===\n");
-    const myGovTenders = await scrapeMyGov();
-    console.log(`Found ${myGovTenders.length} tenders from MyGov`);
-    
-    console.log("\n=== Scraping Tenders.go.ke Tenders ===\n");
-    const tendersGoTenders = await scrapeTendersGo();
-    console.log(`Found ${tendersGoTenders.length} tenders from Tenders.go.ke`);
-    
-    console.log("\n=== Scraping Private Sector Tenders (last 48 hours) ===\n");
-    const privateTenders = await scrapePrivateTenders([], 2); // 2 days = 48 hours
-    console.log(`Found ${privateTenders.length} private sector tenders`);
-    
-    // Combine all results
-    const allTenders = [...myGovTenders, ...tendersGoTenders, ...privateTenders];
-    console.log(`\n=== Scraping Complete: Found ${allTenders.length} tenders in total ===\n`);
-    
-    // Print the first few tenders as a preview
-    if (allTenders.length > 0) {
-      console.log("\n=== Sample Tenders Preview ===\n");
-      allTenders.slice(0, 3).forEach((tender, index) => {
-        console.log(`Tender #${index + 1}:`);
-        console.log(`- Title: ${tender.title}`);
-        console.log(`- Deadline: ${tender.deadline}`);
-        console.log(`- Category: ${tender.category}`);
-        console.log(`- URL: ${tender.tender_url}`);
-        console.log("---");
-      });
+  // If regular scraping of Tenders.go.ke didn't work, try with puppeteer if available
+  if (tendersGoTenders.length === 0) {
+    console.log("\n=== Attempting Puppeteer Fallback for Tenders.go.ke ===\n");
+    try {
+      // Check if puppeteer is available by importing dynamically
+      const puppeteerAvailable = await checkPuppeteerAvailable();
+      
+      if (puppeteerAvailable) {
+        console.log("Puppeteer is available, using headless browser approach");
+        const puppeteerTenders = await scrapeTendersGoPuppeteer();
+        console.log(`Found ${puppeteerTenders.length} tenders using Puppeteer approach`);
+        allTenders = [...allTenders, ...puppeteerTenders];
+      } else {
+        console.log("Puppeteer is not available. Install it to enable headless browser scraping for complex sites.");
+      }
+    } catch (error) {
+      console.error("Error with Puppeteer fallback:", error);
     }
-    
-    // Here you would typically save the results to a database
-    // For now, we'll just return them
-    return allTenders;
-  } catch (error) {
-    console.error("Error running scrapers:", error);
-    return [];
   }
+
+  // Scrape private sector tenders (last 48 hours)
+  console.log("\n=== Scraping Private Sector Tenders (last 48 hours) ===\n");
+  const privateTenders = await scrapePrivateTenders([], 2); // 2 days = 48 hours
+  console.log(`Found ${privateTenders.length} private sector tenders`);
+  allTenders = [...allTenders, ...privateTenders];
+
+  // Display results
+  console.log(`\n=== Scraping Complete: Found ${allTenders.length} tenders in total ===\n`);
+  
+  // Show sample of tenders
+  if (allTenders.length > 0) {
+    console.log("\n=== Sample Tenders Preview ===\n");
+    allTenders.slice(0, 3).forEach((tender, index) => {
+      console.log(`Tender #${index + 1}:`);
+      console.log(`- Title: ${tender.title}`);
+      console.log(`- Deadline: ${tender.deadline}`);
+      console.log(`- Category: ${tender.category}`);
+      console.log(`- URL: ${tender.url}`);
+      console.log("---");
+    });
+  }
+
+  return allTenders;
 }
 
 // Run the main function when this script is executed directly
