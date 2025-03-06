@@ -3,7 +3,7 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.42.7";
 import { corsHeaders } from "../_shared/cors.ts";
 import { format, addDays } from "https://esm.sh/date-fns@2.30.0";
-import { scrapeMyGov, scrapeTendersGo } from "./scraper.ts";
+import { processJob, processNextJob } from "./job-processor.ts";
 import type { Tender } from "./types.ts";
 
 // Create a single supabase client for interacting with your database
@@ -22,17 +22,20 @@ Deno.serve(async (req) => {
   try {
     console.log("Starting scrape-tenders function");
     
-    // Parse request to get force parameter
+    // Parse request to get force parameter and job ID if provided
     let force = false;
+    let specificJobId = null;
+    
     if (req.method === "POST") {
       const body = await req.json();
       force = body?.force === true;
-      console.log(`Force parameter: ${force}`);
+      specificJobId = body?.jobId || null;
+      console.log(`Force parameter: ${force}, Job ID: ${specificJobId}`);
     }
     
     // Check if we've already scraped recently (within last 30 minutes)
     // Skip this check if force is true
-    if (!force) {
+    if (!force && !specificJobId) {
       const { data: lastScrape } = await supabase
         .from("scraping_logs")
         .select("created_at, status")
@@ -61,13 +64,11 @@ Deno.serve(async (req) => {
       }
     }
     
-    console.log("Beginning scrape operations");
-
     // Create a log entry for this scrape
     const { data: logEntry, error: logError } = await supabase
       .from("scraping_logs")
       .insert({
-        source: "mygov.go.ke",
+        source: "job_queue",
         status: "in_progress",
         records_found: 0
       })
@@ -82,35 +83,110 @@ Deno.serve(async (req) => {
     const logId = logEntry.id;
     console.log(`Created scraping log with ID ${logId}`);
     
-    // Scrape MyGov tenders
-    console.log("Scraping MyGov tenders...");
-    const myGovTenders = await scrapeMyGov();
-    console.log(`Scraped ${myGovTenders.length} tenders from MyGov`);
+    // Initialize jobs if needed
+    if (force || !specificJobId) {
+      await supabase.rpc('initialize_scraping_jobs');
+      console.log("Initialized scraping jobs");
+    }
     
-    // Scrape Tenders.go.ke
-    console.log("Scraping Tenders.go.ke...");
-    const tendersGoTenders = await scrapeTendersGo();
-    console.log(`Scraped ${tendersGoTenders.length} tenders from Tenders.go.ke`);
-    
-    // Combine and process all scraped tenders
-    const allTenders = [...myGovTenders, ...tendersGoTenders];
-    console.log(`Total tenders scraped: ${allTenders.length}`);
-    
-    if (allTenders.length === 0) {
-      // Update log with no records found
-      await supabase
-        .from("scraping_logs")
-        .update({
-          status: "success",
-          records_found: 0,
-          records_inserted: 0
-        })
-        .eq("id", logId);
+    // If a specific job ID was provided, process that job
+    if (specificJobId) {
+      // Start processing in the background
+      const backgroundProcessing = async () => {
+        try {
+          // Get the job details
+          const { data: jobData } = await supabase
+            .from('scraping_jobs')
+            .select('*')
+            .eq('id', specificJobId)
+            .single();
+          
+          if (!jobData) {
+            console.error(`Job with ID ${specificJobId} not found`);
+            return;
+          }
+          
+          // Process the specific job
+          console.log(`Processing specific job: ${jobData.source} - ${jobData.url}`);
+          await processJob(supabase, jobData);
+          
+          // Update the log with success
+          await supabase
+            .from("scraping_logs")
+            .update({
+              status: "success",
+              records_found: 1,
+              records_inserted: 1
+            })
+            .eq("id", logId);
+          
+        } catch (error) {
+          console.error("Error in background job processing:", error);
+          
+          // Update the log with error
+          await supabase
+            .from("scraping_logs")
+            .update({
+              status: "error",
+              error_message: error.message || "Unknown error"
+            })
+            .eq("id", logId);
+        }
+      };
+      
+      // Use EdgeRuntime.waitUntil for background processing
+      console.log("Starting background processing for specific job");
+      EdgeRuntime.waitUntil(backgroundProcessing());
       
       return new Response(
         JSON.stringify({
-          message: "No tenders found during scrape",
-          tenders_scraped: 0,
+          message: `Processing job ${specificJobId} started in background`,
+          log_id: logId,
+          success: true
+        }),
+        {
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+          status: 200,
+        }
+      );
+    } else {
+      // Process the next job in the queue
+      // Start processing in the background
+      const backgroundProcessing = async () => {
+        try {
+          await processNextJob(supabase);
+          
+          // Update the log with success
+          await supabase
+            .from("scraping_logs")
+            .update({
+              status: "success",
+              records_found: 1
+            })
+            .eq("id", logId);
+          
+        } catch (error) {
+          console.error("Error in background job processing:", error);
+          
+          // Update the log with error
+          await supabase
+            .from("scraping_logs")
+            .update({
+              status: "error",
+              error_message: error.message || "Unknown error"
+            })
+            .eq("id", logId);
+        }
+      };
+      
+      // Use EdgeRuntime.waitUntil for background processing
+      console.log("Starting background processing for next job");
+      EdgeRuntime.waitUntil(backgroundProcessing());
+      
+      return new Response(
+        JSON.stringify({
+          message: "Job queue processing started in background",
+          log_id: logId,
           success: true
         }),
         {
@@ -119,116 +195,6 @@ Deno.serve(async (req) => {
         }
       );
     }
-    
-    // Process and insert tenders
-    let insertedCount = 0;
-    for (const tender of allTenders) {
-      try {
-        // Check if tender already exists by URL or title
-        const { data: existingTenders } = await supabase
-          .from("tenders")
-          .select("id")
-          .or(`title.eq."${tender.title}",tender_url.eq."${tender.tender_url}"`)
-          .limit(1);
-        
-        if (existingTenders && existingTenders.length > 0) {
-          console.log(`Tender already exists: ${tender.title}`);
-          continue;
-        }
-        
-        // Determine affirmative action status based on content analysis
-        let affirmativeAction = null;
-        const lowerTitle = tender.title.toLowerCase();
-        const lowerDesc = (tender.description || "").toLowerCase();
-        
-        if (
-          lowerTitle.includes("youth") || 
-          lowerDesc.includes("youth") || 
-          lowerTitle.includes("agpo") || 
-          lowerDesc.includes("agpo")
-        ) {
-          affirmativeAction = { 
-            type: "youth", 
-            percentage: 30,
-            details: "30% procurement preference for youth-owned businesses"
-          };
-        } else if (
-          lowerTitle.includes("women") || 
-          lowerDesc.includes("women")
-        ) {
-          affirmativeAction = {
-            type: "women",
-            percentage: 30,
-            details: "30% procurement preference for women-owned businesses"
-          };
-        } else if (
-          lowerTitle.includes("pwd") || 
-          lowerDesc.includes("pwd") || 
-          lowerTitle.includes("persons with disabilities") || 
-          lowerDesc.includes("persons with disabilities")
-        ) {
-          affirmativeAction = {
-            type: "pwds",
-            percentage: 30,
-            details: "30% procurement preference for businesses owned by persons with disabilities"
-          };
-        } else {
-          affirmativeAction = { type: "none" };
-        }
-        
-        // Generate a deadline 14-30 days in the future if not specified
-        const deadline = tender.deadline ? new Date(tender.deadline) : addDays(new Date(), 14 + Math.floor(Math.random() * 16));
-        
-        // Insert the tender with affirmative action info
-        const { error: insertError } = await supabase
-          .from("tenders")
-          .insert({
-            ...tender,
-            deadline,
-            category: tender.category || "Government",
-            affirmative_action: affirmativeAction
-          });
-        
-        if (insertError) {
-          console.error(`Error inserting tender "${tender.title}":`, insertError);
-          continue;
-        }
-        
-        insertedCount++;
-      } catch (err) {
-        console.error(`Error processing tender "${tender.title}":`, err);
-      }
-    }
-    
-    console.log(`Inserted ${insertedCount} new tenders`);
-    
-    // Update log with final stats
-    await supabase
-      .from("scraping_logs")
-      .update({
-        status: "success",
-        records_found: allTenders.length,
-        records_inserted: insertedCount
-      })
-      .eq("id", logId);
-    
-    // Get total tender count
-    const { count } = await supabase
-      .from("tenders")
-      .select("*", { count: "exact", head: true });
-    
-    return new Response(
-      JSON.stringify({
-        message: "Scrape completed successfully",
-        tenders_scraped: insertedCount,
-        total_tenders: count || 0,
-        success: true
-      }),
-      {
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-        status: 200,
-      }
-    );
   } catch (error) {
     console.error("Error in scrape-tenders function:", error);
     
@@ -243,4 +209,9 @@ Deno.serve(async (req) => {
       }
     );
   }
+});
+
+// Add shutdown handler for graceful termination
+addEventListener("beforeunload", (evt) => {
+  console.log("Function shutting down:", evt.detail?.reason);
 });
