@@ -69,11 +69,11 @@ export const ProviderRating = ({
 
     setIsLoading(true);
     try {
+      // Use the body parameter to pass the providerId instead of query
       const { data, error } = await supabase.functions.invoke(
         "service-provider-ratings",
         {
-          method: "GET",
-          query: { providerId },
+          body: { providerId, action: "get" }
         }
       );
 
@@ -103,6 +103,7 @@ export const ProviderRating = ({
             providerId,
             rating: userRating,
             comment,
+            action: "create"
           },
         }
       );
