@@ -13,6 +13,7 @@ import { Toaster } from "@/components/ui/toaster"
 import TermsPage from '@/pages/Terms';
 import PrivacyPage from '@/pages/Privacy';
 import { ChatSupport } from "@/components/ChatSupport";
+import { OpenSourceAssistant } from "@/components/ai/OpenSourceAssistant";
 import LearningHub from '@/pages/LearningHub';
 import { AdManager } from '@/integrations/AdManager';
 import { usePerformance } from '@/hooks/use-performance';
