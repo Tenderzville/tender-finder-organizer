@@ -105,6 +105,35 @@ Deno.serve(async (req) => {
             console.error(`Job with ID ${specificJobId} not found`);
             return;
           }
+
+// Filter for recent tenders (within last 48 hours)
+const isRecent = (dateStr: string) => {
+  try {
+    const publishDate = new Date(dateStr);
+    const last48Hours = new Date();
+    last48Hours.setHours(last48Hours.getHours() - 48);
+    return publishDate >= last48Hours;
+  } catch (error) {
+    console.error(`Error parsing date: ${dateStr}`, error);
+    return false; // If we can't parse the date, assume it's not recent
+  }
+};
+
+// Prioritize recent tenders in results
+const recentTenders = parsedTenders.filter(tender => 
+  tender.publication_date && isRecent(tender.publication_date)
+);
+
+console.log(`Found ${recentTenders.length} tenders published in the last 48 hours`);
+
+// Always include recent tenders at the top of results
+const sortedTenders = [
+  ...recentTenders,
+  ...parsedTenders.filter(tender => 
+    !tender.publication_date || !isRecent(tender.publication_date)
+  )
+];
+
           
           // Process the specific job
           console.log(`Processing specific job: ${jobData.source} - ${jobData.url}`);

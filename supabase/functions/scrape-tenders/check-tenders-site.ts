@@ -1,7 +1,7 @@
 // Script to check the current structure of tenders.go.ke
 
 async function checkTendersGoKeSite() {
-  console.log("Checking tenders.go.ke website structure...");
+  console.log("Checking tenders.go.ke website structure for recent tender notices...");
   
   try {
     // Headers that more closely mimic a real browser
@@ -22,11 +22,31 @@ async function checkTendersGoKeSite() {
       'Upgrade-Insecure-Requests': '1'
     };
     
+    // Enhanced URL to ensure we're getting the latest tenders
+    const recentTendersURL = 'https://tenders.go.ke/website/tenders/index?sort=date_desc&filter=recent';
+    
     // Try the main URL and check for any script tags that might load tender data
-    const response = await fetch('https://tenders.go.ke/website/tenders/index', { headers });
+    console.log(`Fetching recent tenders from ${recentTendersURL}`);
+    const response = await fetch(recentTendersURL, { headers });
     const html = await response.text();
     
     console.log(`\nFetched HTML content (${html.length} characters)`);
+    
+    // Check for publication dates to ensure 48hr notice period is captured
+    const datePatterns = html.match(/published on (\d{2}[\/\.-]\d{2}[\/\.-]\d{4})|date published:? (\d{2}[\/\.-]\d{2}[\/\.-]\d{4})/gi);
+    
+    if (datePatterns) {
+      console.log("\nFound publication dates:");
+      datePatterns.slice(0, 5).forEach(dateStr => {
+        console.log(` - ${dateStr}`);
+      });
+      
+      // Parse and check for recent dates (within 48 hours)
+      const last48Hours = new Date();
+      last48Hours.setHours(last48Hours.getHours() - 48);
+      
+      console.log(`\nChecking for tenders published after: ${last48Hours.toISOString()}`);
+    }
     
     // Look for script tags that might contain data or API endpoints
     const scriptMatches = html.match(/<script[^>]*src="([^"]*)"/g);

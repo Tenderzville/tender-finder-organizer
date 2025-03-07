@@ -2,6 +2,95 @@
 @tailwind components;
 @tailwind utilities;
 
+/* Performance optimizations for low-end devices */
+.simplified-ui img {
+  image-rendering: auto;
+}
+
+.simplified-ui .bg-gradient-to-r {
+  background: #f3f4f6 !important; /* Use simple background instead of gradients */
+}
+
+.simplified-ui .shadow-lg,
+.simplified-ui .shadow-md,
+.simplified-ui .shadow-sm {
+  box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.1) !important; /* Simpler shadows */
+}
+
+/* Reduce motion for better performance */
+.reduce-motion *,
+.reduce-motion *::before,
+.reduce-motion *::after {
+  animation-duration: 0.001ms !important;
+  animation-iteration-count: 1 !important;
+  transition-duration: 0.001ms !important;
+}
+
+/* Lazy loading images */
+.lazy-image {
+  opacity: 0;
+  transition: opacity 0.3s;
+}
+
+.lazy-image.loaded {
+  opacity: 1;
+}
+
+/* Offline mode indicator */
+.offline-indicator {
+  position: fixed;
+  bottom: 1rem;
+  left: 1rem;
+  background-color: rgba(239, 68, 68, 0.9);
+  color: white;
+  padding: 0.5rem 1rem;
+  border-radius: 9999px;
+  font-size: 0.875rem;
+  z-index: 50;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+/* Points indicator */
+.points-indicator {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.25rem 0.75rem;
+  background-color: rgba(16, 185, 129, 0.1);
+  border-radius: 9999px;
+  font-weight: 500;
+}
+
+.points-indicator svg {
+  margin-right: 0.25rem;
+}
+
+/* AGPO badges */
+.agpo-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.25rem 0.5rem;
+  border-radius: 9999px;
+  font-size: 0.75rem;
+  font-weight: 500;
+}
+
+.agpo-badge.youth {
+  background-color: rgba(59, 130, 246, 0.1);
+  color: rgb(29, 78, 216);
+}
+
+.agpo-badge.women {
+  background-color: rgba(236, 72, 153, 0.1);
+  color: rgb(190, 24, 93);
+}
+
+.agpo-badge.pwds {
+  background-color: rgba(245, 158, 11, 0.1);
+  color: rgb(180, 83, 9);
+}
+
 @layer base {
   :root {
     --background: 0 0% 100%;
