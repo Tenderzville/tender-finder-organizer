@@ -5,6 +5,7 @@ import { corsHeaders } from "../_shared/cors.ts";
 // Create a single supabase client for interacting with your database
 const supabaseUrl = Deno.env.get("SUPABASE_URL") || "";
 const supabaseKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") || "";
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2.42.7";
 const supabase = createClient(supabaseUrl, supabaseKey);
 
 async function processPendingJobs() {

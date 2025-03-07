@@ -1,6 +1,6 @@
 // supabase/functions/send-notifications/index.ts
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
-import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.21.0'
+import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.42.7'
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
