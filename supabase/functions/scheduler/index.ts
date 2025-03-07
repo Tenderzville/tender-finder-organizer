@@ -20,23 +20,43 @@ serve(async (req) => {
     
     const supabase = createClient(supabaseUrl, supabaseKey);
 
-    // Use Deno's runtime to run background tasks
-    const controller = new AbortController();
-    const { signal } = controller;
-
-    // Start background processing
+    // Start background processing without waiting for it to complete
     const backgroundProcess = async () => {
       console.log("Initiating background tender scraping process");
       
       try {
+        // First log that we're starting the process
+        await supabase
+          .from('scraping_logs')
+          .insert({
+            status: 'started',
+            tenders_found: 0,
+            error_message: null,
+          });
+        
         // Call the scrape-tenders function
         const { data: scrapeData, error: scrapeError } = await supabase.functions.invoke(
           'scrape-tenders', 
-          { body: { scheduled: true } }
+          { 
+            body: { 
+              scheduled: true,
+              force: true  // Always force a fresh scrape when scheduled
+            } 
+          }
         );
         
         if (scrapeError) {
           console.error("Error in scrape-tenders function:", scrapeError);
+          
+          // Log the error
+          await supabase
+            .from('scraping_logs')
+            .insert({
+              status: 'error',
+              tenders_found: 0,
+              error_message: scrapeError.message || "Unknown error during function invocation",
+            });
+            
           return;
         }
         
@@ -61,19 +81,29 @@ serve(async (req) => {
           .insert({
             status: 'error',
             tenders_found: 0,
-            error_message: error.message,
+            error_message: error.message || "Unknown error in background process",
           });
       }
     };
 
-    // Use EdgeRuntime.waitUntil to continue processing after response is sent
-    // @ts-ignore - Deno Deploy specific API
-    Deno.core.opAsync("op_wait_until", backgroundProcess());
+    // Use Deno's waitUntil to continue processing after response is sent
+    // This works specifically in Deno Deploy environment
+    try {
+      // @ts-ignore - Deno Deploy specific API
+      Deno.core.opAsync("op_wait_until", backgroundProcess());
+      console.log("Background process registered with waitUntil");
+    } catch (error) {
+      console.error("Error registering waitUntil:", error);
+      // Fallback - Just start the process without waiting
+      backgroundProcess();
+      console.log("Background process started without waitUntil");
+    }
 
     return new Response(
       JSON.stringify({
         success: true,
         message: `Scheduler initiated. Running tender scraper in the background every ${SCRAPE_INTERVAL_MINUTES} minutes.`,
+        timestamp: new Date().toISOString()
       }),
       {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
@@ -87,6 +117,8 @@ serve(async (req) => {
       JSON.stringify({
         success: false,
         error: error.message,
+        stack: error.stack,
+        timestamp: new Date().toISOString()
       }),
       {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },

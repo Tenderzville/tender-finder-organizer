@@ -60,8 +60,38 @@ serve(async (req) => {
       throw tendersError;
     }
 
-    // Check if scraper is available by checking if we can access it
-    const scraperAvailable = true;
+    // Try to ping the scraper function to check if it's available
+    let scraperAvailable = false;
+    let pingError = null;
+    try {
+      // Attempt to ping the scrape-tenders function without running it
+      const { data, error } = await supabase.functions.invoke('scrape-tenders', { 
+        body: { ping: true } 
+      });
+      scraperAvailable = data?.success === true;
+      if (error) {
+        pingError = error.message;
+        console.error("Error pinging scraper:", error);
+      }
+    } catch (e) {
+      pingError = e.message;
+      console.error("Exception pinging scraper:", e);
+    }
+
+    // Get Supabase Edge Function timeout setting
+    const timeoutSetting = Deno.env.get('SUPABASE_FUNCTION_TIMEOUT') || '30'; // default is 30 seconds
+
+    // Diagnostic information
+    const diagnostics = {
+      total_tenders_count: totalTenders || 0,
+      latest_tenders_count: latestTenders?.length || 0,
+      latest_logs_count: scrapingLogs?.length || 0,
+      latest_successful_scrape: scrapingLogs?.find(log => log.status === 'success')?.created_at || null,
+      edge_function_timeout: `${timeoutSetting} seconds`,
+      scraper_available: scraperAvailable,
+      ping_error: pingError,
+      database_connection: logsError ? "Error" : "OK"
+    };
 
     return new Response(
       JSON.stringify({
@@ -70,7 +100,8 @@ serve(async (req) => {
         latest_tenders: latestTenders,
         scraper_available: scraperAvailable,
         last_check: new Date().toISOString(),
-        message: "Status check completed"
+        message: "Status check completed",
+        diagnostics
       }),
       {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
@@ -84,6 +115,8 @@ serve(async (req) => {
       JSON.stringify({
         success: false,
         error: error.message,
+        stack: error.stack,
+        timestamp: new Date().toISOString()
       }),
       {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
