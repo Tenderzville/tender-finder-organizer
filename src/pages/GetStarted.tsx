@@ -35,19 +35,17 @@ const GetStarted = () => {
   };
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="flex flex-col items-center justify-center min-h-screen p-4 bg-gray-100">
       {/* Top Banner Ad */}
-      <div className="w-full bg-blue-100 p-4 text-center border-b">
+      <div className="w-full bg-blue-100 p-4 text-center border-b mb-4">
         <p className="text-sm text-blue-800">Advertisement Space</p>
       </div>
 
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
         {/* Hero Section */}
         <div className="text-center mb-16">
-          <h1 className="text-4xl font-bold text-gray-900 sm:text-5xl md:text-6xl mb-8">
-            Welcome to Tenderzville Portal
-          </h1>
-          <p className="text-xl text-gray-600 max-w-2xl mx-auto">
+          <h1 className="text-3xl font-bold text-gray-900 sm:text-4xl md:text-5xl mb-8">Welcome to Tenderzville Portal</h1>
+          <p className="text-lg text-gray-600 max-w-2xl mx-auto">
             Your gateway to discovering and winning tender opportunities. Start earning points today!
           </p>
         </div>
@@ -170,7 +168,7 @@ const GetStarted = () => {
               required
               className="flex-1"
             />
-            <Button type="submit" disabled={isLoading}>
+            <Button type="submit" disabled={isLoading} className="py-3 text-lg">
               {isLoading ? "Subscribing..." : "Subscribe"}
             </Button>
           </form>
@@ -181,7 +179,7 @@ const GetStarted = () => {
           <Button
             size="lg"
             onClick={() => navigate("/auth")}
-            className="bg-blue-600 hover:bg-blue-700"
+            className="bg-blue-600 hover:bg-blue-700 py-3 text-lg"
           >
             Create Your Account
           </Button>

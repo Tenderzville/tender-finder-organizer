@@ -21,5 +21,7 @@ export interface TenderCardProps {
   hasAffirmativeAction?: boolean;
   affirmativeActionType?: 'youth' | 'women' | 'pwds' | 'none';
   language?: 'en' | 'sw';
+  highlightAgpo?: boolean; // Add this line
+
   shareActions?: ShareAction[];
 }

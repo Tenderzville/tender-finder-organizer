@@ -1,3 +1,5 @@
+@import './styles/responsive.css';
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
@@ -33,5 +35,84 @@
   }
   body {
     @apply bg-background text-foreground;
+  }
+}
+
+/* Import responsive styles */
+@import './styles/responsive.css';
+
+/* Mobile-first responsive design */
+html {
+  font-size: 16px;
+  scroll-behavior: smooth;
+}
+
+/* Default body text size for better readability on mobile */
+body {
+  font-size: 1rem;
+  line-height: 1.5;
+  text-rendering: optimizeSpeed;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* Responsive container */
+.container {
+  width: 100%;
+  padding-right: 1rem;
+  padding-left: 1rem;
+  margin-right: auto;
+  margin-left: auto;
+}
+
+/* Responsive spacing utilities */
+.my-responsive {
+  margin-top: 1rem;
+  margin-bottom: 1rem;
+}
+
+.py-responsive {
+  padding-top: 1rem;
+  padding-bottom: 1rem;
+}
+
+/* Media queries for responsive design */
+@media (min-width: 640px) {
+  html {
+    font-size: 16px;
+  }
+  .container {
+    max-width: 640px;
+  }
+  .my-responsive {
+    margin-top: 1.5rem;
+    margin-bottom: 1.5rem;
+  }
+  .py-responsive {
+    padding-top: 1.5rem;
+    padding-bottom: 1.5rem;
+  }
+}
+
+@media (min-width: 768px) {
+  .container {
+    max-width: 768px;
+  }
+}
+
+@media (min-width: 1024px) {
+  html {
+    font-size: 16px;
+  }
+  .container {
+    max-width: 1024px;
+  }
+  .my-responsive {
+    margin-top: 2rem;
+    margin-bottom: 2rem;
+  }
+  .py-responsive {
+    padding-top: 2rem;
+    padding-bottom: 2rem;
   }
 }

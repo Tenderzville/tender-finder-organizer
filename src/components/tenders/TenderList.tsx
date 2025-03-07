@@ -1,4 +1,3 @@
-
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useToast } from "@/hooks/use-toast";
@@ -9,6 +8,7 @@ import { TenderListEmpty } from "@/components/tenders/TenderListEmpty";
 import { AffirmativeActionTenders } from "@/components/tenders/AffirmativeActionTenders";
 import { RegularTenders } from "@/components/tenders/RegularTenders";
 import { LanguageToggle } from "@/components/tenders/LanguageToggle";
+import { BookmarkButton } from "@/components/BookmarkButton";
 import { tenderListTranslations } from "@/utils/tenderListTranslations";
 import { useTenderSharing } from "@/utils/tenderSharing";
 
@@ -29,8 +29,8 @@ export const TenderList = ({ tenders, isLoading = false, onRetry, error }: Tende
   const handleViewDetails = (tenderId: number) => {
     navigate(`/tenders/${tenderId}`);
     toast({
-      title: "Opening tender details",
-      description: "Loading complete tender information...",
+      title: t.openingDetails,
+      description: t.loadingComplete,
     });
   };
   

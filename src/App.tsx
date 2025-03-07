@@ -16,6 +16,7 @@ import Preferences from "./pages/Preferences";
 import TermsOfService from "./pages/TermsOfService";
 import PrivacyPolicy from "./pages/PrivacyPolicy";
 import AgpoTenders from "./pages/AgpoTenders";
+import FAQ from "./pages/FAQ";
 import { Footer } from "./components/Footer";
 
 const queryClient = new QueryClient({
@@ -87,6 +88,7 @@ const App = () => (
                   <AgpoTenders />
                 </ProtectedRoute>
               } />
+              <Route path="/faq" element={<FAQ />} />
               <Route path="*" element={<NotFound />} />
             </Routes>
           </div>

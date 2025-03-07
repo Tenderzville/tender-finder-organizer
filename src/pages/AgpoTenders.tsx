@@ -4,7 +4,7 @@ import { useQuery } from "@tanstack/react-query";
 import { User, Shield, Loader2, Filter, ChevronDown } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { Navigation } from "@/components/Navigation";
-import { TenderCard } from "@/components/tenders/TenderCard";
+import { TenderCard } from '@/components/TenderCard';
 import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
@@ -18,6 +18,7 @@ import {
   AccordionItem,
   AccordionTrigger 
 } from "@/components/ui/accordion";
+import { TenderCardProps } from '@/types/tenderCard';
 
 // Define AGPO categories
 const AGPO_CATEGORIES = [
@@ -29,44 +30,42 @@ const AGPO_CATEGORIES = [
 const AgpoTenders = () => {
   const navigate = useNavigate();
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
-  
+
   // Fetch AGPO tenders with filtering
-  const { data: tenders, isLoading, error, refetch } = useQuery({
+  const { data: tenders, isLoading, error, refetch } = useQuery<TenderCardProps[]>({
     queryKey: ['agpo-tenders', selectedCategory],
     queryFn: async () => {
       console.log(`Fetching AGPO tenders with filter: ${selectedCategory || 'all'}`);
-      
       let query = supabase
         .from('tenders')
-        .select('*')
+        .select('id, title, organization, deadline, category, value, location, pointsRequired, tender_url, hasAffirmativeAction, affirmativeActionType, language, shareActions')
         .not('affirmative_action', 'is', null)
         .not('affirmative_action->type', 'eq', 'none');
-      
+
       // Apply category filter if selected
       if (selectedCategory) {
         query = query.eq('affirmative_action->type', selectedCategory);
       }
-      
+
       // Order by deadline (most recent first)
       query = query.order('deadline', { ascending: true });
-      
+
       const { data, error } = await query;
-      
+
       if (error) {
         console.error("Error fetching AGPO tenders:", error);
         throw error;
       }
-      
-      return data || [];
+
+      return data ? (Array.isArray(data) ? data : [data]) : [];
     },
     staleTime: 5 * 60 * 1000, // 5 minutes
     refetchOnWindowFocus: false,
   });
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-gray-50 px-4 sm:px-6 lg:px-8">
       <Navigation />
-      
       <div className="container py-8 px-4 mx-auto">
         <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-8 gap-4">
           <div>
@@ -75,7 +74,7 @@ const AgpoTenders = () => {
               Access to Government Procurement Opportunities for youth, women, and persons with disabilities
             </p>
           </div>
-          
+
           <div className="flex items-center gap-2">
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
@@ -99,7 +98,7 @@ const AgpoTenders = () => {
                 ))}
               </DropdownMenuContent>
             </DropdownMenu>
-            
+
             <Button
               variant="ghost"
               size="icon"
@@ -114,20 +113,20 @@ const AgpoTenders = () => {
             </Button>
           </div>
         </div>
-        
+
         {/* AGPO Information Panel */}
         <div className="bg-white rounded-lg shadow-sm p-6 mb-8">
           <div className="flex items-center gap-3 mb-4">
             <Shield className="h-6 w-6 text-blue-600" />
             <h2 className="text-xl font-semibold">About AGPO</h2>
           </div>
-          
+
           <p className="text-gray-700 mb-4">
             Access to Government Procurement Opportunities (AGPO) is a Kenya government initiative that seeks to enable 
             youth, women, and persons with disabilities to participate in government procurement opportunities. The program 
             aims to empower these groups by allocating 30% of government tenders to enterprises owned by youth, women, and persons with disabilities.
           </p>
-          
+
           <Accordion type="single" collapsible className="w-full">
             <AccordionItem value="eligibility">
               <AccordionTrigger className="text-left font-medium">
@@ -144,7 +143,7 @@ const AgpoTenders = () => {
                       <li>Kenyan citizenship</li>
                     </ul>
                   </div>
-                  
+
                   <div>
                     <h4 className="font-medium">Women</h4>
                     <ul className="list-disc pl-6 mt-1 text-gray-700 space-y-1">
@@ -153,7 +152,7 @@ const AgpoTenders = () => {
                       <li>Kenyan citizenship</li>
                     </ul>
                   </div>
-                  
+
                   <div>
                     <h4 className="font-medium">Persons with Disabilities</h4>
                     <ul className="list-disc pl-6 mt-1 text-gray-700 space-y-1">
@@ -166,7 +165,7 @@ const AgpoTenders = () => {
                 </div>
               </AccordionContent>
             </AccordionItem>
-            
+
             <AccordionItem value="certification">
               <AccordionTrigger className="text-left font-medium">
                 AGPO Certification Process
@@ -189,7 +188,7 @@ const AgpoTenders = () => {
                 </div>
               </AccordionContent>
             </AccordionItem>
-            
+
             <AccordionItem value="benefits">
               <AccordionTrigger className="text-left font-medium">
                 Benefits of AGPO Registration
@@ -205,7 +204,7 @@ const AgpoTenders = () => {
                 </ul>
               </AccordionContent>
             </AccordionItem>
-            
+
             <AccordionItem value="resources">
               <AccordionTrigger className="text-left font-medium">
                 Additional Resources
@@ -220,7 +219,7 @@ const AgpoTenders = () => {
                       <li><a href="https://ppra.go.ke" className="text-blue-600 hover:underline" target="_blank" rel="noopener noreferrer">Public Procurement Regulatory Authority</a></li>
                     </ul>
                   </div>
-                  
+
                   <div>
                     <h4 className="font-medium">Contact Information</h4>
                     <p className="text-gray-700 mt-1">
@@ -236,7 +235,13 @@ const AgpoTenders = () => {
             </AccordionItem>
           </Accordion>
         </div>
-        
+
+        {/* Loading State */}
+        {isLoading && <Loader2 className="animate-spin h-5 w-5 text-blue-600" />}
+
+        {/* Error Handling */}
+        {error && <p className="text-red-600">Error fetching tenders: {error.message}</p>}
+
         {/* Tenders list */}
         <div className="space-y-6">
           {isLoading ? (
@@ -259,8 +264,20 @@ const AgpoTenders = () => {
               {tenders.map((tender) => (
                 <TenderCard 
                   key={tender.id} 
-                  tender={tender} 
-                  onClick={() => navigate(`/tenders/${tender.id}`)}
+                  id={tender.id} 
+                  title={tender.title} 
+                  organization={tender.organization} 
+                  deadline={tender.deadline} 
+                  category={tender.category} 
+                  value={tender.value} 
+                  location={tender.location} 
+                  pointsRequired={tender.pointsRequired} 
+                  tender_url={tender.tender_url} 
+                  onViewDetails={() => navigate(`/tenders/${tender.id}`)} 
+                  hasAffirmativeAction={tender.hasAffirmativeAction} 
+                  affirmativeActionType={tender.affirmativeActionType} 
+                  language={tender.language} 
+                  shareActions={tender.shareActions} 
                   highlightAgpo={true}
                 />
               ))}

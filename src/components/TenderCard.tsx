@@ -1,4 +1,3 @@
-
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -6,6 +5,7 @@ import { Calendar, Globe, Briefcase } from "lucide-react";
 import { NotificationButton } from "@/components/tenders/NotificationButton";
 import { ShareSheet } from "@/components/tenders/ShareSheet";
 import { ExternalLinkButton } from "@/components/tenders/ExternalLinkButton";
+import { BookmarkButton } from "@/components/BookmarkButton";
 import { formatCurrency } from "@/utils/formatters";
 import { tenderCardTranslations } from "@/utils/translations";
 import { TenderCardProps } from "@/types/tenderCard";
@@ -37,6 +37,7 @@ export const TenderCard = ({
             {category}
           </Badge>
           <div className="flex gap-1">
+            <BookmarkButton tenderId={id.toString()} compact={true} />
             <NotificationButton tenderId={id} tenderTitle={title} />
             <ShareSheet 
               id={id}

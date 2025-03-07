@@ -1,0 +1,45 @@
+/* Responsive Styles */
+
+/* Mobile Styles */
+@media (max-width: 640px) {
+  .min-h-screen {
+    min-height: auto;
+  }
+
+  .max-w-7xl {
+    max-width: 100%;
+    padding: 0 1rem;
+  }
+
+  .text-xl {
+    font-size: 1.5rem;
+  }
+
+  .text-lg {
+    font-size: 1.25rem;
+  }
+
+  .text-sm {
+    font-size: 0.875rem;
+  }
+
+  /* Add more mobile-specific styles as needed */
+}
+
+/* Tablet Styles */
+@media (min-width: 641px) and (max-width: 1024px) {
+  .max-w-7xl {
+    max-width: 90%;
+  }
+
+  /* Add more tablet-specific styles as needed */
+}
+
+/* Desktop Styles */
+@media (min-width: 1025px) {
+  .max-w-7xl {
+    max-width: 80%;
+  }
+
+  /* Add more desktop-specific styles as needed */
+}

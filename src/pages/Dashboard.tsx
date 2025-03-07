@@ -1,4 +1,3 @@
-
 import { useEffect, useState, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
@@ -216,9 +215,9 @@ const Dashboard = () => {
   // Don't show this if stableView is true to prevent flickering
   if ((!stableView || !isInitialized || (!sessionChecked && isAuthenticated) || userLoading)) {
     return (
-      <div className="min-h-screen bg-gray-50">
+      <div className="min-h-screen bg-gray-50 px-4 sm:px-6 lg:px-8">
         <Navigation />
-        <main className="max-w-7xl mx-auto py-6 px-4 sm:px-6 lg:px-8">
+        <main className="max-w-7xl mx-auto py-4 sm:py-6 px-2 sm:px-4 lg:px-8">
           <div className="flex flex-col items-center justify-center h-64 space-y-4">
             <Loader2 className="h-8 w-8 animate-spin text-primary" />
             <p className="text-gray-500">Loading your dashboard...</p>
@@ -291,10 +290,11 @@ const Dashboard = () => {
       <Navigation />
       <TenderNotification />
       
-      <main className="max-w-7xl mx-auto py-6 px-4 sm:px-6 lg:px-8">
-        <div className="mb-6">
-          <h1 className="text-2xl font-bold text-gray-900">Dashboard</h1>
-          <p className="text-gray-500">Welcome back! Here's an overview of your account.</p>
+      <main className="max-w-7xl mx-auto py-4 sm:py-6">
+        <div className="mb-4 sm:mb-6">
+          <h1 className="text-xl sm:text-2xl font-bold text-gray-900">Dashboard</h1>
+            <p className="text-xs sm:text-sm text-gray-500">Welcome back! Here's an overview of your account.</p>
+
         </div>
 
         {tendersError && (
@@ -311,13 +311,13 @@ const Dashboard = () => {
           <Alert className="mb-6">
             <AlertCircle className="h-4 w-4" />
             <AlertTitle>No Tenders Available</AlertTitle>
-            <AlertDescription className="flex justify-between items-center">
+            <AlertDescription className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2 sm:gap-0">
               <span>We're currently gathering tender data for you.</span>
               <Button 
                 size="sm" 
                 onClick={triggerTenderScrape} 
                 variant="outline" 
-                className="ml-2 flex items-center gap-1"
+                className="w-full sm:w-auto ml-0 sm:ml-2 flex items-center justify-center gap-1"
               >
                 <RefreshCw className="h-3 w-3" />
                 Update Now
@@ -326,17 +326,19 @@ const Dashboard = () => {
           </Alert>
         )}
         
-        <UserProfileCard userId={userData.id} />
+        <div className="touch-manipulation">
+          <UserProfileCard userId={userData.id} />
+        </div>
         
-        {/* Add Supplier Collaboration Hub */}
-        <SupplierCollaborationHub />
+        <div className="touch-manipulation">
+          <SupplierCollaborationHub />
+        </div>
         
-        {/* TenderFeed card */}
-        <div className="mb-6">
+        <div className="mb-4 sm:mb-6 touch-manipulation px-4">
           <TenderFeed />
         </div>
         
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mt-6">
+        <div className="grid grid-cols-1 gap-4 sm:gap-6 mt-4 sm:mt-6">
           <PointsCard userId={userData.id} />
           <NotificationPreferencesCard />
           <SavedTendersCard userId={userData.id} />

@@ -1,9 +1,13 @@
 import { useQuery } from "@tanstack/react-query";
-import { Loader2, AlertCircle } from "lucide-react";
-import { supabase } from "@/integrations/supabase/client";
-import { Card } from "@/components/ui/card";
-import { Alert, AlertDescription } from "@/components/ui/alert";
-import { useToast } from "@/hooks/use-toast";
+import { Loader2 } from "lucide-react";
+import { supabase } from "@/integrations/supabase/client"; 
+
+import { Card } from "@/components/ui/card"; 
+
+import { Alert, AlertDescription } from "@/components/ui/alert"; 
+
+import { useToast } from "@/hooks/use-toast"; 
+
 import { PointsDisplay } from "./PointsDisplay";
 import { VideoWatchCard } from "./VideoWatchCard";
 import type { UserPoints } from "@/types/user";
@@ -11,19 +15,19 @@ import type { UserPoints } from "@/types/user";
 export const PointsCard = ({ userId }: { userId: string }) => {
   const { toast } = useToast();
 
-  const { data: userPoints, isLoading, refetch } = useQuery({
+  const { data: userPoints, isLoading, refetch } = useQuery<UserPoints>({
     queryKey: ['points', userId],
     queryFn: async () => {
       console.log("Fetching user points for:", userId);
       const { data, error } = await supabase
         .from("user_points")
-        .select("points, ads_watched")
+        .select("id, user_id, points, ads_watched, referrals, social_shares, facebook_shares, twitter_shares, linkedin_shares, created_at, updated_at")
         .eq("user_id", userId)
         .maybeSingle();
 
       if (error) throw error;
       console.log("User points data:", data);
-      return data as UserPoints;
+      return data; // Type is already inferred as UserPoints
     },
   });
 
