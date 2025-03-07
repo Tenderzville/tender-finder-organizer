@@ -14,7 +14,7 @@ import { CountyTenders } from '@/components/tenders/CountyTenders';
 import { TenderMatcher } from '@/components/ai/TenderMatcher';
 import { useOfflineMode } from '@/hooks/use-offline-mode';
 import { usePoints } from '@/hooks/use-points';
-import { useRouter } from 'next/router'; // Added for navigation
+import { useNavigate } from "react-router-dom";
 
 
 const Dashboard = () => {
@@ -23,8 +23,8 @@ const Dashboard = () => {
   const [isLoading, setIsLoading] = useState(true);
   const [userData, setUserData] = useState<any>(null);
   const { isOnline, offlineData, syncData } = useOfflineMode();
-  const { points } = usePoints({ userId: userData?.id || null }); // Use userData after it's loaded
-  const router = useRouter(); // Initialize router
+  const { points } = usePoints({ userId: userData?.id || null });
+  const navigate = useNavigate();
 
   useEffect(() => {
     const loadUserData = async () => {
@@ -106,8 +106,8 @@ const Dashboard = () => {
 
   // Placeholder for language,  needs to be properly implemented
   const language = 'en'; 
-  const toggleLanguage = () => {}; // Placeholder function
-  const fetchTenders = () => {}; // Placeholder function for fetching tenders
+  const toggleLanguage = () => {}; 
+  const fetchTenders = () => {}; 
 
 
   // Main dashboard content
@@ -142,7 +142,7 @@ const Dashboard = () => {
           <Button 
             variant="outline" 
             className="flex flex-col items-center justify-center py-6"
-            onClick={() => router.push('/learning-hub')}
+            onClick={() => navigate('/learning-hub')}
           >
             <BookOpen className="h-6 w-6 mb-2" />
             <span>{language === 'en' ? "Learning Hub" : "Kituo cha Kujifunza"}</span>
@@ -197,9 +197,9 @@ const Dashboard = () => {
         </Card>
 
         {/* Placeholder for tenders data */}
-        const tenders = []; // Replace with actual tender data fetching
-        const isLoadingTenders = false; // Replace with actual loading state
-        const errorTenders = null; // Replace with actual error state
+        const tenders = []; 
+        const isLoadingTenders = false; 
+        const errorTenders = null; 
 
 
         {/* Tender Feed (replace with actual implementation) */}
@@ -217,7 +217,7 @@ const Dashboard = () => {
           <div className="mt-8">
             <CountyTenders 
               tenders={tenders}
-              onViewDetails={(id) => router.push(`/tenders/${id}`)}
+              onViewDetails={(id) => navigate(`/tenders/${id}`)}
               language={language}
               shareActions={{
                 shareEmail: (id) => {/* Email sharing logic */},
@@ -239,7 +239,7 @@ const Dashboard = () => {
               userProfile={userData?.profile || {}}
               language={language}
               userId={userData?.id || null}
-              onViewDetails={(id) => router.push(`/tenders/${id}`)}
+              onViewDetails={(id) => navigate(`/tenders/${id}`)}
             />
           </div>
         )}

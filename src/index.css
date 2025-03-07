@@ -39,4 +39,29 @@
     --info: 205 82% 45%;
     --info-foreground: 210 40% 98%;
   }
+
+@keyframes float {
+  0% {
+    transform: translateY(0px);
+  }
+  50% {
+    transform: translateY(-10px);
+  }
+  100% {
+    transform: translateY(0px);
+  }
+}
+
+.float-animation {
+  animation: float 4s ease-in-out infinite;
+}
+
+.gradient-text {
+  background-clip: text;
+  -webkit-background-clip: text;
+  color: transparent;
+  background-image: linear-gradient(90deg, #ff4d4d, #f9cb28);
+}
+
+
 }
