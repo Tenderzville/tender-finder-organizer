@@ -1,3 +1,4 @@
+
 import { Link } from "react-router-dom";
 import {
   NavigationMenu,
@@ -50,8 +51,8 @@ export function Navigation() {
             </DropdownMenu>
           ) : (
             <>
-              <Link to="/auth/sign-in">Sign In</Link>
-              <Link to="/auth/sign-up">Sign Up</Link>
+              <Link to="/auth">Sign In</Link>
+              <Link to="/auth">Sign Up</Link>
             </>
           )}
         
