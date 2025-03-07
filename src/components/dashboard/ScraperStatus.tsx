@@ -135,11 +135,30 @@ export const ScraperStatus = () => {
                     </Badge>
                   </div>
                   <div className="grid grid-cols-1 gap-2 mt-2 text-xs">
+                    {log.records_found !== null && log.records_inserted !== null && (
+                      <div className="flex items-center mt-1">
+                        <div className="w-full bg-muted rounded-full h-2.5 mr-2">
+                          <div 
+                            className="bg-primary h-2.5 rounded-full" 
+                            style={{ 
+                              width: `${log.records_found > 0 ? (log.records_inserted / log.records_found) * 100 : 0}%` 
+                            }}
+                          ></div>
+                        </div>
+                        <span className="whitespace-nowrap">{log.records_inserted} / {log.records_found}</span>
+                      </div>
+                    )}
                     {log.records_found !== null && (
-                      <div>Records Found: {log.records_found}</div>
+                      <div className="flex gap-1 items-center">
+                        <span className="font-medium">Records Found:</span> 
+                        <span>{log.records_found}</span>
+                      </div>
                     )}
                     {log.records_inserted !== null && (
-                      <div>Records Inserted: {log.records_inserted}</div>
+                      <div className="flex gap-1 items-center">
+                        <span className="font-medium">Records Inserted:</span> 
+                        <span>{log.records_inserted}</span>
+                      </div>
                     )}
                     {log.error_message && (
                       <div className="text-red-500">Error: {log.error_message}</div>
