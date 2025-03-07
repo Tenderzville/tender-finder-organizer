@@ -1,27 +1,49 @@
-
 // Follow Deno's URL imports pattern for Edge Functions
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.42.7";
 import { corsHeaders } from "../_shared/cors.ts";
-import { format, addDays } from "https://esm.sh/date-fns@2.30.0";
-import { scrapeMyGov, scrapeTendersGo } from "./scraper.ts";
-import type { Tender } from "./types.ts";
+import { format } from "https://esm.sh/date-fns@2.30.0";
 
 // Create a single supabase client for interacting with your database
 const supabaseUrl = Deno.env.get("SUPABASE_URL") || "";
 const supabaseKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") || "";
 const supabase = createClient(supabaseUrl, supabaseKey);
 
-Deno.serve(async (req) => {
-  // Handle CORS preflight requests
-  if (req.method === "OPTIONS") {
-    return new Response(null, {
-      headers: corsHeaders,
-    });
-  }
-
+// Main handler function that initiates separate scraping jobs
+async function handler(req: Request) {
   try {
-    console.log("Starting scrape-tenders function");
+    console.log("Scrape tenders coordinator function started");
     
+    // Create a Supabase client with the Auth context of the function
+    const supabaseClient = createClient(
+      Deno.env.get("SUPABASE_URL") ?? "",
+      Deno.env.get("SUPABASE_ANON_KEY") ?? "",
+      {
+        global: {
+          headers: { Authorization: req.headers.get("Authorization")! },
+        },
+      }
+    );
+
+    // Log the start of the coordinator function
+    await supabaseClient
+      .from("scraper_logs")
+      .insert({
+        function_name: "scrape-tenders-coordinator",
+        status: "started",
+        tenders_count: 0
+      });
+    
+    const startTime = Date.now();
+    let totalTenders = 0;
+    const errors: string[] = [];
+
+    // Handle CORS preflight requests
+    if (req.method === "OPTIONS") {
+      return new Response(null, {
+        headers: corsHeaders,
+      });
+    }
+
     // Parse request to get force parameter
     let force = false;
     if (req.method === "POST") {
@@ -36,7 +58,7 @@ Deno.serve(async (req) => {
       const { data: lastScrape } = await supabase
         .from("scraping_logs")
         .select("created_at, status")
-        .eq("source", "mygov.go.ke")
+        .eq("source", "main-coordinator")
         .order("created_at", { ascending: false })
         .limit(1);
       
@@ -63,13 +85,14 @@ Deno.serve(async (req) => {
     
     console.log("Beginning scrape operations");
 
-    // Create a log entry for this scrape
+    // Create a log entry for this coordinated scrape
     const { data: logEntry, error: logError } = await supabase
       .from("scraping_logs")
       .insert({
-        source: "mygov.go.ke",
+        source: "main-coordinator",
         status: "in_progress",
-        records_found: 0
+        records_found: 0,
+        details: "Coordinating multiple scraping jobs"
       })
       .select()
       .single();
@@ -80,148 +103,59 @@ Deno.serve(async (req) => {
     }
     
     const logId = logEntry.id;
-    console.log(`Created scraping log with ID ${logId}`);
+    console.log(`Created coordination log with ID ${logId}`);
     
-    // Scrape MyGov tenders
-    console.log("Scraping MyGov tenders...");
-    const myGovTenders = await scrapeMyGov();
-    console.log(`Scraped ${myGovTenders.length} tenders from MyGov`);
+    // Instead of doing all the scraping here, trigger separate edge functions
+    // for each scraping job to stay within the 60-second limit
     
-    // Scrape Tenders.go.ke
-    console.log("Scraping Tenders.go.ke...");
-    const tendersGoTenders = await scrapeTendersGo();
-    console.log(`Scraped ${tendersGoTenders.length} tenders from Tenders.go.ke`);
-    
-    // Combine and process all scraped tenders
-    const allTenders = [...myGovTenders, ...tendersGoTenders];
-    console.log(`Total tenders scraped: ${allTenders.length}`);
-    
-    if (allTenders.length === 0) {
-      // Update log with no records found
-      await supabase
-        .from("scraping_logs")
-        .update({
-          status: "success",
-          records_found: 0,
-          records_inserted: 0
-        })
-        .eq("id", logId);
+    try {
+      // Launch scrape-mygov function
+      console.log("Initiating MyGov scraper...");
+      const myGovResult = await supabase.functions.invoke('scrape-mygov', {
+        body: { logId, force }
+      });
       
-      return new Response(
-        JSON.stringify({
-          message: "No tenders found during scrape",
-          tenders_scraped: 0,
-          success: true
-        }),
-        {
-          headers: { ...corsHeaders, "Content-Type": "application/json" },
-          status: 200,
-        }
-      );
-    }
-    
-    // Process and insert tenders
-    let insertedCount = 0;
-    for (const tender of allTenders) {
-      try {
-        // Check if tender already exists by URL or title
-        const { data: existingTenders } = await supabase
-          .from("tenders")
-          .select("id")
-          .or(`title.eq."${tender.title}",tender_url.eq."${tender.tender_url}"`)
-          .limit(1);
-        
-        if (existingTenders && existingTenders.length > 0) {
-          console.log(`Tender already exists: ${tender.title}`);
-          continue;
-        }
-        
-        // Determine affirmative action status based on content analysis
-        let affirmativeAction = null;
-        const lowerTitle = tender.title.toLowerCase();
-        const lowerDesc = (tender.description || "").toLowerCase();
-        
-        if (
-          lowerTitle.includes("youth") || 
-          lowerDesc.includes("youth") || 
-          lowerTitle.includes("agpo") || 
-          lowerDesc.includes("agpo")
-        ) {
-          affirmativeAction = { 
-            type: "youth", 
-            percentage: 30,
-            details: "30% procurement preference for youth-owned businesses"
-          };
-        } else if (
-          lowerTitle.includes("women") || 
-          lowerDesc.includes("women")
-        ) {
-          affirmativeAction = {
-            type: "women",
-            percentage: 30,
-            details: "30% procurement preference for women-owned businesses"
-          };
-        } else if (
-          lowerTitle.includes("pwd") || 
-          lowerDesc.includes("pwd") || 
-          lowerTitle.includes("persons with disabilities") || 
-          lowerDesc.includes("persons with disabilities")
-        ) {
-          affirmativeAction = {
-            type: "pwds",
-            percentage: 30,
-            details: "30% procurement preference for businesses owned by persons with disabilities"
-          };
-        } else {
-          affirmativeAction = { type: "none" };
-        }
-        
-        // Generate a deadline 14-30 days in the future if not specified
-        const deadline = tender.deadline ? new Date(tender.deadline) : addDays(new Date(), 14 + Math.floor(Math.random() * 16));
-        
-        // Insert the tender with affirmative action info
-        const { error: insertError } = await supabase
-          .from("tenders")
-          .insert({
-            ...tender,
-            deadline,
-            category: tender.category || "Government",
-            affirmative_action: affirmativeAction
-          });
-        
-        if (insertError) {
-          console.error(`Error inserting tender "${tender.title}":`, insertError);
-          continue;
-        }
-        
-        insertedCount++;
-      } catch (err) {
-        console.error(`Error processing tender "${tender.title}":`, err);
+      if (myGovResult.error) {
+        console.error("Error invoking MyGov scraper:", myGovResult.error);
+      } else {
+        console.log("MyGov scraper started successfully");
       }
+    } catch (err) {
+      console.error("Failed to invoke MyGov scraper:", err);
+      // Continue with other scrapers even if one fails
     }
     
-    console.log(`Inserted ${insertedCount} new tenders`);
+    try {
+      // Launch scrape-tendersgo function
+      console.log("Initiating TendersGo scraper...");
+      const tendersGoResult = await supabase.functions.invoke('scrape-tendersgo', {
+        body: { logId, force }
+      });
+      
+      if (tendersGoResult.error) {
+        console.error("Error invoking TendersGo scraper:", tendersGoResult.error);
+      } else {
+        console.log("TendersGo scraper started successfully");
+      }
+    } catch (err) {
+      console.error("Failed to invoke TendersGo scraper:", err);
+      // Continue with other scrapers even if one fails
+    }
     
-    // Update log with final stats
+    // Update the coordination log to success since we've initiated all scraping jobs
     await supabase
       .from("scraping_logs")
       .update({
         status: "success",
-        records_found: allTenders.length,
-        records_inserted: insertedCount
+        details: "All scraping jobs initiated"
       })
       .eq("id", logId);
     
-    // Get total tender count
-    const { count } = await supabase
-      .from("tenders")
-      .select("*", { count: "exact", head: true });
-    
+    // Return immediately with a success status
     return new Response(
       JSON.stringify({
-        message: "Scrape completed successfully",
-        tenders_scraped: insertedCount,
-        total_tenders: count || 0,
+        message: "Tender scraping jobs initiated successfully",
+        log_id: logId,
         success: true
       }),
       {
@@ -229,12 +163,13 @@ Deno.serve(async (req) => {
         status: 200,
       }
     );
+    
   } catch (error) {
-    console.error("Error in scrape-tenders function:", error);
+    console.error("Error in scrape-tenders coordination function:", error);
     
     return new Response(
       JSON.stringify({
-        error: error.message || "An error occurred during the scrape operation",
+        error: `Scraping coordination error: ${error.message}`,
         success: false
       }),
       {
@@ -243,4 +178,7 @@ Deno.serve(async (req) => {
       }
     );
   }
-});
+}
+
+// Serve the handler
+Deno.serve(handler);

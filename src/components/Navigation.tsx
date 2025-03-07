@@ -37,19 +37,44 @@ export const Navigation = () => {
                   >
                     Tenders
                   </Button>
+                  <Button
+                    onClick={() => navigate("/agpo")}
+                    variant="ghost"
+                    className="text-gray-900 inline-flex items-center px-1 pt-1 text-sm font-medium"
+                  >
+                    AGPO
+                  </Button>
                 </>
               ) : (
-                <Button
-                  onClick={() => navigate("/dashboard")}
-                  variant="ghost"
-                  className="text-gray-900 inline-flex items-center px-1 pt-1 text-sm font-medium"
-                >
-                  Browse Tenders
-                </Button>
+                <>
+                  <Button
+                    onClick={() => navigate("/dashboard")}
+                    variant="ghost"
+                    className="text-gray-900 inline-flex items-center px-1 pt-1 text-sm font-medium"
+                  >
+                    Browse Tenders
+                  </Button>
+                </>
               )}
             </div>
           </div>
           <div className="hidden sm:ml-6 sm:flex sm:items-center">
+            <div className="flex items-center space-x-4 mr-4">
+              <Button
+                onClick={() => navigate("/terms")}
+                variant="ghost"
+                className="text-gray-600 text-xs"
+              >
+                Terms
+              </Button>
+              <Button
+                onClick={() => navigate("/privacy")}
+                variant="ghost"
+                className="text-gray-600 text-xs"
+              >
+                Privacy
+              </Button>
+            </div>
             {isAuthenticated ? (
               <Button onClick={handleSignOut} variant="outline">
                 Sign out

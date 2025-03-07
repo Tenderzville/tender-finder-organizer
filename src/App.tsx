@@ -1,4 +1,3 @@
-
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -14,6 +13,10 @@ import NotFound from "./pages/NotFound";
 import GetStarted from "./pages/GetStarted";
 import Dashboard from "./pages/Dashboard";
 import Preferences from "./pages/Preferences";
+import TermsOfService from "./pages/TermsOfService";
+import PrivacyPolicy from "./pages/PrivacyPolicy";
+import AgpoTenders from "./pages/AgpoTenders";
+import { Footer } from "./components/Footer";
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -54,29 +57,41 @@ const App = () => (
       <Toaster />
       <Sonner />
       <BrowserRouter>
-        <Routes>
-          <Route path="/" element={<Landing />} />
-          <Route path="/dashboard" element={
-            <ProtectedRoute>
-              <Dashboard />
-            </ProtectedRoute>
-          } />
-          <Route path="/preferences" element={
-            <ProtectedRoute>
-              <Preferences />
-            </ProtectedRoute>
-          } />
-          <Route path="/get-started" element={<GetStarted />} />
-          <Route path="/onboarding" element={<Onboarding />} />
-          <Route path="/tenders/:id" element={
-            <ProtectedRoute>
-              <TenderDetails />
-            </ProtectedRoute>
-          } />
-          <Route path="/auth" element={<Auth />} />
-          <Route path="/profile" element={<NotFound />} />
-          <Route path="*" element={<NotFound />} />
-        </Routes>
+        <div className="flex flex-col min-h-screen">
+          <div className="flex-grow">
+            <Routes>
+              <Route path="/" element={<Landing />} />
+              <Route path="/dashboard" element={
+                <ProtectedRoute>
+                  <Dashboard />
+                </ProtectedRoute>
+              } />
+              <Route path="/preferences" element={
+                <ProtectedRoute>
+                  <Preferences />
+                </ProtectedRoute>
+              } />
+              <Route path="/get-started" element={<GetStarted />} />
+              <Route path="/onboarding" element={<Onboarding />} />
+              <Route path="/tenders/:id" element={
+                <ProtectedRoute>
+                  <TenderDetails />
+                </ProtectedRoute>
+              } />
+              <Route path="/auth" element={<Auth />} />
+              <Route path="/profile" element={<NotFound />} />
+              <Route path="/terms" element={<TermsOfService />} />
+              <Route path="/privacy" element={<PrivacyPolicy />} />
+              <Route path="/agpo" element={
+                <ProtectedRoute>
+                  <AgpoTenders />
+                </ProtectedRoute>
+              } />
+              <Route path="*" element={<NotFound />} />
+            </Routes>
+          </div>
+          <Footer />
+        </div>
       </BrowserRouter>
     </TooltipProvider>
   </QueryClientProvider>
