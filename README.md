@@ -1,69 +1,48 @@
-# Welcome to your Lovable project
+# Tender Management System
 
-## Project info
+## About
 
-**URL**: https://lovable.dev/projects/37ffde61-40d6-47ea-9f1e-41a9df4ec03b
+This application is a comprehensive tender management system designed to help businesses, particularly small and medium enterprises (SMEs), access and qualify for procurement opportunities in Kenya. The system has a special focus on AGPO (Access to Government Procurement Opportunities) tenders targeted at youth, women, and persons with disabilities.
 
-## How can I edit this code?
+## Features
 
-There are several ways of editing your application.
+- **Tender Discovery**: Automated scraping of tenders from multiple sources including government portals and private sector
+- **AGPO Focus**: Special identification and filtering of tenders reserved for youth, women, and persons with disabilities
+- **Qualification Tool**: Assessment of business eligibility for specific tenders
+- **Supplier Collaboration**: Platform for suppliers to collaborate on joint ventures
+- **AI-powered Assistance**: (To be implemented) Smart analysis of tender requirements and qualification
 
-**Use Lovable**
+## Technical Implementation
 
-Simply visit the [Lovable Project](https://lovable.dev/projects/37ffde61-40d6-47ea-9f1e-41a9df4ec03b) and start prompting.
+- React + TypeScript frontend with Tailwind CSS styling
+- Supabase backend for database and serverless functions
+- Automated scrapers that run on a schedule to collect the latest tenders
+- RESTful API for data access
 
-Changes made via Lovable will be committed automatically to this repo.
+## Scrapers
 
-**Use your preferred IDE**
+The system includes sophisticated scrapers that:
+- Can detect and adapt to different website structures (SPA support)
+- Parse tender details including deadlines, categories, and requirements
+- Identify AGPO-specific procurement opportunities
+- Handle paginated results and authentication where needed
 
-If you want to work locally using your own IDE, you can clone this repo and push changes. Pushed changes will also be reflected in Lovable.
+## Privacy Notice
 
-The only requirement is having Node.js & npm installed - [install with nvm](https://github.com/nvm-sh/nvm#installing-and-updating)
+This application respects user privacy. We do not collect or store any personal information beyond what is necessary for the functioning of the application. Tender data is publicly available information that is aggregated for ease of access.
 
-Follow these steps:
+## Development
 
-```sh
-# Step 1: Clone the repository using the project's Git URL.
-git clone <YOUR_GIT_URL>
+### Setup
 
-# Step 2: Navigate to the project directory.
-cd <YOUR_PROJECT_NAME>
+1. Clone the repository
+2. Install dependencies with `npm install`
+3. Start the development server with `npm run dev`
 
-# Step 3: Install the necessary dependencies.
-npm i
+## Roadmap
 
-# Step 4: Start the development server with auto-reloading and an instant preview.
-npm run dev
-```
-
-**Edit a file directly in GitHub**
-
-- Navigate to the desired file(s).
-- Click the "Edit" button (pencil icon) at the top right of the file view.
-- Make your changes and commit the changes.
-
-**Use GitHub Codespaces**
-
-- Navigate to the main page of your repository.
-- Click on the "Code" button (green button) near the top right.
-- Select the "Codespaces" tab.
-- Click on "New codespace" to launch a new Codespace environment.
-- Edit files directly within the Codespace and commit and push your changes once you're done.
-
-## What technologies are used for this project?
-
-This project is built with .
-
-- Vite
-- TypeScript
-- React
-- shadcn-ui
-- Tailwind CSS
-
-## How can I deploy this project?
-
-Simply open [Lovable](https://lovable.dev/projects/37ffde61-40d6-47ea-9f1e-41a9df4ec03b) and click on Share -> Publish.
-
-## I want to use a custom domain - is that possible?
-
-We don't support custom domains (yet). If you want to deploy your project under your own domain then we recommend using Netlify. Visit our docs for more details: [Custom domains](https://docs.lovable.dev/tips-tricks/custom-domain/)
+- AI-powered tender recommendation engine
+- Document generation for tender applications
+- Mobile application for on-the-go tender management
+- Enhanced collaboration tools for supplier partnerships
+- Integration with government procurement systems

@@ -1,223 +1,142 @@
-
 import { useState, useEffect } from "react";
-import { useQuery } from "@tanstack/react-query";
-import { supabase } from "@/integrations/supabase/client";
-import { Loader2, AlertCircle, RefreshCw, ArrowUpRight } from "lucide-react";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
-import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { Separator } from "@/components/ui/separator";
+import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { Loader2, CheckCircle, AlertCircle, RotateCw } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { format } from "date-fns";
-import { useToast } from "@/hooks/use-toast";
+import { supabase } from "@/lib/supabase-client";
 
-export const ScraperStatus = () => {
-  const { toast } = useToast();
-  const [isRefreshing, setIsRefreshing] = useState(false);
-  
-  const { 
-    data, 
-    isLoading,
-    error,
-    refetch
-  } = useQuery({
-    queryKey: ["scraper-status"],
-    queryFn: async () => {
-      try {
-        const { data, error } = await supabase.functions.invoke('check-scraper-status');
-        
-        if (error) {
-          console.error("Error fetching scraper status:", error);
-          throw error;
-        }
-        
-        return data;
-      } catch (err) {
-        console.error("Failed to fetch scraper status:", err);
-        throw err;
-      }
-    },
-    staleTime: 1000 * 60 * 5, // 5 minutes
-    refetchInterval: 1000 * 60 * 5, // 5 minutes
-    retry: 1
+export function ScraperStatus() {
+  const [scraperStatus, setScraperStatus] = useState<{
+    lastRun: string | null;
+    status: 'idle' | 'running' | 'success' | 'failed';
+    tendersFound: number;
+    agpoTendersFound: number;
+    sources: {name: string, count: number, status: string}[];
+  }>({
+    lastRun: null,
+    status: 'idle',
+    tendersFound: 0,
+    agpoTendersFound: 0,
+    sources: [
+      { name: 'Tenders.go.ke', count: 0, status: 'idle' },
+      { name: 'Private Sector', count: 0, status: 'idle' },
+      { name: 'AGPO Tenders', count: 0, status: 'idle' }
+    ]
   });
 
-  const triggerScraper = async () => {
-    setIsRefreshing(true);
+  const [isRefreshing, setIsRefreshing] = useState(false);
+
+  useEffect(() => {
+    fetchScraperStatus();
+  }, []);
+
+  const fetchScraperStatus = async () => {
     try {
-      const { data: result, error } = await supabase.functions.invoke('scrape-tenders');
-      
-      if (error) {
-        console.error("Error triggering scraper:", error);
-        toast({
-          title: "Scraper Error",
-          description: `Failed to run scraper: ${error.message}`,
-          variant: "destructive",
+      // Fetch status from database
+      const { data, error } = await supabase
+        .from('scraper_logs')
+        .select('*')
+        .order('created_at', { ascending: false })
+        .limit(1);
+
+      if (error) throw error;
+
+      if (data && data.length > 0) {
+        const log = data[0];
+
+        // Count AGPO tenders
+        const { data: agpoData } = await supabase
+          .from('tenders')
+          .select('count')
+          .not('affirmative_action', 'is', null);
+
+        setScraperStatus({
+          lastRun: log.created_at,
+          status: log.status,
+          tendersFound: log.tenders_found || 0,
+          agpoTendersFound: agpoData?.[0]?.count || 0,
+          sources: [
+            { 
+              name: 'Tenders.go.ke', 
+              count: log.sources?.find(s => s.name === 'tenders.go.ke')?.count || 0,
+              status: log.sources?.find(s => s.name === 'tenders.go.ke')?.status || 'idle'
+            },
+            { 
+              name: 'Private Sector', 
+              count: log.sources?.find(s => s.name === 'private')?.count || 0,
+              status: log.sources?.find(s => s.name === 'private')?.status || 'idle'
+            },
+            { 
+              name: 'AGPO Tenders', 
+              count: agpoData?.[0]?.count || 0,
+              status: 'idle'
+            }
+          ]
         });
-      } else {
-        console.log("Scraper run result:", result);
-        toast({
-          title: "Scraper Completed",
-          description: `Found ${result?.tenders_scraped || 0} new tenders`,
-        });
-        refetch();
       }
-    } catch (err) {
-      console.error("Failed to trigger scraper:", err);
-      toast({
-        title: "Scraper Error",
-        description: "An unexpected error occurred while running the scraper",
-        variant: "destructive",
-      });
-    } finally {
-      setIsRefreshing(false);
+    } catch (error) {
+      console.error('Error fetching scraper status:', error);
     }
   };
 
-  if (isLoading) {
-    return (
-      <Card>
-        <CardHeader>
-          <CardTitle>Scraper Status</CardTitle>
-          <CardDescription>Checking scraper status...</CardDescription>
-        </CardHeader>
-        <CardContent className="flex justify-center p-6">
-          <Loader2 className="h-8 w-8 animate-spin text-primary" />
-        </CardContent>
-      </Card>
-    );
-  }
+  const refreshScraperStatus = async () => {
+    setIsRefreshing(true);
+    await fetchScraperStatus();
+    setIsRefreshing(false);
+  };
 
-  if (error) {
-    return (
-      <Card>
-        <CardHeader>
-          <CardTitle>Scraper Status</CardTitle>
-          <CardDescription>Unable to check scraper status</CardDescription>
-        </CardHeader>
-        <CardContent>
-          <Alert variant="destructive">
-            <AlertCircle className="h-4 w-4" />
-            <AlertTitle>Error</AlertTitle>
-            <AlertDescription>
-              Unable to check scraper status. Please try again later.
-            </AlertDescription>
-          </Alert>
-        </CardContent>
-      </Card>
-    );
-  }
+  const getStatusBadge = (status: string) => {
+    switch (status) {
+      case 'running':
+        return <Badge variant="outline" className="bg-blue-50 text-blue-700 border-blue-300">Running <Loader2 className="ml-1 h-3 w-3 animate-spin" /></Badge>;
+      case 'success':
+        return <Badge variant="outline" className="bg-green-50 text-green-700 border-green-300">Success <CheckCircle className="ml-1 h-3 w-3" /></Badge>;
+      case 'failed':
+        return <Badge variant="outline" className="bg-red-50 text-red-700 border-red-300">Failed <AlertCircle className="ml-1 h-3 w-3" /></Badge>;
+      default:
+        return <Badge variant="outline">Idle</Badge>;
+    }
+  };
 
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle className="flex justify-between items-center">
-          <span>Scraper Status</span>
-          <Badge variant={data.scraper_available ? "success" : "destructive"}>
-            {data.scraper_available ? "Available" : "Unavailable"}
-          </Badge>
+    <Card className="shadow-md">
+      <CardHeader className="pb-2">
+        <CardTitle className="text-lg font-medium flex items-center justify-between">
+          Scraper Status
+          <Button 
+            variant="ghost" 
+            size="sm" 
+            onClick={refreshScraperStatus} 
+            disabled={isRefreshing}
+            className="h-8 px-2"
+          >
+            {isRefreshing ? <Loader2 className="h-4 w-4 animate-spin" /> : <RotateCw className="h-4 w-4" />}
+          </Button>
         </CardTitle>
         <CardDescription>
-          Monitor and manage tender scraping operations
+          Last run: {scraperStatus.lastRun 
+            ? new Date(scraperStatus.lastRun).toLocaleString() 
+            : 'Never'}
         </CardDescription>
       </CardHeader>
-      <CardContent className="space-y-4">
-        <div>
-          <h3 className="text-sm font-medium mb-2">Latest Scraping Logs</h3>
-          {data.scraping_logs && data.scraping_logs.length > 0 ? (
-            <div className="space-y-3">
-              {data.scraping_logs.map((log: any) => (
-                <div key={log.id} className="bg-muted p-3 rounded-md text-sm">
-                  <div className="flex justify-between items-center mb-1">
-                    <span className="font-medium">Source: {log.source}</span>
-                    <Badge variant={log.status === 'success' ? "success" : "destructive"}>
-                      {log.status}
-                    </Badge>
-                  </div>
-                  <div className="grid grid-cols-1 gap-2 mt-2 text-xs">
-                    {log.records_found !== null && log.records_inserted !== null && (
-                      <div className="flex items-center mt-1">
-                        <div className="w-full bg-muted rounded-full h-2.5 mr-2">
-                          <div 
-                            className="bg-primary h-2.5 rounded-full" 
-                            style={{ 
-                              width: `${log.records_found > 0 ? (log.records_inserted / log.records_found) * 100 : 0}%` 
-                            }}
-                          ></div>
-                        </div>
-                        <span className="whitespace-nowrap">{log.records_inserted} / {log.records_found}</span>
-                      </div>
-                    )}
-                    {log.records_found !== null && (
-                      <div className="flex gap-1 items-center">
-                        <span className="font-medium">Records Found:</span> 
-                        <span>{log.records_found}</span>
-                      </div>
-                    )}
-                    {log.records_inserted !== null && (
-                      <div className="flex gap-1 items-center">
-                        <span className="font-medium">Records Inserted:</span> 
-                        <span>{log.records_inserted}</span>
-                      </div>
-                    )}
-                    {log.error_message && (
-                      <div className="text-red-500">Error: {log.error_message}</div>
-                    )}
-                    <div>Time: {log.created_at ? format(new Date(log.created_at), "PPp") : "Unknown"}</div>
-                  </div>
-                </div>
-              ))}
-            </div>
-          ) : (
-            <p className="text-sm text-muted-foreground">No scraping logs available.</p>
-          )}
-        </div>
-        
-        <Separator />
-        
-        <div>
-          <h3 className="text-sm font-medium mb-2">Database Status</h3>
-          <div className="grid grid-cols-2 gap-4">
-            <div className="bg-muted p-3 rounded-md">
-              <div className="text-sm font-medium">Total Tenders</div>
-              <div className="text-2xl font-bold">{data.total_tenders || 0}</div>
-            </div>
-            <div className="bg-muted p-3 rounded-md">
-              <div className="text-sm font-medium">Latest Run</div>
-              <div className="text-sm">
-                {data.scraping_logs && data.scraping_logs.length > 0
-                  ? format(new Date(data.scraping_logs[0].created_at), "PPp")
-                  : "Never"}
+      <CardContent>
+        <div className="space-y-3">
+          {scraperStatus.sources.map((source, i) => (
+            <div key={i} className="flex items-center justify-between py-1 border-b border-gray-100 last:border-0">
+              <span className="text-sm font-medium">{source.name}</span>
+              <div className="flex items-center space-x-2">
+                <span className="text-sm">{source.count} tenders</span>
+                {getStatusBadge(source.status)}
               </div>
             </div>
-          </div>
+          ))}
         </div>
       </CardContent>
-      <CardFooter className="flex justify-between">
-        <Button 
-          variant="outline" 
-          size="sm" 
-          onClick={() => refetch()} 
-          className="flex items-center gap-1"
-        >
-          <RefreshCw className="h-4 w-4" /> Refresh Status
-        </Button>
-        <Button 
-          onClick={triggerScraper} 
-          disabled={isRefreshing}
-          className="flex items-center gap-1"
-        >
-          {isRefreshing ? (
-            <>
-              <Loader2 className="h-4 w-4 animate-spin" /> Running...
-            </>
-          ) : (
-            <>
-              <ArrowUpRight className="h-4 w-4" /> Run Scraper Now
-            </>
-          )}
-        </Button>
+      <CardFooter className="pt-2">
+        <div className="w-full text-sm text-center text-muted-foreground">
+          Total: {scraperStatus.tendersFound} tenders found ({scraperStatus.agpoTendersFound} AGPO)
+        </div>
       </CardFooter>
     </Card>
   );
-};
+}

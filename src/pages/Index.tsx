@@ -356,6 +356,12 @@ const Index = () => {
             <div className="lg:col-span-1">
               <TenderFilters onFilterChange={setFilters} />
               <div className="mt-8">
+                <ScraperStatus />
+              </div>
+              <div className="mt-8">
+                <ServiceProviders />
+              </div>
+              <div className="mt-8">
                 <SocialShare />
               </div>
             </div>
