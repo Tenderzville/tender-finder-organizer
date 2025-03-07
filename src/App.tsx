@@ -1,87 +1,37 @@
+import React from 'react';
+import { Routes, Route } from 'react-router-dom';
+import Landing from '@/pages/Landing';
+import Onboarding from '@/pages/Onboarding';
+import Dashboard from '@/pages/Dashboard';
+import TenderDetails from '@/pages/TenderDetails';
+import Preferences from '@/pages/Preferences';
+import Auth from '@/pages/Auth';
+import Services from '@/pages/Services';
+import NotFound from '@/pages/NotFound';
+import { Toaster } from "@/components/ui/toaster"
+import TermsPage from '@/pages/Terms';
+import PrivacyPage from '@/pages/Privacy';
+import { ChatSupport } from "@/components/ChatSupport";
 
-import { Toaster } from "@/components/ui/toaster";
-import { Toaster as Sonner } from "@/components/ui/sonner";
-import { TooltipProvider } from "@/components/ui/tooltip";
-import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
-import { useAuthState } from "@/hooks/useAuthState";
-import Landing from "./pages/Landing";
-import Index from "./pages/Index";
-import Onboarding from "./pages/Onboarding";
-import TenderDetails from "./pages/TenderDetails";
-import Auth from "./pages/Auth";
-import NotFound from "./pages/NotFound";
-import GetStarted from "./pages/GetStarted";
-import Dashboard from "./pages/Dashboard";
-import Preferences from "./pages/Preferences";
-import Services from "./pages/Services";
-
-const queryClient = new QueryClient({
-  defaultOptions: {
-    queries: {
-      retry: 1,
-      refetchOnWindowFocus: false,
-    },
-  },
-});
-
-const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
-  const { isAuthenticated, profileStatus, isInitialized } = useAuthState();
-  
-  if (!isInitialized) {
-    return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-900" />
-      </div>
-    );
-  }
-
-  if (!isAuthenticated) {
-    console.log("[ProtectedRoute] User not authenticated, redirecting to auth");
-    return <Navigate to="/auth" />;
-  }
-
-  if (profileStatus === 'missing') {
-    console.log("[ProtectedRoute] Profile missing, redirecting to onboarding");
-    return <Navigate to="/onboarding" />;
-  }
-
-  return <>{children}</>;
-};
-
-const App = () => (
-  <QueryClientProvider client={queryClient}>
-    <TooltipProvider>
+function App() {
+  return (
+    <div className="App">
+      <Routes>
+        <Route path="/" element={<Landing />} />
+        <Route path="/onboarding" element={<Onboarding />} />
+        <Route path="/dashboard" element={<Dashboard />} />
+        <Route path="/tenders/:tenderId" element={<TenderDetails />} />
+        <Route path="/preferences" element={<Preferences />} />
+        <Route path="/auth" element={<Auth />} />
+        <Route path="/services" element={<Services />} />
+        <Route path="/terms" element={<TermsPage />} />
+        <Route path="/privacy" element={<PrivacyPage />} />
+        <Route path="*" element={<NotFound />} />
+      </Routes>
       <Toaster />
-      <Sonner />
-      <BrowserRouter>
-        <Routes>
-          <Route path="/" element={<Landing />} />
-          <Route path="/dashboard" element={
-            <ProtectedRoute>
-              <Dashboard />
-            </ProtectedRoute>
-          } />
-          <Route path="/preferences" element={
-            <ProtectedRoute>
-              <Preferences />
-            </ProtectedRoute>
-          } />
-          <Route path="/services" element={<Services />} />
-          <Route path="/get-started" element={<GetStarted />} />
-          <Route path="/onboarding" element={<Onboarding />} />
-          <Route path="/tenders/:id" element={
-            <ProtectedRoute>
-              <TenderDetails />
-            </ProtectedRoute>
-          } />
-          <Route path="/auth" element={<Auth />} />
-          <Route path="/profile" element={<NotFound />} />
-          <Route path="*" element={<NotFound />} />
-        </Routes>
-      </BrowserRouter>
-    </TooltipProvider>
-  </QueryClientProvider>
-);
+      <ChatSupport />
+    </div>
+  );
+}
 
 export default App;
