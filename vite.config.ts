@@ -1,10 +1,20 @@
 
 import { defineConfig } from 'vite'
+import dns from 'dns'
+
+// This is needed for Replit to resolve localhost correctly
+dns.setDefaultResultOrder('verbatim')
 import react from '@vitejs/plugin-react'
 import path from 'path'
 
 // https://vitejs.dev/config/
 export default defineConfig({
+  server: {
+    host: '0.0.0.0',
+    hmr: {
+      clientPort: 443,
+    },
+  },
   plugins: [react()],
   resolve: {
     alias: {

@@ -20,6 +20,12 @@ import { usePerformance } from '@/hooks/use-performance';
 function App() {
   const { performanceLevel, options } = usePerformance();
   
+  // Allow iframe embedding for webview in Replit
+  useEffect(() => {
+    // Add header to allow iframing on replit.com
+    document.title = "Tender Connect";
+  }, []);
+  
   // Apply performance optimizations
   useEffect(() => {
     // Apply simplified UI for low-end devices if needed
@@ -38,7 +44,7 @@ function App() {
   }, [options]);
   
   return (
-    <div className="App">
+    <div className="App min-h-screen bg-white">
       <Routes>
         <Route path="/" element={<Landing />} />
         <Route path="/onboarding" element={<Onboarding />} />

@@ -16,7 +16,7 @@ const Landing = () => {
         <div className="mt-10 flex items-center justify-center gap-x-6">
           <Button 
             size="lg"
-            onClick={() => navigate("/get-started")}
+            onClick={() => navigate("/onboarding")}
           >
             Get Started
           </Button>
