@@ -1,4 +1,3 @@
-
 import React, { useEffect } from 'react';
 import { Routes, Route } from 'react-router-dom';
 import Landing from '@/pages/Landing';
@@ -17,16 +16,19 @@ import { OpenSourceAssistant } from "@/components/ai/OpenSourceAssistant";
 import LearningHub from '@/pages/LearningHub';
 import { AdManager } from '@/integrations/AdManager';
 import { usePerformance } from '@/hooks/use-performance';
+import Footer from '@/components/Footer'; // Assuming Footer component exists
+import SupportPage from '@/pages/Support'; // Assuming SupportPage component exists
+
 
 function App() {
   const { performanceLevel, options } = usePerformance();
-  
+
   // Allow iframe embedding for webview in Replit
   useEffect(() => {
     // Add header to allow iframing on replit.com
     document.title = "Tender Connect";
   }, []);
-  
+
   // Apply performance optimizations
   useEffect(() => {
     // Apply simplified UI for low-end devices if needed
@@ -35,7 +37,7 @@ function App() {
     } else {
       document.documentElement.classList.remove('simplified-ui');
     }
-    
+
     // Disable animations for low-end devices if needed
     if (!options.animations) {
       document.documentElement.classList.add('reduce-motion');
@@ -43,7 +45,7 @@ function App() {
       document.documentElement.classList.remove('reduce-motion');
     }
   }, [options]);
-  
+
   return (
     <div className="App min-h-screen bg-white">
       <Routes>
@@ -57,11 +59,13 @@ function App() {
         <Route path="/learning-hub" element={<LearningHub />} />
         <Route path="/terms" element={<TermsPage />} />
         <Route path="/privacy" element={<PrivacyPage />} />
+        <Route path="/support" element={<SupportPage />} /> {/* Added Support Route */}
         <Route path="*" element={<NotFound />} />
       </Routes>
       <Toaster />
       <ChatSupport />
       <AdManager />
+      <Footer /> {/* Added Footer */}
     </div>
   );
 }
