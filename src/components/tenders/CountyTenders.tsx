@@ -3,7 +3,7 @@ import React, { useState, useEffect } from 'react';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { appTranslations } from '@/utils/translations';
 import { Tender } from '@/types/tender';
-import { TenderCard } from '@/components/tenders/TenderCard';
+import { TenderCard } from '@/components/TenderCard';
 import { Skeleton } from '@/components/ui/skeleton';
 
 // Kenya counties list
