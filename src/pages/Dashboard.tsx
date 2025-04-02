@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { Navigation } from "@/components/Navigation";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -27,7 +26,6 @@ const Dashboard = () => {
   const { points } = usePoints({ userId: userData?.id || null });
   const navigate = useNavigate();
   
-  // Add state for tenders data
   const [tenders, setTenders] = useState<Tender[]>([]);
   const [isLoadingTenders, setIsLoadingTenders] = useState(false);
   const [errorTenders, setErrorTenders] = useState<Error | null>(null);
@@ -74,17 +72,13 @@ const Dashboard = () => {
     }
   }, [isAuthenticated, isInitialized, toast]);
 
-  // Add function to fetch tenders
   const fetchTenders = async () => {
     setIsLoadingTenders(true);
     setErrorTenders(null);
     
     try {
-      // Here you would normally fetch from your API
-      // For now, we'll just simulate a delay
       await new Promise(resolve => setTimeout(resolve, 1000));
       
-      // Set empty array for now
       setTenders([]);
       
     } catch (error) {
@@ -95,7 +89,6 @@ const Dashboard = () => {
     }
   };
   
-  // Fetch tenders on initial load
   useEffect(() => {
     if (isAuthenticated) {
       fetchTenders();
@@ -106,7 +99,6 @@ const Dashboard = () => {
     setLanguage(prev => prev === 'en' ? 'sw' : 'en');
   };
 
-  // Loading state
   if (isLoading || !isInitialized) {
     return (
       <div className="min-h-screen bg-gray-50">
@@ -121,7 +113,6 @@ const Dashboard = () => {
     );
   }
 
-  // Not authenticated state
   if (!isAuthenticated) {
     return (
       <div className="min-h-screen bg-gray-50">
@@ -143,7 +134,6 @@ const Dashboard = () => {
     );
   }
 
-  // Main dashboard content
   return (
     <div className="min-h-screen bg-gray-50">
       <Navigation />
@@ -154,7 +144,6 @@ const Dashboard = () => {
           <p className="text-gray-500">Welcome back! Here's an overview of your account.</p>
         </div>
 
-        {/* Online/Offline indicator */}
         {!isOnline && (
           <div className="offline-indicator">
             <WifiOff className="h-4 w-4" />
@@ -162,7 +151,6 @@ const Dashboard = () => {
           </div>
         )}
 
-        {/* Points indicator */}
         <div className="flex justify-end mb-4">
           <div className="points-indicator">
             <Award className="h-4 w-4 text-green-600" />
@@ -170,7 +158,6 @@ const Dashboard = () => {
           </div>
         </div>
 
-        {/* Quick links to new features */}
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
           <Button 
             variant="outline" 
@@ -209,7 +196,6 @@ const Dashboard = () => {
           </Button>
         </div>
 
-        {/* User Profile Card */}
         <Card className="mb-6">
           <CardHeader>
             <CardTitle>Your Profile</CardTitle>
@@ -228,7 +214,6 @@ const Dashboard = () => {
           </CardContent>
         </Card>
 
-        {/* Tender List */}
         <TenderList 
           tenders={tenders}
           isLoading={isLoadingTenders}
@@ -236,18 +221,26 @@ const Dashboard = () => {
           onRetry={fetchTenders}
         />
 
-        {/* County-specific tenders section */}
         {!isLoadingTenders && !errorTenders && tenders.length > 0 && (
           <div className="mt-8">
-            <CountyTenders 
+            <CountyTenders
               tenders={tenders}
-              onViewDetails={(id) => navigate(`/tenders/${id}`)}
+              onViewDetails={handleViewTenderDetails}
               language={language}
+              shareActions={[
+                {
+                  label: "Share via Email",
+                  action: (id) => handleShareViaEmail(id)
+                },
+                {
+                  label: "Share via WhatsApp",
+                  action: (id) => handleShareViaWhatsApp(id)
+                }
+              ]}
             />
           </div>
         )}
 
-        {/* AI-powered tender matching */}
         {!isLoadingTenders && !errorTenders && tenders.length > 0 && (
           <div className="mt-8">
             <TenderMatcher 
@@ -260,12 +253,22 @@ const Dashboard = () => {
           </div>
         )}
 
-        {/* Supplier Collaboration Hub */}
         <SupplierCollaborationHub />
 
       </main>
     </div>
   );
+};
+
+const handleShareViaEmail = (id: string) => {
+  const subject = encodeURIComponent("Check out this tender");
+  const body = encodeURIComponent(`I found this tender that might interest you: ${window.location.origin}/tenders/${id}`);
+  window.open(`mailto:?subject=${subject}&body=${body}`);
+};
+
+const handleShareViaWhatsApp = (id: string) => {
+  const text = encodeURIComponent(`Check out this tender: ${window.location.origin}/tenders/${id}`);
+  window.open(`https://wa.me/?text=${text}`, '_blank');
 };
 
 export default Dashboard;

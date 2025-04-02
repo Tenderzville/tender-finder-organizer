@@ -21,18 +21,15 @@ export const TenderFeed = () => {
   const [language, setLanguage] = useState<'en' | 'sw'>('en');
   const [forceStableView, setForceStableView] = useState(false);
 
-  // Anti-flicker technique - force a minimum "loading" display time 
-  // when data query is initiated to prevent rapid toggling states
   useEffect(() => {
     setForceStableView(true);
     const timer = setTimeout(() => {
       setForceStableView(false);
-    }, 800); // Prevent flickering for 800ms
+    }, 800);
     
     return () => clearTimeout(timer);
   }, []);
 
-  // Optimized query with proper error handling and real data prioritization
   const { 
     data, 
     isLoading: rawIsLoading,
@@ -43,7 +40,6 @@ export const TenderFeed = () => {
     queryFn: async () => {
       console.log("TenderFeed: Fetching latest tenders");
       
-      // Direct database approach - most efficient
       const { data: latestTenders, error: tendersError } = await supabase
         .from('tenders')
         .select('*')
@@ -55,7 +51,6 @@ export const TenderFeed = () => {
         throw tendersError;
       }
       
-      // Get total count
       const { count, error: countError } = await supabase
         .from('tenders')
         .select('*', { count: 'exact', head: true });
@@ -64,10 +59,8 @@ export const TenderFeed = () => {
         console.error("Error counting tenders:", countError);
       }
       
-      // Map the raw database records to the Tender type with proper affirmative_action handling
       const formattedTenders = latestTenders?.map(tender => ({
         ...tender,
-        // Use the parser to safely handle the affirmative_action JSON
         affirmative_action: parseTenderAffirmativeAction(tender.affirmative_action)
       })) || [];
       
@@ -78,17 +71,15 @@ export const TenderFeed = () => {
         source: "database"
       };
     },
-    staleTime: 1000 * 60 * 5, // 5 minutes
-    refetchInterval: false, // Prevent automatic refetching which causes flickering
+    staleTime: 1000 * 60 * 5,
+    refetchInterval: false,
     retry: 1,
-    refetchOnWindowFocus: false, // Prevent excessive refetches
-    gcTime: 1000 * 60 * 10, // 10 minutes - keep data in cache longer
+    refetchOnWindowFocus: false,
+    gcTime: 1000 * 60 * 10
   });
 
-  // Prevent flickering by enforcing minimum loading times
   const isLoading = rawIsLoading || forceStableView;
 
-  // Fetch data on component mount - only once, with proper cleanup
   useEffect(() => {
     let isMounted = true;
     
@@ -109,21 +100,18 @@ export const TenderFeed = () => {
     };
   }, []);
 
-  // Memoize the refreshTenderFeed function to prevent recreation on every render
   const refreshTenderFeed = useCallback(async () => {
-    if (isRefreshing) return; // Prevent multiple simultaneous refreshes
+    if (isRefreshing) return;
     
     setIsRefreshing(true);
-    setForceStableView(true); // Prevent flickering during refresh
+    setForceStableView(true);
     
     try {
-      // Show a toast to indicate the process is starting
       toast({
         title: "Refreshing Tenders",
         description: "Starting the tender scraping process...",
       });
       
-      // Trigger scrape with force parameter
       const { data: result, error: invokeError } = await supabase.functions.invoke('scrape-tenders', {
         body: { force: true }
       });
@@ -140,10 +128,8 @@ export const TenderFeed = () => {
         throw new Error(result?.error || "Unknown error occurred during scraping");
       }
       
-      // Add a small delay to ensure the database has time to update
       await new Promise(resolve => setTimeout(resolve, 2000));
       
-      // Immediately refetch from database
       await refetch();
       
       toast({
@@ -153,7 +139,6 @@ export const TenderFeed = () => {
     } catch (err) {
       console.error("Failed to refresh tender feed:", err);
       
-      // Try direct database refresh as fallback
       try {
         await refetch();
         toast({
@@ -169,7 +154,6 @@ export const TenderFeed = () => {
         });
       }
     } finally {
-      // Add a short delay before changing states to prevent flickering
       setTimeout(() => {
         setIsRefreshing(false);
         setForceStableView(false);
@@ -179,7 +163,6 @@ export const TenderFeed = () => {
 
   const handleShareOnSocial = useCallback(async (tenderId: number) => {
     try {
-      // Open WhatsApp directly
       const text = encodeURIComponent(`Check out this tender: ${window.location.origin}/tenders/${tenderId}`);
       window.open(`https://wa.me/?text=${text}`, '_blank');
       
@@ -209,14 +192,11 @@ export const TenderFeed = () => {
     }
   }, []);
 
-  // Use tenders from data or empty array - memoized to prevent recreation
   const tendersToDisplay = useMemo(() => {
-    // Ensure we properly type the tenders as Tender[]
     const tenders = data?.latest_tenders || [];
     return tenders as Tender[];
   }, [data]);
 
-  // Translations - memoized to prevent recreation on every render
   const t = useMemo(() => ({
     en: {
       latestTenders: "Latest Tenders",
@@ -258,7 +238,6 @@ export const TenderFeed = () => {
     );
   }
 
-  // If showing qualification tool and we have tenders
   if (showQualificationTool && tendersToDisplay.length > 0) {
     return (
       <Card>
@@ -277,7 +256,10 @@ export const TenderFeed = () => {
           </Button>
         </CardHeader>
         <CardContent>
-          <QualificationTool tenders={tendersToDisplay} />
+          <QualificationTool 
+            tender={tendersToDisplay.length > 0 ? tendersToDisplay[0] : undefined} 
+            language={language}
+          />
         </CardContent>
       </Card>
     );
