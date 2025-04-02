@@ -6,7 +6,7 @@ import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
-import { Loader2 } from "lucide-react";
+import { Loader2, Shield } from "lucide-react";
 
 const Auth = () => {
   const navigate = useNavigate();
@@ -17,6 +17,7 @@ const Auth = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [initialCheckDone, setInitialCheckDone] = useState(false);
 
+  // Check for existing session on mount
   useEffect(() => {
     const checkSession = async () => {
       try {
@@ -29,7 +30,6 @@ const Auth = () => {
             .eq('user_id', session.user.id)
             .maybeSingle();
 
-          // Only navigate if we're not already on the target route
           const currentPath = window.location.pathname;
           if (profile && currentPath === '/auth') {
             console.log("[Auth] Profile exists, navigating to dashboard");
@@ -53,36 +53,76 @@ const Auth = () => {
     e.preventDefault();
     if (isLoading) return;
     
+    if (!email.trim() || !password.trim()) {
+      toast({
+        title: "Error",
+        description: "Email and password are required",
+        variant: "destructive",
+      });
+      return;
+    }
+    
+    // Add basic password validation
+    if (password.length < 8) {
+      toast({
+        title: "Error",
+        description: "Password must be at least 8 characters",
+        variant: "destructive",
+      });
+      return;
+    }
+    
     setIsLoading(true);
     console.log(`[Auth] Attempting to ${isLogin ? 'sign in' : 'sign up'} with email:`, email);
 
     try {
       if (isLogin) {
         const { data, error } = await supabase.auth.signInWithPassword({
-          email,
+          email: email.trim(),
           password,
         });
 
         if (error) throw error;
         console.log("[Auth] Sign in successful:", data);
+        
+        // Check if profile exists
+        const { data: profile } = await supabase
+          .from('profiles')
+          .select('id')
+          .eq('user_id', data.user.id)
+          .single();
+          
+        if (profile) {
+          navigate('/dashboard');
+        } else {
+          navigate('/onboarding');
+        }
       } else {
         const { data, error } = await supabase.auth.signUp({
-          email,
+          email: email.trim(),
           password,
+          options: {
+            emailRedirectTo: window.location.origin + '/dashboard',
+          }
         });
 
         if (error) throw error;
         console.log("[Auth] Sign up successful:", data);
-        toast({
-          title: "Success",
-          description: "Account created successfully. Please check your email to verify your account.",
-        });
+        
+        if (data.session) {
+          navigate('/onboarding');
+        } else {
+          toast({
+            title: "Success",
+            description: "Account created successfully. Please check your email to verify your account.",
+          });
+        }
       }
     } catch (error: any) {
       console.error("[Auth] Auth error:", error);
       toast({
         title: "Error",
-        description: error.message,
+        description: error.message || "Authentication failed",
         variant: "destructive",
       });
     } finally {
@@ -102,7 +142,10 @@ const Auth = () => {
     <div className="min-h-screen bg-gray-50 flex items-center justify-center py-12 px-4 sm:px-6 lg:px-8">
       <Card className="w-full max-w-md">
         <CardHeader>
-          <CardTitle>{isLogin ? "Sign in" : "Create an account"}</CardTitle>
+          <div className="flex items-center gap-2">
+            <Shield className="h-5 w-5 text-primary" />
+            <CardTitle>{isLogin ? "Sign in" : "Create an account"}</CardTitle>
+          </div>
           <CardDescription>
             {isLogin
               ? "Welcome back! Please sign in to continue."
@@ -119,6 +162,8 @@ const Auth = () => {
                 onChange={(e) => setEmail(e.target.value)}
                 required
                 disabled={isLoading}
+                className="bg-white"
+                autoComplete="email"
               />
             </div>
             <div className="space-y-2">
@@ -129,6 +174,8 @@ const Auth = () => {
                 onChange={(e) => setPassword(e.target.value)}
                 required
                 disabled={isLoading}
+                className="bg-white"
+                autoComplete={isLogin ? "current-password" : "new-password"}
               />
             </div>
           </CardContent>

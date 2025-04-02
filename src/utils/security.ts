@@ -1,175 +1,181 @@
-
 import { supabase } from "@/integrations/supabase/client";
+import { UserProfile } from "@/types/user";
 
-// A simple rate limiter implementation
-const rateLimits: Record<string, { count: number; timestamp: number }> = {};
-
-export const checkRateLimit = (
-  key: string, 
-  maxRequests = 10, 
-  timeWindowMs = 60000
-): boolean => {
-  const now = Date.now();
-  
-  // Initialize or clean up old entries
-  if (!rateLimits[key] || now - rateLimits[key].timestamp > timeWindowMs) {
-    rateLimits[key] = { count: 1, timestamp: now };
-    return true;
-  }
-  
-  // Increment count
-  rateLimits[key].count += 1;
-  
-  // Check if limit exceeded
-  if (rateLimits[key].count > maxRequests) {
-    // Could log this as a potential abuse
-    logSecurityEvent({
-      type: 'rate_limit_exceeded',
-      key,
-      count: rateLimits[key].count,
-      timestamp: new Date().toISOString()
-    });
-    return false;
-  }
-  
-  return true;
+// Data minimization helper
+export const sanitizeUserData = (userData: UserProfile) => {
+  const { id, user_id, ...publicData } = userData;
+  return publicData;
 };
 
-// Basic input sanitization
-export const sanitizeInput = (input: string): string => {
-  if (!input) return '';
-  
-  // Replace potentially dangerous characters
-  return input
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;')
-    .replace(/'/g, '&#39;')
-    .replace(/`/g, '&#96;');
-};
+// Security utilities
+export const securityUtils = {
+  // Validate user inputs to prevent XSS and SQL injection
+  sanitizeInput: (input: string): string => {
+    if (!input) return "";
+    // Basic sanitization - remove script tags, SQL comments, etc.
+    return input
+      .replace(/<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script>/gi, "")
+      .replace(/'/g, "''")
+      .trim();
+  },
 
-// Validate email format
-export const isValidEmail = (email: string): boolean => {
-  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-  return emailRegex.test(email);
-};
+  // Check for suspicious activity (multiple failed login attempts)
+  checkSuspiciousActivity: async (email: string): Promise<boolean> => {
+    try {
+      const { data, error } = await supabase
+        .from('auth_logs')
+        .select('*')
+        .eq('email', email)
+        .eq('success', false)
+        .gte('created_at', new Date(Date.now() - 15 * 60 * 1000).toISOString()) // Last 15 minutes
+        .order('created_at', { ascending: false });
 
-// Log security events for monitoring
-export const logSecurityEvent = async (event: any): Promise<void> => {
-  try {
-    console.warn('Security event:', event);
-    
-    // Could implement server-side logging here
-    // await supabase.from('security_logs').insert(event);
-  } catch (error) {
-    console.error('Failed to log security event:', error);
-  }
-};
-
-// Check for suspicious patterns (e.g., SQL injection attempts)
-export const detectSuspiciousPatterns = (input: string): boolean => {
-  if (!input) return false;
-  
-  const suspiciousPatterns = [
-    /(\%27)|(\')|(\-\-)|(\%23)|(#)/i,
-    /((\%3D)|(=))[^\n]*((\%27)|(\')|(\-\-)|(\%3B)|(;))/i,
-    /\w*((\%27)|(\'))((\%6F)|o|(\%4F))((\%72)|r|(\%52))/i,
-    /((\%27)|(\'))union/i
-  ];
-  
-  for (const pattern of suspiciousPatterns) {
-    if (pattern.test(input)) {
-      logSecurityEvent({
-        type: 'suspicious_pattern_detected',
-        input,
-        pattern: pattern.toString(),
-        timestamp: new Date().toISOString()
-      });
-      return true;
-    }
-  }
-  
-  return false;
-};
-
-// Enhanced security wrapper for fetch operations
-export const secureFetch = async (
-  url: string, 
-  options: RequestInit = {}
-): Promise<Response> => {
-  try {
-    // Add security headers
-    const secureOptions = {
-      ...options,
-      headers: {
-        ...options.headers,
-        'X-Content-Type-Options': 'nosniff',
-        'X-Frame-Options': 'DENY',
-        'Referrer-Policy': 'strict-origin-when-cross-origin'
+      if (error) {
+        console.error('Error checking for suspicious activity:', error);
+        return false;
       }
-    };
-    
-    return await fetch(url, secureOptions);
-  } catch (error) {
-    console.error('Secure fetch error:', error);
-    throw error;
-  }
-};
 
-// JWT token validation helper
-export const isValidJWT = (token: string): boolean => {
-  if (!token) return false;
-  
-  // Basic structure validation
-  const parts = token.split('.');
-  if (parts.length !== 3) return false;
-  
-  try {
-    // Check if parts are valid base64
-    for (const part of parts) {
-      window.atob(part.replace(/-/g, '+').replace(/_/g, '/'));
-    }
-    
-    // Check expiration
-    const payload = JSON.parse(
-      window.atob(parts[1].replace(/-/g, '+').replace(/_/g, '/'))
-    );
-    
-    if (payload.exp && payload.exp < Date.now() / 1000) {
+      // If more than 5 failed attempts in the last 15 minutes
+      return (data?.length || 0) > 5;
+    } catch (error) {
+      console.error('Failed to check for suspicious activity:', error);
       return false;
     }
-    
-    return true;
-  } catch (e) {
-    return false;
+  },
+
+  // Log important security events for audit trail
+  logSecurityEvent: async (eventType: string, userId?: string, details?: object): Promise<void> => {
+    try {
+      await supabase
+        .from('security_logs')
+        .insert({
+          event_type: eventType,
+          user_id: userId,
+          details: details || {},
+          ip_address: '0.0.0.0', // In a real app, you would get the actual IP
+          user_agent: navigator.userAgent
+        });
+    } catch (error) {
+      console.error('Failed to log security event:', error);
+    }
+  },
+
+  // Custom password validation
+  validatePassword: (password: string): { valid: boolean; message: string } => {
+    if (password.length < 8) {
+      return { valid: false, message: 'Password must be at least 8 characters' };
+    }
+    if (!/[A-Z]/.test(password)) {
+      return { valid: false, message: 'Password must include an uppercase letter' };
+    }
+    if (!/[a-z]/.test(password)) {
+      return { valid: false, message: 'Password must include a lowercase letter' };
+    }
+    if (!/[0-9]/.test(password)) {
+      return { valid: false, message: 'Password must include a number' };
+    }
+    if (!/[^A-Za-z0-9]/.test(password)) {
+      return { valid: false, message: 'Password must include a special character' };
+    }
+    return { valid: true, message: 'Password meets requirements' };
+  },
+
+  // Set secure HTTP headers (for use in meta tags)
+  getSecurityMeta: () => [
+    { httpEquiv: "Content-Security-Policy", content: "default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data: https:; connect-src 'self' https://*.supabase.co" },
+    { httpEquiv: "X-Content-Type-Options", content: "nosniff" },
+    { httpEquiv: "X-Frame-Options", content: "DENY" },
+    { httpEquiv: "Referrer-Policy", content: "no-referrer-when-downgrade" },
+  ]
+};
+
+// GDPR Data protection utilities
+export const dataProtection = {
+  // Download user's data in compliance with GDPR right to access
+  exportUserData: async (userId: string): Promise<object | null> => {
+    try {
+      const userData = {};
+      
+      // Get user profile
+      const { data: profile } = await supabase
+        .from('profiles')
+        .select('*')
+        .eq('user_id', userId)
+        .single();
+        
+      if (profile) {
+        Object.assign(userData, { profile });
+      }
+      
+      // Get user points
+      const { data: points } = await supabase
+        .from('user_points')
+        .select('*')
+        .eq('user_id', userId)
+        .single();
+        
+      if (points) {
+        Object.assign(userData, { points });
+      }
+      
+      return userData;
+    } catch (error) {
+      console.error('Failed to export user data:', error);
+      return null;
+    }
+  },
+
+  // Request to delete user data (GDPR right to be forgotten)
+  requestDataDeletion: async (userId: string): Promise<boolean> => {
+    try {
+      // In a real app, this would trigger a workflow for data deletion
+      // For now, we just log the request
+      await securityUtils.logSecurityEvent('data_deletion_request', userId);
+      return true;
+    } catch (error) {
+      console.error('Failed to request data deletion:', error);
+      return false;
+    }
   }
 };
 
-// Session timeout helper
-export const initSessionTimeout = (
-  timeoutMinutes = 30,
-  onTimeout: () => void
-): () => void => {
-  let timeoutId: number;
-  
-  const resetTimeout = () => {
-    if (timeoutId) window.clearTimeout(timeoutId);
-    timeoutId = window.setTimeout(onTimeout, timeoutMinutes * 60 * 1000);
-  };
-  
-  // Set up event listeners
-  window.addEventListener('mousemove', resetTimeout);
-  window.addEventListener('keypress', resetTimeout);
-  window.addEventListener('click', resetTimeout);
-  
-  // Initial timeout
-  resetTimeout();
-  
-  // Return cleanup function
-  return () => {
-    window.removeEventListener('mousemove', resetTimeout);
-    window.removeEventListener('keypress', resetTimeout);
-    window.removeEventListener('click', resetTimeout);
-    if (timeoutId) window.clearTimeout(timeoutId);
-  };
+// Data obfuscation for AI-related functions (to prevent model inversion attacks)
+export const aiSecurity = {
+  // Anonymize data before sending to AI services
+  anonymizeDataForAI: (data: any): any => {
+    // Deep clone the data to avoid modifying the original
+    const clonedData = JSON.parse(JSON.stringify(data));
+    
+    // Replace sensitive fields with anonymized versions
+    if (clonedData.user_id) {
+      clonedData.user_id = 'anonymized_user';
+    }
+    
+    if (clonedData.email) {
+      clonedData.email = 'anonymized@example.com';
+    }
+    
+    if (clonedData.name) {
+      clonedData.name = 'Anonymous User';
+    }
+    
+    if (clonedData.location) {
+      // Keep only the country/region level information
+      const locationParts = clonedData.location.split(',');
+      if (locationParts.length > 1) {
+        clonedData.location = locationParts[locationParts.length - 1].trim();
+      }
+    }
+    
+    return clonedData;
+  }
 };
+
+// Export combined security utilities
+export const securityModule = {
+  ...securityUtils,
+  dataProtection,
+  aiSecurity
+};
+
+export default securityModule;

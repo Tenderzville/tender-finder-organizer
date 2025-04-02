@@ -1,3 +1,4 @@
+
 import React, { useEffect } from 'react';
 import { Routes, Route } from 'react-router-dom';
 import Landing from '@/pages/Landing';
@@ -16,9 +17,9 @@ import { OpenSourceAssistant } from "@/components/ai/OpenSourceAssistant";
 import LearningHub from '@/pages/LearningHub';
 import { AdManager } from '@/integrations/AdManager';
 import { usePerformance } from '@/hooks/use-performance';
-import Footer from '@/components/Footer'; // Assuming Footer component exists
-import SupportPage from '@/pages/Support'; // Assuming SupportPage component exists
-
+import Footer from '@/components/Footer';
+import SupportPage from '@/pages/Support';
+import { AuthProvider } from '@/hooks/use-auth';
 
 function App() {
   const { performanceLevel, options } = usePerformance();
@@ -47,26 +48,28 @@ function App() {
   }, [options]);
 
   return (
-    <div className="App min-h-screen bg-white">
-      <Routes>
-        <Route path="/" element={<Landing />} />
-        <Route path="/onboarding" element={<Onboarding />} />
-        <Route path="/dashboard" element={<Dashboard />} />
-        <Route path="/tenders/:tenderId" element={<TenderDetails />} />
-        <Route path="/preferences" element={<Preferences />} />
-        <Route path="/auth" element={<Auth />} />
-        <Route path="/services" element={<Services />} />
-        <Route path="/learning-hub" element={<LearningHub />} />
-        <Route path="/terms" element={<TermsPage />} />
-        <Route path="/privacy" element={<PrivacyPage />} />
-        <Route path="/support" element={<SupportPage />} /> {/* Added Support Route */}
-        <Route path="*" element={<NotFound />} />
-      </Routes>
-      <Toaster />
-      <ChatSupport />
-      <AdManager />
-      <Footer /> {/* Added Footer */}
-    </div>
+    <AuthProvider>
+      <div className="App min-h-screen bg-white">
+        <Routes>
+          <Route path="/" element={<Landing />} />
+          <Route path="/onboarding" element={<Onboarding />} />
+          <Route path="/dashboard" element={<Dashboard />} />
+          <Route path="/tenders/:tenderId" element={<TenderDetails />} />
+          <Route path="/preferences" element={<Preferences />} />
+          <Route path="/auth" element={<Auth />} />
+          <Route path="/services" element={<Services />} />
+          <Route path="/learning-hub" element={<LearningHub />} />
+          <Route path="/terms" element={<TermsPage />} />
+          <Route path="/privacy" element={<PrivacyPage />} />
+          <Route path="/support" element={<SupportPage />} />
+          <Route path="*" element={<NotFound />} />
+        </Routes>
+        <Toaster />
+        <ChatSupport />
+        <AdManager />
+        <Footer />
+      </div>
+    </AuthProvider>
   );
 }
 
