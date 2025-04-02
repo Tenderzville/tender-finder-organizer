@@ -9,15 +9,14 @@ import Preferences from '@/pages/Preferences';
 import Auth from '@/pages/Auth';
 import Services from '@/pages/Services';
 import NotFound from '@/pages/NotFound';
-import { Toaster } from "@/components/ui/toaster"
+import { Toaster } from "@/components/ui/toaster";
 import TermsPage from '@/pages/Terms';
 import PrivacyPage from '@/pages/Privacy';
 import { ChatSupport } from "@/components/ChatSupport";
-import { OpenSourceAssistant } from "@/components/ai/OpenSourceAssistant";
 import LearningHub from '@/pages/LearningHub';
 import { AdManager } from '@/integrations/AdManager';
 import { usePerformance } from '@/hooks/use-performance';
-import Footer from '@/components/Footer';
+import { Footer } from '@/components/layout/Footer'; // Corrected import path
 import SupportPage from '@/pages/Support';
 import { AuthProvider } from '@/hooks/use-auth';
 
@@ -67,7 +66,7 @@ function App() {
         <Toaster />
         <ChatSupport />
         <AdManager />
-        <Footer />
+        <Footer language="en" />
       </div>
     </AuthProvider>
   );
