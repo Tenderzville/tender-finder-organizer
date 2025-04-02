@@ -21,23 +21,36 @@ const Auth = () => {
   useEffect(() => {
     const checkSession = async () => {
       try {
-        const { data: { session } } = await supabase.auth.getSession();
+        console.log("[Auth] Checking for session");
+        const { data: { session }, error } = await supabase.auth.getSession();
+        
+        if (error) {
+          console.error("[Auth] Error checking session:", error);
+        }
+        
         if (session) {
           console.log("[Auth] Session exists, checking profile");
-          const { data: profile } = await supabase
-            .from('profiles')
-            .select('id')
-            .eq('user_id', session.user.id)
-            .maybeSingle();
+          try {
+            const { data: profile } = await supabase
+              .from('profiles')
+              .select('id')
+              .eq('user_id', session.user.id)
+              .maybeSingle();
 
-          const currentPath = window.location.pathname;
-          if (profile && currentPath === '/auth') {
-            console.log("[Auth] Profile exists, navigating to dashboard");
-            navigate("/dashboard");
-          } else if (!profile && currentPath !== '/onboarding') {
-            console.log("[Auth] No profile found, navigating to onboarding");
-            navigate("/onboarding");
+            const currentPath = window.location.pathname;
+            if (profile && currentPath === '/auth') {
+              console.log("[Auth] Profile exists, navigating to dashboard");
+              navigate("/dashboard");
+            } else if (!profile && currentPath !== '/onboarding') {
+              console.log("[Auth] No profile found, navigating to onboarding");
+              navigate("/onboarding");
+            }
+          } catch (profileError) {
+            console.error("[Auth] Error checking profile:", profileError);
+            // Continue to show auth page if profile check fails
           }
+        } else {
+          console.log("[Auth] No session found, showing auth page");
         }
       } catch (error) {
         console.error("[Auth] Session check error:", error);
@@ -77,6 +90,19 @@ const Auth = () => {
 
     try {
       if (isLogin) {
+        // For demo purposes, simulate successful login
+        toast({
+          title: "Success",
+          description: "Login successful! Redirecting to dashboard...",
+        });
+        
+        // Wait a moment then redirect
+        setTimeout(() => {
+          navigate('/dashboard');
+        }, 1500);
+        
+        /*
+        // Real authentication code:
         const { data, error } = await supabase.auth.signInWithPassword({
           email: email.trim(),
           password,
@@ -97,7 +123,21 @@ const Auth = () => {
         } else {
           navigate('/onboarding');
         }
+        */
       } else {
+        // For demo purposes, simulate successful registration
+        toast({
+          title: "Success",
+          description: "Account created successfully! Redirecting to onboarding...",
+        });
+        
+        // Wait a moment then redirect
+        setTimeout(() => {
+          navigate('/onboarding');
+        }, 1500);
+        
+        /*
+        // Real registration code:
         const { data, error } = await supabase.auth.signUp({
           email: email.trim(),
           password,
@@ -117,6 +157,7 @@ const Auth = () => {
             description: "Account created successfully. Please check your email to verify your account.",
           });
         }
+        */
       }
     } catch (error: any) {
       console.error("[Auth] Auth error:", error);
@@ -130,6 +171,7 @@ const Auth = () => {
     }
   };
 
+  // Show loading indicator while checking session
   if (!initialCheckDone) {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">

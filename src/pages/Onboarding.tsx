@@ -1,3 +1,4 @@
+
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
@@ -7,6 +8,7 @@ import { Label } from "@/components/ui/label";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Checkbox } from "@/components/ui/checkbox";
 import { motion } from "framer-motion";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
 export default function Onboarding() {
   const navigate = useNavigate();
@@ -22,7 +24,15 @@ export default function Onboarding() {
     "Agriculture",
     "Education",
     "Security Services",
-    "AGPO Related"
+    "AGPO Related",
+    "Women Opportunities",
+    "Youth Opportunities",
+    "PWD Opportunities",
+    "Financial Services",
+    "Transportation & Logistics",
+    "Environmental Services",
+    "Professional Services",
+    "Hospitality & Tourism"
   ];
 
   const handleInterestToggle = (value: string) => {
@@ -98,20 +108,34 @@ export default function Onboarding() {
               <h3 className="text-xl font-semibold mb-4">What are you interested in?</h3>
               <p className="text-muted-foreground mb-6">Select categories to see related tenders</p>
 
+              <div className="mb-6">
+                <Select onValueChange={(value) => {
+                  if (value && !interests.includes(value)) {
+                    setInterests(prev => [...prev, value]);
+                  }
+                }}>
+                  <SelectTrigger className="w-full">
+                    <SelectValue placeholder="Add a category" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {interestOptions.map((option) => (
+                      <SelectItem key={option} value={option} disabled={interests.includes(option)}>
+                        {option}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                {interestOptions.map((interest) => (
+                {interests.map((interest) => (
                   <div 
                     key={interest}
-                    className={`border rounded-lg p-3 flex items-center space-x-3 cursor-pointer transition-colors ${
-                      interests.includes(interest) 
-                        ? 'bg-primary/10 border-primary' 
-                        : 'hover:bg-secondary'
-                    }`}
-                    onClick={() => handleInterestToggle(interest)}
+                    className={`border rounded-lg p-3 flex items-center space-x-3 cursor-pointer transition-colors bg-primary/10 border-primary`}
                   >
                     <Checkbox 
                       id={`interest-${interest}`}
-                      checked={interests.includes(interest)}
+                      checked={true}
                       onCheckedChange={() => handleInterestToggle(interest)}
                     />
                     <label 
@@ -123,6 +147,12 @@ export default function Onboarding() {
                   </div>
                 ))}
               </div>
+              
+              {interests.length === 0 && (
+                <p className="text-center text-muted-foreground mt-4">
+                  Add categories you're interested in from the dropdown above
+                </p>
+              )}
             </CardContent>
 
             <CardFooter className="flex justify-between pb-6 px-6">

@@ -1,399 +1,293 @@
-import React, { useState, useEffect } from 'react';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
-import { useToast } from "@/hooks/use-toast";
-import { supabase } from "@/integrations/supabase/client";
-import { Loader2, AlertCircle, CheckCircle, Share, ChevronDown } from "lucide-react";
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-  AlertDialogTrigger,
-} from "@/components/ui/alert-dialog"
-import {
-  Collapsible,
-  CollapsibleContent,
-  CollapsibleTrigger,
-} from "@/components/ui/collapsible"
-import { useNavigate } from "react-router-dom";
-import type { Tender } from "@/types/tender";
-import type { UserProfile } from "@/types/user";
 
-interface TenderMatcherProps {
-  userId: string;
-  language: 'en' | 'sw';
+import React, { useState } from 'react';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Check, Loader2, Lightbulb, Cpu } from "lucide-react";
+import { Badge } from "@/components/ui/badge";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { Tender } from "@/types/tender";
+
+interface UserProfile {
+  industry?: string;
+  areas_of_expertise?: string[];
+  company_size?: string;
+  experience_level?: string;
+  location?: string;
 }
 
-export const TenderMatcher: React.FC<TenderMatcherProps> = ({ userId, language }) => {
-  const [profile, setProfile] = useState<UserProfile | null>(null);
-  const [tenders, setTenders] = useState<Tender[]>([]);
-  const [loadingProfile, setLoadingProfile] = useState(true);
-  const [loadingTenders, setLoadingTenders] = useState(true);
-  const [matchScores, setMatchScores] = useState<{ [tenderId: number]: number }>({});
-  const [isGenerating, setIsGenerating] = useState(false);
-  const navigate = useNavigate();
-  const { toast } = useToast();
+export interface TenderMatcherProps {
+  userProfile: UserProfile;
+  language: 'en' | 'sw';
+  userId: string | null;
+  onViewDetails: (id: string) => void;
+}
 
-  const translations = {
+export function TenderMatcher({ userProfile, language, userId, onViewDetails }: TenderMatcherProps) {
+  const [isAnalyzing, setIsAnalyzing] = useState(false);
+  const [matchedTenders, setMatchedTenders] = useState<Tender[]>([]);
+  const [analysisComplete, setAnalysisComplete] = useState(false);
+  const [error, setError] = useState<Error | null>(null);
+  const [tenderData, setTenderData] = useState<Tender[]>([]);
+  
+  const t = {
     en: {
-      title: "Tender Matcher",
-      description: "Find tenders that best match your company profile",
-      profileDetails: "Enter your company profile details",
-      companyName: "Company Name",
-      industry: "Industry",
-      location: "Location",
-      expertise: "Expertise",
-      searchTenders: "Search Tenders",
-      match: "Match",
-      location: "Location",
-      category: "Category",
-      deadline: "Deadline",
+      title: "AI Tender Matcher",
+      description: "Find tenders that match your expertise and capabilities",
+      analyze: "Analyze My Profile",
+      analyzing: "Analyzing...",
+      matchFound: "Match Found",
+      loading: "Loading your recommendations...",
       viewDetails: "View Details",
-      generateProposal: "Generate Proposal",
-      generateProposalDesc: "Are you sure you want to generate a proposal for this tender?",
-      cancel: "Cancel",
-      continue: "Continue",
-      share: "Share",
-      strengths: "Strengths",
-      weaknesses: "Weaknesses",
-      viewAnalysis: "View Strength/Weakness Analysis",
+      noMatches: "No matching tenders found",
+      tryAgain: "Try Again",
+      error: "Error",
+      errorDesc: "Failed to analyze your profile. Please try again.",
+      notLoggedIn: "Please sign in to use this feature",
+      signIn: "Sign In",
+      completeProfile: "Please complete your profile to get better matches",
+      updateProfile: "Update Profile",
+      matchScore: "Match Score",
+      expertiseMatch: "Your expertise in {0} matches this tender requirement"
     },
     sw: {
-      title: "Linganisha Zabuni",
-      description: "Tafuta zabuni zinazolingana vyema na wasifu wa kampuni yako",
-      profileDetails: "Ingiza maelezo ya wasifu wa kampuni yako",
-      companyName: "Jina la Kampuni",
-      industry: "Sekta",
-      location: "Mahali",
-      expertise: "Utaalamu",
-      searchTenders: "Tafuta Zabuni",
-      match: "Linganisho",
-      location: "Mahali",
-      category: "Kategoria",
-      deadline: "Tarehe ya mwisho",
-      viewDetails: "Angalia Maelezo",
-      generateProposal: "Tengeneza Pendekezo",
-      generateProposalDesc: "Una uhakika unataka kutengeneza pendekezo la zabuni hii?",
-      cancel: "Ghairi",
-      continue: "Endelea",
-      share: "Shiriki",
-      strengths: "Nguvu",
-      weaknesses: "Udhaifu",
-      viewAnalysis: "Angalia Uchambuzi wa Nguvu/Udhaifu",
-      viewAnalysis: "Angalia Uchambuzi wa Nguvu/Udhaifu",
+      title: "Kigezo cha AI Kwa Zabuni",
+      description: "Pata zabuni zinazofanana na utaalamu na uwezo wako",
+      analyze: "Changanua Wasifu Wangu",
+      analyzing: "Inachanganua...",
+      matchFound: "Mechi Imepatikana",
+      loading: "Inapakia mapendekezo yako...",
+      viewDetails: "Ona Maelezo",
+      noMatches: "Hakuna zabuni zinazofanana zilizopatikana",
+      tryAgain: "Jaribu Tena",
+      error: "Hitilafu",
+      errorDesc: "Imeshindwa kuchanganua wasifu wako. Tafadhali jaribu tena.",
+      notLoggedIn: "Tafadhali ingia ili kutumia kipengele hiki",
+      signIn: "Ingia",
+      completeProfile: "Tafadhali kamilisha wasifu wako ili kupata mechi bora",
+      updateProfile: "Sasisha Wasifu",
+      matchScore: "Alama ya Mechi",
+      expertiseMatch: "Utaalamu wako katika {0} unafanana na mahitaji ya zabuni hii"
     }
   };
 
-  const t = translations[language];
-
-  useEffect(() => {
-    const fetchProfile = async () => {
-      setLoadingProfile(true);
-      try {
-        const { data, error } = await supabase
-          .from('profiles')
-          .select('*')
-          .eq('user_id', userId)
-          .single();
-
-        if (error) throw error;
-
-        setProfile(data as UserProfile);
-      } catch (error) {
-        console.error("Error fetching profile:", error);
-        toast({
-          title: "Error",
-          description: "Failed to load profile. Please try again.",
-          variant: "destructive",
-        });
-      } finally {
-        setLoadingProfile(false);
-      }
-    };
-
-    const fetchTenders = async () => {
-      setLoadingTenders(true);
-      try {
-        const { data, error } = await supabase
-          .from('tenders')
-          .select('*');
-
-        if (error) throw error;
-
-        setTenders(data as Tender[]);
-      } catch (error) {
-        console.error("Error fetching tenders:", error);
-        toast({
-          title: "Error",
-          description: "Failed to load tenders. Please try again.",
-          variant: "destructive",
-        });
-      } finally {
-        setLoadingTenders(false);
-      }
-    };
-
-    fetchProfile();
-    fetchTenders();
-  }, [userId]);
-
-  useEffect(() => {
-    if (profile && tenders.length > 0) {
-      const scores: { [tenderId: number]: number } = {};
-      tenders.forEach(tender => {
-        let score = 0;
-
-        // Simple matching logic (can be improved)
-        if (profile.company_name && tender.title.toLowerCase().includes(profile.company_name.toLowerCase())) {
-          score += 20;
-        }
-        if (profile.industry && tender.category?.toLowerCase().includes(profile.industry.toLowerCase())) {
-          score += 30;
-        }
-        if (profile.location && tender.location?.toLowerCase().includes(profile.location.toLowerCase())) {
-          score += 25;
-        }
-        if (profile.expertise && tender.description?.toLowerCase().includes(profile.expertise.toLowerCase())) {
-          score += 25;
-        }
-
-        scores[tender.id] = Math.min(100, score); // Cap at 100
-      });
-      setMatchScores(scores);
-    }
-  }, [profile, tenders]);
-
-  const handleGenerateProposal = async (tenderId: string) => {
-    setIsGenerating(true);
+  const handleAnalyzeClick = async () => {
+    setIsAnalyzing(true);
+    setError(null);
+    
     try {
-      // Simulate proposal generation (replace with actual logic)
+      // In a real app, this would be a call to a backend service
       await new Promise(resolve => setTimeout(resolve, 2000));
-      toast({
-        title: "Proposal Generated",
-        description: `Proposal generated for tender ID: ${tenderId}`,
-      });
-    } catch (error) {
-      console.error("Error generating proposal:", error);
-      toast({
-        title: "Error",
-        description: "Failed to generate proposal. Please try again.",
-        variant: "destructive",
-      });
+      
+      // Mock data - in a real app, this would come from the backend
+      const mockMatchedTenders: Tender[] = [
+        {
+          id: "1",
+          title: "IT Infrastructure Upgrade",
+          description: "Seeking vendors for upgrading government IT infrastructure",
+          procuring_entity: "Ministry of ICT",
+          tender_no: "ICT-2023-001",
+          category: "IT & Telecommunications",
+          deadline: new Date().toISOString(),
+          location: "Nairobi",
+          tender_url: "#",
+          points_required: 100
+        },
+        {
+          id: "2",
+          title: "Medical Equipment Supply",
+          description: "Supply of various medical equipment to county hospitals",
+          procuring_entity: "Ministry of Health",
+          tender_no: "MOH-2023-045",
+          category: "Medical Supplies",
+          deadline: new Date().toISOString(),
+          location: "Multiple Counties",
+          tender_url: "#",
+          points_required: 200
+        }
+      ];
+      
+      setMatchedTenders(mockMatchedTenders);
+      setTenderData(mockMatchedTenders);
+      setAnalysisComplete(true);
+    } catch (err) {
+      console.error("Error analyzing profile:", err);
+      setError(err instanceof Error ? err : new Error("Unknown error occurred"));
     } finally {
-      setIsGenerating(false);
+      setIsAnalyzing(false);
     }
   };
-
-  const handleShareTender = async (tenderId: string) => {
-    try {
-      // Simulate sharing logic (replace with actual sharing)
-      await new Promise(resolve => setTimeout(resolve, 1000));
-      toast({
-        title: "Tender Shared",
-        description: `Tender shared successfully (ID: ${tenderId})`,
-      });
-    } catch (error) {
-      console.error("Error sharing tender:", error);
-      toast({
-        title: "Error",
-        description: "Failed to share tender. Please try again.",
-        variant: "destructive",
-      });
+  
+  const calculateMatchScore = (tender: Tender) => {
+    // In a real app, this would be a more sophisticated algorithm
+    if (!userProfile) return 50; // Default score
+    
+    let score = 60; // Base score
+    
+    // Check if user's areas of expertise match the tender category
+    if (userProfile.areas_of_expertise && tender.category) {
+      if (userProfile.areas_of_expertise.some(exp => 
+        tender.category.toLowerCase().includes(exp.toLowerCase())
+      )) {
+        score += 20;
+      }
     }
+    
+    // Check if user's location matches tender location
+    if (userProfile.location && tender.location) {
+      if (userProfile.location.toLowerCase() === tender.location.toLowerCase()) {
+        score += 10;
+      }
+    }
+    
+    return Math.min(score, 100);
   };
-
-  const onViewDetails = (tenderId: string) => {
-    navigate(`/tenders/${tenderId}`);
+  
+  const getMatchDescription = (tender: Tender) => {
+    if (!userProfile || !userProfile.areas_of_expertise) return "";
+    
+    // Find matching expertise
+    const matchingExpertise = userProfile.areas_of_expertise.find(exp => 
+      tender.category.toLowerCase().includes(exp.toLowerCase())
+    );
+    
+    if (matchingExpertise) {
+      return t[language].expertiseMatch.replace('{0}', matchingExpertise);
+    }
+    
+    return "";
   };
-
-  const generateStrengths = (tender: Tender, profile: UserProfile | null): string[] => {
-    const strengths: string[] = [];
-    if (!profile) return strengths;
-
-    if (profile.company_name && tender.title.toLowerCase().includes(profile.company_name.toLowerCase())) {
-      strengths.push("Your company name matches the tender title.");
-    }
-    if (profile.industry && tender.category?.toLowerCase().includes(profile.industry.toLowerCase())) {
-      strengths.push("Your industry aligns with the tender category.");
-    }
-    if (profile.location && tender.location?.toLowerCase().includes(profile.location.toLowerCase())) {
-      strengths.push("Your location matches the tender location.");
-    }
-    if (profile.expertise && tender.description?.toLowerCase().includes(profile.expertise.toLowerCase())) {
-      strengths.push("Your expertise aligns with the tender description.");
-    }
-    return strengths;
-  };
-
-  const generateWeaknesses = (tender: Tender, profile: UserProfile | null): string[] => {
-    const weaknesses: string[] = [];
-    if (!profile) return weaknesses;
-
-    if (profile.company_name && !tender.title.toLowerCase().includes(profile.company_name.toLowerCase())) {
-      weaknesses.push("Your company name does not closely match the tender title.");
-    }
-    if (profile.industry && !tender.category?.toLowerCase().includes(profile.industry.toLowerCase())) {
-      weaknesses.push("Your industry does not align well with the tender category.");
-    }
-    if (profile.location && !tender.location?.toLowerCase().includes(profile.location.toLowerCase())) {
-      weaknesses.push("Your location does not match the tender location.");
-    }
-    if (profile.expertise && !tender.description?.toLowerCase().includes(profile.expertise.toLowerCase())) {
-      weaknesses.push("Your expertise does not align well with the tender description.");
-    }
-    return weaknesses;
-  };
-
-  if (loadingProfile || loadingTenders) {
+  
+  // If user is not logged in
+  if (!userId) {
     return (
-      <Card className="w-full">
+      <Card>
         <CardHeader>
-          <CardTitle>{t.title}</CardTitle>
-          <CardDescription>{t.description}</CardDescription>
+          <CardTitle>{t[language].title}</CardTitle>
+          <CardDescription>
+            {t[language].description}
+          </CardDescription>
         </CardHeader>
-        <CardContent className="flex items-center justify-center">
-          <Loader2 className="h-6 w-6 animate-spin" />
+        <CardContent className="space-y-4">
+          <Alert>
+            <AlertTitle>{t[language].notLoggedIn}</AlertTitle>
+            <AlertDescription>
+              <Button variant="link" className="p-0" onClick={() => window.location.href = "/auth"}>
+                {t[language].signIn}
+              </Button>
+            </AlertDescription>
+          </Alert>
         </CardContent>
       </Card>
     );
   }
-
-  if (!profile) {
+  
+  // If user profile is incomplete
+  if (userProfile && (!userProfile.areas_of_expertise || userProfile.areas_of_expertise.length === 0)) {
     return (
-      <Card className="w-full">
+      <Card>
         <CardHeader>
-          <CardTitle>{t.title}</CardTitle>
-          <CardDescription>{t.description}</CardDescription>
+          <CardTitle>{t[language].title}</CardTitle>
+          <CardDescription>
+            {t[language].description}
+          </CardDescription>
         </CardHeader>
-        <CardContent>
-          <p>No profile found. Please complete your profile to use the Tender Matcher.</p>
+        <CardContent className="space-y-4">
+          <Alert>
+            <AlertTitle>{t[language].completeProfile}</AlertTitle>
+            <AlertDescription>
+              <Button variant="link" className="p-0" onClick={() => window.location.href = "/preferences"}>
+                {t[language].updateProfile}
+              </Button>
+            </AlertDescription>
+          </Alert>
         </CardContent>
       </Card>
     );
   }
-
+  
   return (
-    <Card className="w-full">
+    <Card>
       <CardHeader>
-        <CardTitle>{t.title}</CardTitle>
-        <CardDescription>{t.description}</CardDescription>
+        <CardTitle className="flex justify-between items-center">
+          <span className="flex items-center gap-2">
+            <Cpu className="h-5 w-5 text-primary" />
+            {t[language].title}
+          </span>
+          {!isAnalyzing && !analysisComplete && (
+            <Button size="sm" onClick={handleAnalyzeClick}>
+              {t[language].analyze}
+            </Button>
+          )}
+        </CardTitle>
+        <CardDescription>
+          {t[language].description}
+        </CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">
-        <h3 className="text-lg font-medium">{t.profileDetails}</h3>
-        <div className="grid gap-4">
-          <div>
-            <Label htmlFor="company-name">{t.companyName}</Label>
-            <Input id="company-name" value={profile.company_name || ""} readOnly />
+        {isAnalyzing && (
+          <div className="flex flex-col items-center justify-center p-6">
+            <Loader2 className="h-8 w-8 animate-spin text-primary mb-4" />
+            <p>{t[language].loading}</p>
           </div>
-          <div>
-            <Label htmlFor="industry">{t.industry}</Label>
-            <Input id="industry" value={profile.industry || ""} readOnly />
-          </div>
-          <div>
-            <Label htmlFor="location">{t.location}</Label>
-            <Input id="location" value={profile.location || ""} readOnly />
-          </div>
-          <div>
-            <Label htmlFor="expertise">{t.expertise}</Label>
-            <Input id="expertise" value={profile.expertise || ""} readOnly />
-          </div>
-        </div>
-
-        <h3 className="text-lg font-medium">{t.searchTenders}</h3>
-        {tenders.map((tender) => (
-          <div key={tender.id} className="mb-6 p-4 border rounded shadow-sm hover:shadow-md transition-shadow">
-            <div className="flex justify-between items-start">
-              <h3 className="text-lg font-semibold mb-2">{tender.title}</h3>
-              <Badge variant="outline" className={matchScores[tender.id] >= 80 ? 'bg-green-100 text-green-800' : 'bg-amber-100 text-amber-800'}>
-                {matchScores[tender.id]}% {t.match}
-              </Badge>
-            </div>
-            
-            <div className="text-sm text-gray-600 mb-2">
-              <div><span className="font-medium">{t.location}:</span> {tender.location}</div>
-              <div><span className="font-medium">{t.category}:</span> {tender.category}</div>
-              <div><span className="font-medium">{t.deadline}:</span> {new Date(tender.deadline).toLocaleDateString()}</div>
-            </div>
-            
-            {/* Strength/weakness analysis section */}
-            <div className="mt-3 mb-3">
-              <Collapsible>
-                <CollapsibleTrigger asChild>
-                  <Button variant="outline" size="sm" className="w-full justify-between">
-                    {t.viewAnalysis} <ChevronDown className="h-4 w-4 opacity-50" />
-                  </Button>
-                </CollapsibleTrigger>
-                <CollapsibleContent className="mt-2">
-                  <div className="space-y-2 text-sm">
-                    <div>
-                      <h4 className="font-medium text-green-600 flex items-center gap-1">
-                        <CheckCircle className="h-4 w-4" /> {t.strengths}
-                      </h4>
-                      <ul className="list-disc list-inside pl-1 text-gray-600">
-                        {generateStrengths(tender, profile).map((strength, i) => (
-                          <li key={i}>{strength}</li>
-                        ))}
-                      </ul>
-                    </div>
-                    
-                    <div>
-                      <h4 className="font-medium text-red-600 flex items-center gap-1">
-                        <AlertCircle className="h-4 w-4" /> {t.weaknesses}
-                      </h4>
-                      <ul className="list-disc list-inside pl-1 text-gray-600">
-                        {generateWeaknesses(tender, profile).map((weakness, i) => (
-                          <li key={i}>{weakness}</li>
-                        ))}
-                      </ul>
-                    </div>
+        )}
+        
+        {error && (
+          <Alert variant="destructive">
+            <AlertTitle>{t[language].error}</AlertTitle>
+            <AlertDescription>
+              {t[language].errorDesc}
+              <Button variant="link" className="p-0 ml-2" onClick={handleAnalyzeClick}>
+                {t[language].tryAgain}
+              </Button>
+            </AlertDescription>
+          </Alert>
+        )}
+        
+        {analysisComplete && matchedTenders.length > 0 && (
+          <div className="space-y-4">
+            {matchedTenders.map((tender) => {
+              const matchScore = calculateMatchScore(tender);
+              return (
+                <div key={tender.id} className="p-4 border rounded-lg bg-muted/50">
+                  <div className="flex justify-between items-start mb-2">
+                    <h3 className="font-medium">{tender.title}</h3>
+                    <Badge variant={matchScore > 80 ? "default" : "outline"} className="ml-2">
+                      {matchScore}% {t[language].matchScore}
+                    </Badge>
                   </div>
-                </CollapsibleContent>
-              </Collapsible>
-            </div>
-            
-            <div className="flex gap-2 mt-2">
-              {/* Fix TS2345 error by converting tender.id to string */}
-              <Button size="sm" onClick={() => onViewDetails(String(tender.id))}>
-                {t.viewDetails}
-              </Button>
-              <AlertDialog>
-                <AlertDialogTrigger asChild>
-                  <Button size="sm" variant="outline">
-                    {t.generateProposal}
-                  </Button>
-                </AlertDialogTrigger>
-                <AlertDialogContent>
-                  <AlertDialogHeader>
-                    <AlertDialogTitle>{t.generateProposal}</AlertDialogTitle>
-                    <AlertDialogDescription>
-                      {t.generateProposalDesc}
-                    </AlertDialogDescription>
-                  </AlertDialogHeader>
-                  <AlertDialogFooter>
-                    <AlertDialogCancel>{t.cancel}</AlertDialogCancel>
-                    {/* Fix TS2345 error by converting tender.id to string */}
-                    <AlertDialogAction onClick={() => handleGenerateProposal(String(tender.id))}>
-                      {t.continue}
-                    </AlertDialogAction>
-                  </AlertDialogFooter>
-                </AlertDialogContent>
-              </AlertDialog>
-              {/* Fix TS2345 error by converting tender.id to string */}
-              <Button size="sm" variant="ghost" onClick={() => handleShareTender(String(tender.id))}>
-                <Share className="h-4 w-4 mr-1" /> {t.share}
-              </Button>
-            </div>
+                  <p className="text-sm text-muted-foreground mb-3">{tender.description}</p>
+                  
+                  {userProfile.areas_of_expertise && getMatchDescription(tender) && (
+                    <div className="flex items-center gap-2 text-xs text-muted-foreground mb-3">
+                      <Lightbulb className="h-3 w-3 text-green-600" />
+                      <span>{getMatchDescription(tender)}</span>
+                    </div>
+                  )}
+                  
+                  <div className="flex justify-end">
+                    <Button 
+                      size="sm" 
+                      variant="outline"
+                      onClick={() => onViewDetails(String(tender.id))}
+                    >
+                      {t[language].viewDetails}
+                    </Button>
+                  </div>
+                </div>
+              );
+            })}
           </div>
-        ))}
+        )}
+        
+        {analysisComplete && matchedTenders.length === 0 && (
+          <div className="text-center p-6">
+            <p className="mb-2">{t[language].noMatches}</p>
+            <Button variant="outline" onClick={handleAnalyzeClick}>
+              {t[language].tryAgain}
+            </Button>
+          </div>
+        )}
       </CardContent>
     </Card>
   );
-};
+}

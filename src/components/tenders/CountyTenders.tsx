@@ -1,3 +1,4 @@
+
 import React from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -5,14 +6,16 @@ import { Calendar, MapPin, Tag } from "lucide-react";
 import { format, parseISO } from "date-fns";
 import type { Tender } from "@/types/tender";
 
+interface ShareAction {
+  label: string;
+  action: (id: string) => void;
+}
+
 interface CountyTendersProps {
   tenders: Tender[];
   onViewDetails: (id: string) => void;
   language: 'en' | 'sw';
-  shareActions: {
-    label: string;
-    action: (id: string) => void;
-  }[];
+  shareActions: ShareAction[];
 }
 
 export function CountyTenders({ tenders, onViewDetails, language, shareActions }: CountyTendersProps) {
@@ -90,35 +93,16 @@ export function CountyTenders({ tenders, onViewDetails, language, shareActions }
               {t.viewDetails}
             </Button>
             <div className="flex space-x-2">
-              {Array.isArray(shareActions) ? (
-                shareActions.map((action, index) => (
-                  <Button 
-                    key={index} 
-                    size="sm" 
-                    variant="ghost"
-                    onClick={() => action.action(String(tender.id))}
-                  >
-                    {action.label}
-                  </Button>
-                ))
-              ) : (
-                <>
-                  <Button
-                    size="sm"
-                    variant="ghost"
-                    onClick={() => shareActions.shareEmail(String(tender.id))}
-                  >
-                    {shareActions.shareLabels.email}
-                  </Button>
-                  <Button
-                    size="sm"
-                    variant="ghost"
-                    onClick={() => shareActions.shareWhatsApp(String(tender.id))}
-                  >
-                    {shareActions.shareLabels.whatsapp}
-                  </Button>
-                </>
-              )}
+              {Array.isArray(shareActions) && shareActions.map((action, index) => (
+                <Button 
+                  key={index} 
+                  size="sm" 
+                  variant="ghost"
+                  onClick={() => action.action(String(tender.id))}
+                >
+                  {action.label}
+                </Button>
+              ))}
             </div>
           </div>
         </Card>
