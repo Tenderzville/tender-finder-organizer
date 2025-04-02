@@ -80,10 +80,10 @@ const Dashboard = () => {
     try {
       await new Promise(resolve => setTimeout(resolve, 1000));
       
-      // Mock data for demonstration
+      // Mock data for demonstration - with numeric IDs
       const mockTenders: Tender[] = [
         {
-          id: "1",
+          id: 1, // Changed from string to number
           title: "IT Infrastructure Upgrade",
           description: "Seeking vendors for upgrading government IT infrastructure",
           procuring_entity: "Ministry of ICT",
@@ -95,7 +95,7 @@ const Dashboard = () => {
           points_required: 100
         },
         {
-          id: "2",
+          id: 2, // Changed from string to number
           title: "Women Entrepreneurship Support Program",
           description: "Contracts for training and mentoring women entrepreneurs",
           procuring_entity: "Ministry of Gender",
@@ -107,7 +107,7 @@ const Dashboard = () => {
           points_required: 50
         },
         {
-          id: "3",
+          id: 3, // Changed from string to number
           title: "Rural School Construction",
           description: "Construction of primary schools in rural counties",
           procuring_entity: "Ministry of Education",
@@ -140,17 +140,17 @@ const Dashboard = () => {
     setLanguage(prev => prev === 'en' ? 'sw' : 'en');
   };
 
-  const handleViewTenderDetails = (id: string) => {
+  const handleViewTenderDetails = (id: number) => {
     navigate(`/tenders/${id}`);
   };
 
-  const handleShareViaEmail = (id: string) => {
+  const handleShareViaEmail = (id: number) => {
     const subject = encodeURIComponent("Check out this tender");
     const body = encodeURIComponent(`I found this tender that might interest you: ${window.location.origin}/tenders/${id}`);
     window.open(`mailto:?subject=${subject}&body=${body}`);
   };
 
-  const handleShareViaWhatsApp = (id: string) => {
+  const handleShareViaWhatsApp = (id: number) => {
     const text = encodeURIComponent(`Check out this tender: ${window.location.origin}/tenders/${id}`);
     window.open(`https://wa.me/?text=${text}`, '_blank');
   };

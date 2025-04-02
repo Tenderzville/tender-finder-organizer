@@ -3,18 +3,20 @@ export type Tender = {
   id: number;
   title: string;
   description: string;
-  requirements: string;
+  requirements?: string;
   deadline: string;
-  contact_info: string | null;
-  fees: string | null;
-  prerequisites: string | null;
-  created_at: string | null;
+  contact_info?: string | null;
+  fees?: string | null;
+  prerequisites?: string | null;
+  created_at?: string | null;
   category: string;
-  subcategory: string | null;
-  tender_url: string | null;
+  subcategory?: string | null;
+  tender_url?: string | null;
   location: string;
-  points_required: number | null;
+  points_required?: number | null;
   affirmative_action?: TenderAffirmativeAction;
+  procuring_entity?: string;
+  tender_no?: string;
 };
 
 export type SavedTender = {

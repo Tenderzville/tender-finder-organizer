@@ -19,7 +19,7 @@ export interface TenderMatcherProps {
   userProfile: UserProfile;
   language: 'en' | 'sw';
   userId: string | null;
-  onViewDetails: (id: string) => void;
+  onViewDetails: (id: number) => void;
 }
 
 export function TenderMatcher({ userProfile, language, userId, onViewDetails }: TenderMatcherProps) {
@@ -81,7 +81,7 @@ export function TenderMatcher({ userProfile, language, userId, onViewDetails }: 
       // Mock data - in a real app, this would come from the backend
       const mockMatchedTenders: Tender[] = [
         {
-          id: "1",
+          id: 1, // Changed from string to number
           title: "IT Infrastructure Upgrade",
           description: "Seeking vendors for upgrading government IT infrastructure",
           procuring_entity: "Ministry of ICT",
@@ -93,7 +93,7 @@ export function TenderMatcher({ userProfile, language, userId, onViewDetails }: 
           points_required: 100
         },
         {
-          id: "2",
+          id: 2, // Changed from string to number
           title: "Medical Equipment Supply",
           description: "Supply of various medical equipment to county hospitals",
           procuring_entity: "Ministry of Health",
@@ -268,7 +268,7 @@ export function TenderMatcher({ userProfile, language, userId, onViewDetails }: 
                     <Button 
                       size="sm" 
                       variant="outline"
-                      onClick={() => onViewDetails(String(tender.id))}
+                      onClick={() => onViewDetails(tender.id)}
                     >
                       {t[language].viewDetails}
                     </Button>

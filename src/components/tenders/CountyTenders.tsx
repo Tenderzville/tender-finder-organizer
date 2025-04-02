@@ -8,12 +8,12 @@ import type { Tender } from "@/types/tender";
 
 interface ShareAction {
   label: string;
-  action: (id: string) => void;
+  action: (id: number) => void;
 }
 
 interface CountyTendersProps {
   tenders: Tender[];
-  onViewDetails: (id: string) => void;
+  onViewDetails: (id: number) => void;
   language: 'en' | 'sw';
   shareActions: ShareAction[];
 }
@@ -50,7 +50,7 @@ export function CountyTenders({ tenders, onViewDetails, language, shareActions }
     }
   };
   
-  const handleViewDetails = (id: string) => {
+  const handleViewDetails = (id: number) => {
     onViewDetails(id);
   };
 
@@ -88,7 +88,7 @@ export function CountyTenders({ tenders, onViewDetails, language, shareActions }
             <Button 
               size="sm" 
               variant="outline"
-              onClick={() => handleViewDetails(String(tender.id))}
+              onClick={() => handleViewDetails(tender.id)}
             >
               {t.viewDetails}
             </Button>
@@ -98,7 +98,7 @@ export function CountyTenders({ tenders, onViewDetails, language, shareActions }
                   key={index} 
                   size="sm" 
                   variant="ghost"
-                  onClick={() => action.action(String(tender.id))}
+                  onClick={() => action.action(tender.id)}
                 >
                   {action.label}
                 </Button>
