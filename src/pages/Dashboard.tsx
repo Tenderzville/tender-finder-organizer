@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from "react";
 import { Navigation } from "@/components/Navigation";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -15,7 +16,7 @@ import { TenderMatcher } from '@/components/ai/TenderMatcher';
 import { useOfflineMode } from '@/hooks/use-offline-mode';
 import { usePoints } from '@/hooks/use-points';
 import { useNavigate } from "react-router-dom";
-
+import { Tender } from "@/types/tender";
 
 const Dashboard = () => {
   const { toast } = useToast();
@@ -25,6 +26,12 @@ const Dashboard = () => {
   const { isOnline, offlineData, syncData } = useOfflineMode();
   const { points } = usePoints({ userId: userData?.id || null });
   const navigate = useNavigate();
+  
+  // Add state for tenders data
+  const [tenders, setTenders] = useState<Tender[]>([]);
+  const [isLoadingTenders, setIsLoadingTenders] = useState(false);
+  const [errorTenders, setErrorTenders] = useState<Error | null>(null);
+  const [language, setLanguage] = useState<'en' | 'sw'>('en');
 
   useEffect(() => {
     const loadUserData = async () => {
@@ -67,6 +74,38 @@ const Dashboard = () => {
     }
   }, [isAuthenticated, isInitialized, toast]);
 
+  // Add function to fetch tenders
+  const fetchTenders = async () => {
+    setIsLoadingTenders(true);
+    setErrorTenders(null);
+    
+    try {
+      // Here you would normally fetch from your API
+      // For now, we'll just simulate a delay
+      await new Promise(resolve => setTimeout(resolve, 1000));
+      
+      // Set empty array for now
+      setTenders([]);
+      
+    } catch (error) {
+      console.error("Error fetching tenders:", error);
+      setErrorTenders(error instanceof Error ? error : new Error('Unknown error'));
+    } finally {
+      setIsLoadingTenders(false);
+    }
+  };
+  
+  // Fetch tenders on initial load
+  useEffect(() => {
+    if (isAuthenticated) {
+      fetchTenders();
+    }
+  }, [isAuthenticated]);
+
+  const toggleLanguage = () => {
+    setLanguage(prev => prev === 'en' ? 'sw' : 'en');
+  };
+
   // Loading state
   if (isLoading || !isInitialized) {
     return (
@@ -103,12 +142,6 @@ const Dashboard = () => {
       </div>
     );
   }
-
-  // Placeholder for language,  needs to be properly implemented
-  const language = 'en'; 
-  const toggleLanguage = () => {}; 
-  const fetchTenders = () => {}; 
-
 
   // Main dashboard content
   return (
@@ -176,7 +209,6 @@ const Dashboard = () => {
           </Button>
         </div>
 
-
         {/* User Profile Card */}
         <Card className="mb-6">
           <CardHeader>
@@ -196,20 +228,12 @@ const Dashboard = () => {
           </CardContent>
         </Card>
 
-        {/* Placeholder for tenders data */}
-        const tenders = []; 
-        const isLoadingTenders = false; 
-        const errorTenders = null; 
-
-
-        {/* Tender Feed (replace with actual implementation) */}
+        {/* Tender List */}
         <TenderList 
           tenders={tenders}
           isLoading={isLoadingTenders}
           error={errorTenders}
           onRetry={fetchTenders}
-          language={language}
-          toggleLanguage={toggleLanguage}
         />
 
         {/* County-specific tenders section */}
@@ -219,14 +243,6 @@ const Dashboard = () => {
               tenders={tenders}
               onViewDetails={(id) => navigate(`/tenders/${id}`)}
               language={language}
-              shareActions={{
-                shareEmail: (id) => {/* Email sharing logic */},
-                shareWhatsApp: (id) => {/* WhatsApp sharing logic */},
-                shareLabels: {
-                  email: language === 'en' ? "Email" : "Barua pepe",
-                  whatsapp: language === 'en' ? "WhatsApp" : "WhatsApp"
-                }
-              }}
             />
           </div>
         )}

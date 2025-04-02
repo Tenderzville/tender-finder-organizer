@@ -55,7 +55,7 @@ export const QualificationTool: React.FC<QualificationToolProps> = ({ tender, la
         title: t.title,
         description: t[randomResult],
         variant: randomResult === 'qualified' ? 'default' : 
-                 randomResult === 'not-qualified' ? 'destructive' : 'warning'
+                 randomResult === 'not-qualified' ? 'destructive' : 'default'
       });
       
       setIsChecking(false);

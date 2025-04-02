@@ -72,8 +72,8 @@ export const TenderMatcher: React.FC<TenderMatcherProps> = ({
             }
             
             // Business size appropriate match
-            if (tender.value) {
-              const tenderValue = parseInt(tender.value.replace(/[^0-9]/g, '')) || 0;
+            if (tender.fees) {
+              const tenderValue = parseInt(tender.fees.replace(/[^0-9]/g, '')) || 0;
               if (userProfile.annualTurnover >= tenderValue * 0.5) {
                 score += 15;
               }
@@ -123,6 +123,11 @@ export const TenderMatcher: React.FC<TenderMatcherProps> = ({
       [tenderId]: true
     }));
   };
+
+  // Custom translations for deadline and value
+  const deadlineText = language === 'en' ? 'Deadline' : 'Tarehe ya mwisho';
+  const valueText = language === 'en' ? 'Value' : 'Thamani';
+  const viewDetailsText = language === 'en' ? 'View Details' : 'Angalia Maelezo';
   
   return (
     <div className="space-y-6">
@@ -201,11 +206,11 @@ export const TenderMatcher: React.FC<TenderMatcherProps> = ({
               <CardContent>
                 <div className="grid grid-cols-2 gap-4 mb-4">
                   <div>
-                    <p className="text-sm font-medium text-muted-foreground">{t.deadline}</p>
-                    <p>{tender.deadline}</p>
+                    <p className="text-sm font-medium text-muted-foreground">{deadlineText}</p>
+                    <p>{tender.closing_date || "Not specified"}</p>
                   </div>
                   <div>
-                    <p className="text-sm font-medium text-muted-foreground">{t.value}</p>
+                    <p className="text-sm font-medium text-muted-foreground">{valueText}</p>
                     <p>{tender.fees || "Contact for pricing"}</p>
                   </div>
                 </div>
@@ -226,7 +231,7 @@ export const TenderMatcher: React.FC<TenderMatcherProps> = ({
                   variant="default" 
                   onClick={() => onViewDetails(tender.id)}
                 >
-                  {t.viewDetails}
+                  {viewDetailsText}
                 </Button>
                 
                 {!feedbackSent[tender.id] ? (
