@@ -17,6 +17,9 @@ export type Tender = {
   affirmative_action?: TenderAffirmativeAction;
   procuring_entity?: string;
   tender_no?: string;
+  status?: 'open' | 'closing_soon' | 'closed' | 'awarded' | 'unknown';
+  publication_date?: string;
+  source?: string;
 };
 
 export type SavedTender = {
@@ -77,5 +80,28 @@ export function parseTenderAffirmativeAction(value: any): TenderAffirmativeActio
   } catch (error) {
     console.error("Error parsing affirmative action:", error);
     return defaultValue;
+  }
+}
+
+// Function to determine tender status based on deadline
+export function getTenderStatus(deadlineStr: string): 'open' | 'closing_soon' | 'closed' | 'unknown' {
+  if (!deadlineStr) return 'unknown';
+  
+  try {
+    const deadline = new Date(deadlineStr);
+    const now = new Date();
+    
+    if (isNaN(deadline.getTime())) return 'unknown';
+    
+    if (deadline < now) return 'closed';
+    
+    const sevenDaysFromNow = new Date();
+    sevenDaysFromNow.setDate(now.getDate() + 7);
+    
+    if (deadline <= sevenDaysFromNow) return 'closing_soon';
+    
+    return 'open';
+  } catch (e) {
+    return 'unknown';
   }
 }

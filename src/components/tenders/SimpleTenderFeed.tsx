@@ -2,11 +2,14 @@
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
-import { Loader2, AlertCircle, RefreshCw } from "lucide-react";
+import { Loader2, AlertCircle, RefreshCw, TrendingUp, Calendar } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
+import { getTenderStatus } from "@/types/tender";
+import { format, parseISO } from "date-fns";
 
 export const SimpleTenderFeed = () => {
   const { toast } = useToast();
@@ -122,6 +125,14 @@ export const SimpleTenderFeed = () => {
 
   const tenders = data?.latest_tenders || [];
 
+  const formatDate = (dateStr: string) => {
+    try {
+      return format(parseISO(dateStr), "MMM d, yyyy");
+    } catch (err) {
+      return "Unknown date";
+    }
+  };
+
   return (
     <Card>
       <CardHeader>
@@ -133,20 +144,61 @@ export const SimpleTenderFeed = () => {
       <CardContent className="space-y-4">
         {tenders.length > 0 ? (
           <div className="space-y-3">
-            {tenders.map((tender: any) => (
-              <div key={tender.id} className="bg-muted p-3 rounded-md text-sm">
-                <h4 className="font-medium mb-1">{tender.title || "Untitled Tender"}</h4>
-                <div className="text-xs text-muted-foreground">
-                  {tender.category && <span className="mr-2">Category: {tender.category}</span>}
-                  {tender.location && <span className="mr-2">Location: {tender.location}</span>}
-                  {tender.deadline && <span>Deadline: {new Date(tender.deadline).toLocaleDateString()}</span>}
+            {tenders.map((tender: any) => {
+              const status = tender.deadline ? getTenderStatus(tender.deadline) : 'unknown';
+              const statusColors = {
+                open: "bg-green-100 text-green-800 border-green-300",
+                closing_soon: "bg-yellow-100 text-yellow-800 border-yellow-300",
+                closed: "bg-red-100 text-red-800 border-red-300",
+                unknown: "bg-gray-100 text-gray-800 border-gray-300"
+              };
+              
+              return (
+                <div key={tender.id} className="bg-muted p-3 rounded-md text-sm">
+                  <div className="flex justify-between items-start mb-1">
+                    <h4 className="font-medium">{tender.title || "Untitled Tender"}</h4>
+                    <Badge className={statusColors[status]}>
+                      {status === 'open' ? 'Open' : 
+                       status === 'closing_soon' ? 'Closing Soon' : 
+                       status === 'closed' ? 'Closed' : 'Unknown'}
+                    </Badge>
+                  </div>
+                  <div className="text-xs text-muted-foreground grid grid-cols-2 gap-x-2 gap-y-1">
+                    {tender.category && (
+                      <span className="flex items-center">
+                        <TrendingUp className="h-3 w-3 mr-1" />
+                        {tender.category}
+                      </span>
+                    )}
+                    {tender.location && (
+                      <span className="flex items-center">
+                        <AlertCircle className="h-3 w-3 mr-1" />
+                        {tender.location}
+                      </span>
+                    )}
+                    {tender.deadline && (
+                      <span className="flex items-center">
+                        <Calendar className="h-3 w-3 mr-1" />
+                        {formatDate(tender.deadline)}
+                      </span>
+                    )}
+                  </div>
                 </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
         ) : (
           <div className="text-center py-6 bg-muted rounded-md">
             <p className="text-sm text-muted-foreground mb-2">No tenders currently available.</p>
+            <div className="text-xs text-gray-500 mb-4">
+              <p>The scraper may not have run recently or might be experiencing issues.</p>
+              <p>You can:</p>
+              <ul className="list-disc list-inside mt-2 space-y-1">
+                <li>Check if the scraper is properly configured</li>
+                <li>Verify database connections</li>
+                <li>Try refreshing the tenders manually</li>
+              </ul>
+            </div>
             <Button 
               variant="outline" 
               size="sm"
