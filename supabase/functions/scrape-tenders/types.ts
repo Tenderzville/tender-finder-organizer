@@ -1,3 +1,4 @@
+
 export interface TenderSource {
   url: string;
   selectors: {
