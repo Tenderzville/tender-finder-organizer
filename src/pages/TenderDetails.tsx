@@ -1,3 +1,4 @@
+
 import { useParams, useNavigate } from "react-router-dom";
 import { Navigation } from "@/components/Navigation";
 import { Button } from "@/components/ui/button";
@@ -15,7 +16,12 @@ const TenderDetails = () => {
   const { tenderId } = useParams();
   const navigate = useNavigate();
   const { toast } = useToast();
-  const { isOnline, saveTenderOffline } = useOfflineMode();
+  const { isOnline, offlineData, saveTenderOffline } = useOfflineMode();
+
+  // First check if we have this tender in offline data
+  const offlineTender = offlineData.tenders.find(
+    tender => tender.id === parseInt(tenderId || '0', 10)
+  );
 
   const { data: tender, isLoading, error } = useQuery({
     queryKey: ["tender", tenderId],
@@ -26,41 +32,51 @@ const TenderDetails = () => {
 
       console.log("Fetching tender details for ID:", numericId);
 
-      const { data, error } = await supabase
-        .from("tenders")
-        .select("*")
-        .eq("id", numericId)
-        .single();
-
-      if (error) {
-        console.error("Error fetching tender:", error);
-        toast({
-          title: "Error",
-          description: "Failed to load tender details. Please try again.",
-          variant: "destructive",
-        });
-        throw error;
+      // If we're offline, try to use cached data first
+      if (!isOnline && offlineTender) {
+        console.log("Using offline data for tender:", offlineTender);
+        return offlineTender;
       }
 
-      if (!data) {
-        toast({
-          title: "Not Found",
-          description: "The requested tender could not be found.",
-          variant: "destructive",
-        });
-        throw new Error("Tender not found");
-      }
+      try {
+        const { data, error } = await supabase
+          .from("tenders")
+          .select("*")
+          .eq("id", numericId)
+          .single();
 
-      console.log("Fetched tender details:", data);
-      
-      // If online, save the tender for offline access
-      if (isOnline) {
-        saveTenderOffline(data);
+        if (error) {
+          console.error("Error fetching tender:", error);
+          throw error;
+        }
+
+        if (!data) {
+          throw new Error("Tender not found");
+        }
+
+        console.log("Fetched tender details:", data);
+        
+        // If online, save the tender for offline access
+        if (isOnline) {
+          saveTenderOffline(data);
+        }
+        
+        return data;
+      } catch (err) {
+        console.error("Failed to fetch tender:", err);
+        
+        // If we failed to fetch but have offline data, use that
+        if (offlineTender) {
+          console.log("Falling back to offline data for tender:", offlineTender);
+          return offlineTender;
+        }
+        
+        throw err;
       }
-      
-      return data;
     },
-    retry: 1
+    enabled: !!tenderId,
+    retry: 1,
+    staleTime: 5 * 60 * 1000, // 5 minutes
   });
 
   const handleShare = () => {
@@ -103,6 +119,7 @@ const TenderDetails = () => {
   }
 
   if (error || !tender) {
+    console.error("Error or no tender data:", error);
     return (
       <div className="min-h-screen bg-gray-50">
         <Navigation />
@@ -110,7 +127,11 @@ const TenderDetails = () => {
           <div className="px-4 py-6 sm:px-0">
             <div className="text-center">
               <h2 className="text-2xl font-semibold text-gray-900">Tender Not Found</h2>
-              <p className="mt-2 text-gray-600">The tender you're looking for doesn't exist or has been removed.</p>
+              <p className="mt-2 text-gray-600">
+                {error instanceof Error
+                  ? `Error: ${error.message}`
+                  : "The tender you're looking for doesn't exist or has been removed."}
+              </p>
               <Button onClick={() => navigate("/tenders")} className="mt-4">
                 Return to Tenders
               </Button>
