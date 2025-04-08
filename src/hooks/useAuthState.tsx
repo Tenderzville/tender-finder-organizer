@@ -1,6 +1,6 @@
 
 import { useState, useEffect } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useLocation } from "react-router-dom";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 
@@ -12,6 +12,7 @@ export const useAuthState = () => {
   const [isInitialized, setIsInitialized] = useState(false);
   const [authError, setAuthError] = useState<Error | null>(null);
   const navigate = useNavigate();
+  const location = useLocation();
   const { toast } = useToast();
 
   // Initialize auth state - optimized to prevent race conditions
@@ -23,8 +24,6 @@ export const useAuthState = () => {
     const timeoutId = setTimeout(() => {
       if (isMounted && !isInitialized) {
         console.warn("[useAuthState] Auth initialization timed out");
-        // Don't automatically set isAuthenticated to false
-        // This prevents auto-redirecting to login page
         setIsInitialized(true);
       }
     }, 15000); // 15 second timeout instead of 5 seconds
@@ -125,9 +124,10 @@ export const useAuthState = () => {
           console.log("[useAuthState] New profile status after auth change:", newStatus);
           setProfileStatus(newStatus);
 
-          // Only handle navigation if we're fully initialized
+          // Only handle navigation if we're fully initialized and on a page that requires a redirect
           if (isInitialized) {
-            if (!profile && window.location.pathname !== '/onboarding') {
+            // Only redirect to onboarding if profile is missing and user is on auth page or home page
+            if (!profile && (location.pathname === '/auth' || location.pathname === '/')) {
               console.log("[useAuthState] No profile found, navigating to onboarding");
               navigate("/onboarding");
             }
@@ -145,7 +145,7 @@ export const useAuthState = () => {
       console.log("[useAuthState] Cleaning up auth listener");
       authListener.subscription.unsubscribe();
     };
-  }, [navigate]);
+  }, [navigate, location.pathname]);
 
   const handleSignOut = async () => {
     try {

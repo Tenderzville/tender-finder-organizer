@@ -1,6 +1,7 @@
 
 import { useState, useEffect } from 'react';
 import { useToast } from '@/hooks/use-toast';
+import { Tender } from '@/types/tender';
 
 // Define types for stored tender data
 interface StoredTender {
@@ -25,7 +26,7 @@ interface StoredTender {
 export const useOfflineMode = () => {
   const [isOnline, setIsOnline] = useState(navigator.onLine);
   const [offlineData, setOfflineData] = useState<{
-    tenders: StoredTender[];
+    tenders: Tender[];
     lastSynced: string | null;
   }>({
     tenders: [],
@@ -73,10 +74,16 @@ export const useOfflineMode = () => {
       const lastSynced = localStorage.getItem('lastTenderSync');
       
       if (savedData) {
+        // Parse saved tenders and convert to Tender type
+        const parsedTenders = JSON.parse(savedData);
         setOfflineData({
-          tenders: JSON.parse(savedData),
+          tenders: parsedTenders,
           lastSynced: lastSynced
         });
+        
+        console.log("Loaded offline tenders:", parsedTenders.length);
+      } else {
+        console.log("No offline tenders found in localStorage");
       }
     } catch (error) {
       console.error('Error loading offline data:', error);
@@ -84,7 +91,7 @@ export const useOfflineMode = () => {
   };
   
   // Save tenders for offline access
-  const saveTendersOffline = (tenders: StoredTender[]) => {
+  const saveTendersOffline = (tenders: Tender[]) => {
     try {
       localStorage.setItem('offlineTenders', JSON.stringify(tenders));
       const now = new Date().toISOString();
@@ -95,6 +102,7 @@ export const useOfflineMode = () => {
         lastSynced: now
       });
       
+      console.log("Saved tenders for offline use:", tenders.length);
       return true;
     } catch (error) {
       console.error('Error saving tenders offline:', error);
@@ -139,7 +147,7 @@ export const useOfflineMode = () => {
   };
   
   // Save a single tender for offline access
-  const saveTenderOffline = (tender: StoredTender) => {
+  const saveTenderOffline = (tender: Tender) => {
     try {
       const currentTenders = [...offlineData.tenders];
       const existingIndex = currentTenders.findIndex(t => t.id === tender.id);
@@ -169,6 +177,7 @@ export const useOfflineMode = () => {
     offlineData,
     isSyncing,
     saveTenderOffline,
+    saveTendersOffline,
     syncData
   };
 };

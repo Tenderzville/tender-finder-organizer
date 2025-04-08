@@ -5,6 +5,7 @@ import Landing from '@/pages/Landing';
 import Onboarding from '@/pages/Onboarding';
 import Dashboard from '@/pages/Dashboard';
 import TenderDetails from '@/pages/TenderDetails';
+import Tenders from '@/pages/Tenders';
 import Preferences from '@/pages/Preferences';
 import Auth from '@/pages/Auth';
 import Services from '@/pages/Services';
@@ -16,7 +17,7 @@ import { ChatSupport } from "@/components/ChatSupport";
 import LearningHub from '@/pages/LearningHub';
 import { AdManager } from '@/integrations/AdManager';
 import { usePerformance } from '@/hooks/use-performance';
-import { Footer } from '@/components/layout/Footer'; // Corrected import path
+import { Footer } from '@/components/layout/Footer';
 import SupportPage from '@/pages/Support';
 import { AuthProvider } from '@/hooks/use-auth';
 
@@ -53,6 +54,7 @@ function App() {
           <Route path="/" element={<Landing />} />
           <Route path="/onboarding" element={<Onboarding />} />
           <Route path="/dashboard" element={<Dashboard />} />
+          <Route path="/tenders" element={<Tenders />} />
           <Route path="/tenders/:tenderId" element={<TenderDetails />} />
           <Route path="/preferences" element={<Preferences />} />
           <Route path="/auth" element={<Auth />} />
