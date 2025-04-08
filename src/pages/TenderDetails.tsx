@@ -3,22 +3,26 @@ import { useParams, useNavigate } from "react-router-dom";
 import { Navigation } from "@/components/Navigation";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Calendar, Globe, Briefcase, ExternalLink, ArrowLeft, AlertTriangle, Check } from "lucide-react";
+import { Calendar, Globe, Briefcase, ExternalLink, ArrowLeft, AlertTriangle, Check, Share2 } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { format, isAfter } from "date-fns";
+import { TenderStatusBadge } from "@/components/ui/tender-status-badge";
+import { getTenderStatus } from "@/types/tender";
+import { useOfflineMode } from "@/hooks/use-offline-mode";
 
 const TenderDetails = () => {
-  const { id } = useParams();
+  const { tenderId } = useParams();
   const navigate = useNavigate();
   const { toast } = useToast();
+  const { isOnline, saveTenderOffline } = useOfflineMode();
 
-  const { data: tender, isLoading } = useQuery({
-    queryKey: ["tender", id],
+  const { data: tender, isLoading, error } = useQuery({
+    queryKey: ["tender", tenderId],
     queryFn: async () => {
-      if (!id) throw new Error("No tender ID provided");
-      const numericId = parseInt(id, 10);
+      if (!tenderId) throw new Error("No tender ID provided");
+      const numericId = parseInt(tenderId, 10);
       if (isNaN(numericId)) throw new Error("Invalid tender ID");
 
       console.log("Fetching tender details for ID:", numericId);
@@ -49,9 +53,40 @@ const TenderDetails = () => {
       }
 
       console.log("Fetched tender details:", data);
+      
+      // If online, save the tender for offline access
+      if (isOnline) {
+        saveTenderOffline(data);
+      }
+      
       return data;
     },
+    retry: 1
   });
+
+  const handleShare = () => {
+    if (!tender) return;
+    
+    const text = `Check out this tender: ${tender.title}`;
+    const url = window.location.href;
+    
+    if (navigator.share) {
+      navigator.share({
+        title: tender.title,
+        text: text,
+        url: url
+      }).catch(err => {
+        console.error("Share failed:", err);
+      });
+    } else {
+      // Fallback for browsers that don't support navigator.share
+      navigator.clipboard.writeText(`${text}\n${url}`);
+      toast({
+        title: "Link copied!",
+        description: "Tender link copied to clipboard",
+      });
+    }
+  };
 
   if (isLoading) {
     return (
@@ -68,7 +103,7 @@ const TenderDetails = () => {
     );
   }
 
-  if (!tender) {
+  if (error || !tender) {
     return (
       <div className="min-h-screen bg-gray-50">
         <Navigation />
@@ -77,7 +112,7 @@ const TenderDetails = () => {
             <div className="text-center">
               <h2 className="text-2xl font-semibold text-gray-900">Tender Not Found</h2>
               <p className="mt-2 text-gray-600">The tender you're looking for doesn't exist or has been removed.</p>
-              <Button onClick={() => navigate("/")} className="mt-4">
+              <Button onClick={() => navigate("/tenders")} className="mt-4">
                 Return to Tenders
               </Button>
             </div>
@@ -88,7 +123,7 @@ const TenderDetails = () => {
   }
 
   const deadlineDate = new Date(tender.deadline);
-  const isExpired = !isAfter(deadlineDate, new Date());
+  const tenderStatus = getTenderStatus(tender.deadline);
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -106,7 +141,7 @@ const TenderDetails = () => {
 
           <div className="bg-white shadow rounded-lg p-6">
             <div className="mb-6">
-              <div className="flex flex-wrap gap-2 mb-4">
+              <div className="flex flex-wrap gap-2 mb-4 items-center">
                 <Badge variant="secondary">
                   {tender.category}
                 </Badge>
@@ -115,15 +150,13 @@ const TenderDetails = () => {
                     {tender.subcategory}
                   </Badge>
                 )}
-                {isExpired ? (
-                  <Badge variant="destructive" className="flex items-center">
-                    <AlertTriangle className="h-3 w-3 mr-1" />
-                    Expired
-                  </Badge>
-                ) : (
-                  <Badge variant="secondary" className="flex items-center bg-green-500">
-                    <Check className="h-3 w-3 mr-1" />
-                    Active
+                <TenderStatusBadge status={tenderStatus} />
+                
+                {tender.affirmative_action?.type && tender.affirmative_action.type !== 'none' && (
+                  <Badge variant="outline" className="bg-green-50 text-green-700 hover:bg-green-100 border-green-200">
+                    {tender.affirmative_action.type === 'youth' ? 'Youth Opportunity' : 
+                     tender.affirmative_action.type === 'women' ? 'Women Opportunity' : 
+                     tender.affirmative_action.type === 'pwds' ? 'PWDs Opportunity' : 'Special Category'}
                   </Badge>
                 )}
               </div>
@@ -182,6 +215,11 @@ const TenderDetails = () => {
                         ? tender.tender_url
                         : `https://${tender.tender_url}`;
                       window.open(url, "_blank");
+                      
+                      toast({
+                        title: "Opening source website",
+                        description: "Redirecting to the original tender posting.",
+                      });
                     }}
                     className="flex items-center"
                   >
@@ -189,6 +227,15 @@ const TenderDetails = () => {
                     View Original Tender
                   </Button>
                 )}
+                
+                <Button
+                  variant="outline"
+                  onClick={handleShare}
+                  className="flex items-center"
+                >
+                  <Share2 className="mr-2 h-4 w-4" />
+                  Share Tender
+                </Button>
                 
                 <Button
                   variant="outline"

@@ -20,6 +20,17 @@ import { usePerformance } from '@/hooks/use-performance';
 import { Footer } from '@/components/layout/Footer';
 import SupportPage from '@/pages/Support';
 import { AuthProvider } from '@/hooks/use-auth';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+
+// Create a client
+const queryClient = new QueryClient({
+  defaultOptions: {
+    queries: {
+      retry: 1,
+      refetchOnWindowFocus: false,
+    },
+  },
+});
 
 function App() {
   const { performanceLevel, options } = usePerformance();
@@ -48,29 +59,31 @@ function App() {
   }, [options]);
 
   return (
-    <AuthProvider>
-      <div className="App min-h-screen bg-white">
-        <Routes>
-          <Route path="/" element={<Landing />} />
-          <Route path="/onboarding" element={<Onboarding />} />
-          <Route path="/dashboard" element={<Dashboard />} />
-          <Route path="/tenders" element={<Tenders />} />
-          <Route path="/tenders/:tenderId" element={<TenderDetails />} />
-          <Route path="/preferences" element={<Preferences />} />
-          <Route path="/auth" element={<Auth />} />
-          <Route path="/services" element={<Services />} />
-          <Route path="/learning-hub" element={<LearningHub />} />
-          <Route path="/terms" element={<TermsPage />} />
-          <Route path="/privacy" element={<PrivacyPage />} />
-          <Route path="/support" element={<SupportPage />} />
-          <Route path="*" element={<NotFound />} />
-        </Routes>
-        <Toaster />
-        <ChatSupport />
-        <AdManager />
-        <Footer language="en" />
-      </div>
-    </AuthProvider>
+    <QueryClientProvider client={queryClient}>
+      <AuthProvider>
+        <div className="App min-h-screen bg-white">
+          <Routes>
+            <Route path="/" element={<Landing />} />
+            <Route path="/onboarding" element={<Onboarding />} />
+            <Route path="/dashboard" element={<Dashboard />} />
+            <Route path="/tenders" element={<Tenders />} />
+            <Route path="/tenders/:tenderId" element={<TenderDetails />} />
+            <Route path="/preferences" element={<Preferences />} />
+            <Route path="/auth" element={<Auth />} />
+            <Route path="/services" element={<Services />} />
+            <Route path="/learning-hub" element={<LearningHub />} />
+            <Route path="/terms" element={<TermsPage />} />
+            <Route path="/privacy" element={<PrivacyPage />} />
+            <Route path="/support" element={<SupportPage />} />
+            <Route path="*" element={<NotFound />} />
+          </Routes>
+          <Toaster />
+          <ChatSupport />
+          <AdManager />
+          <Footer language="en" />
+        </div>
+      </AuthProvider>
+    </QueryClientProvider>
   );
 }
 
