@@ -1,21 +1,18 @@
-
 import React, { useCallback } from "react";
 import { format, parseISO } from "date-fns";
 import { useNavigate } from "react-router-dom";
 import { useToast } from "@/hooks/use-toast";
-import { 
-  Badge, 
-  Button, 
-  Card, 
-  CardContent, 
-  CardDescription, 
-  CardFooter, 
-  CardHeader, 
-  CardTitle,
-  Alert,
-  AlertTitle,
-  AlertDescription
-} from "@/components/ui/index";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { Card } from "@/components/ui/card";
+import { CardContent } from "@/components/ui/card";
+import { CardDescription } from "@/components/ui/card";
+import { CardFooter } from "@/components/ui/card";
+import { CardHeader } from "@/components/ui/card";
+import { CardTitle } from "@/components/ui/card";
+import { Alert } from "@/components/ui/alert";
+import { AlertTitle } from "@/components/ui/alert";
+import { AlertDescription } from "@/components/ui/alert";
 import { 
   ExternalLink, 
   ArrowUpRight, 
