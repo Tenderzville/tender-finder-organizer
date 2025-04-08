@@ -1,13 +1,12 @@
-
 import { useParams, useNavigate } from "react-router-dom";
 import { Navigation } from "@/components/Navigation";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Calendar, Globe, Briefcase, ExternalLink, ArrowLeft, AlertTriangle, Check, Share2 } from "lucide-react";
+import { Calendar, Globe, Briefcase, ExternalLink, ArrowLeft, Share2 } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
-import { format, isAfter } from "date-fns";
+import { format } from "date-fns";
 import { TenderStatusBadge } from "@/components/ui/tender-status-badge";
 import { getTenderStatus } from "@/types/tender";
 import { useOfflineMode } from "@/hooks/use-offline-mode";
