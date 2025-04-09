@@ -1,5 +1,5 @@
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Navigation } from "@/components/Navigation";
 import { TenderList } from '@/components/tenders/TenderList';
 import { useOfflineMode } from '@/hooks/use-offline-mode';
@@ -8,15 +8,17 @@ import { useTenderSharingActions } from "@/components/dashboard/TenderSharingAct
 import { useDashboardNavigation } from "@/components/dashboard/DashboardNavigation";
 import { ScraperStatus } from "@/components/dashboard/ScraperStatus";
 import { Button } from "@/components/ui/button";
-import { RefreshCw } from "lucide-react";
+import { RefreshCw, AlertTriangle } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 
 const Tenders = () => {
   const [language, setLanguage] = useState<'en' | 'sw'>('en');
   const { isOnline, offlineData, syncData } = useOfflineMode();
   const { toast } = useToast();
   const [isRefreshing, setIsRefreshing] = useState(false);
+  const [apiError, setApiError] = useState<string | null>(null);
   
   const { 
     tenders, 
@@ -31,10 +33,20 @@ const Tenders = () => {
   // Use offline data if not online
   const displayTenders = isOnline ? tenders : offlineData.tenders;
   
+  useEffect(() => {
+    // Initial data fetch
+    fetchTenders().catch(err => {
+      console.error("Error in initial tenders fetch:", err);
+      setApiError("Failed to load tenders. Please try refreshing.");
+    });
+  }, [fetchTenders]);
+  
   const handleRefreshTenders = async () => {
     if (isRefreshing) return;
     
     setIsRefreshing(true);
+    setApiError(null);
+    
     try {
       toast({
         title: "Refreshing tenders",
@@ -70,6 +82,7 @@ const Tenders = () => {
       }
     } catch (err) {
       console.error("Error refreshing tenders:", err);
+      setApiError("Failed to refresh tenders. Please try again later.");
       toast({
         title: "Refresh failed",
         description: "Could not refresh tenders. Please try again later.",
@@ -100,6 +113,14 @@ const Tenders = () => {
           </Button>
         </div>
 
+        {apiError && (
+          <Alert variant="destructive" className="mb-6">
+            <AlertTriangle className="h-4 w-4" />
+            <AlertTitle>Error</AlertTitle>
+            <AlertDescription>{apiError}</AlertDescription>
+          </Alert>
+        )}
+
         {!isOnline && (
           <div className="bg-amber-50 border-l-4 border-amber-400 p-4 mb-6">
             <div className="flex">
@@ -125,7 +146,7 @@ const Tenders = () => {
             <TenderList 
               tenders={displayTenders}
               isLoading={isLoadingTenders}
-              error={errorTenders}
+              error={errorTenders || (apiError ? new Error(apiError) : null)}
               onRetry={fetchTenders}
             />
           </div>

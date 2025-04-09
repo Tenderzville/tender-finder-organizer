@@ -26,8 +26,8 @@ export function Navigation() {
         <nav className="flex gap-4 items-center">
           {user ? (
             <>
-              <Link to="/tenders" className="text-sm font-medium">Tenders</Link>
-              <Link to="/dashboard" className="text-sm font-medium">Dashboard</Link>
+              <Link to="/tenders" className="text-sm font-medium hover:text-primary transition-colors">Tenders</Link>
+              <Link to="/dashboard" className="text-sm font-medium hover:text-primary transition-colors">Dashboard</Link>
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
                   <Button variant="ghost" className="h-8 w-8 p-0">
@@ -58,39 +58,37 @@ export function Navigation() {
             </>
           ) : (
             <>
-              <Link to="/tenders" className="text-sm font-medium">Tenders</Link>
+              <Link to="/tenders" className="text-sm font-medium hover:text-primary transition-colors">Tenders</Link>
               <Link to="/auth">Sign In</Link>
               <Link to="/auth">Sign Up</Link>
             </>
           )}
         
-        {/* Add this somewhere in the nav section */}
-        <NavigationMenu>
-          <NavigationMenuList>
-            <NavigationMenuItem>
-              <NavigationMenuTrigger>Legal</NavigationMenuTrigger>
-              <NavigationMenuContent>
-                <ul className="grid w-[200px] gap-3 p-4">
-                  <li>
-                    <NavigationMenuLink asChild>
-                      <Link to="/terms" className="block p-2 hover:bg-muted rounded-md">
-                        Terms of Service
-                      </Link>
-                    </NavigationMenuLink>
-                  </li>
-                  <li>
-                    <NavigationMenuLink asChild>
-                      <Link to="/privacy" className="block p-2 hover:bg-muted rounded-md">
-                        Privacy Policy
-                      </Link>
-                    </NavigationMenuLink>
-                  </li>
-                </ul>
-              </NavigationMenuContent>
-            </NavigationMenuItem>
-          </NavigationMenuList>
-        </NavigationMenu>
-        
+          <NavigationMenu>
+            <NavigationMenuList>
+              <NavigationMenuItem>
+                <NavigationMenuTrigger>Legal</NavigationMenuTrigger>
+                <NavigationMenuContent>
+                  <ul className="grid w-[200px] gap-3 p-4">
+                    <li>
+                      <NavigationMenuLink asChild>
+                        <Link to="/terms" className="block p-2 hover:bg-muted rounded-md">
+                          Terms of Service
+                        </Link>
+                      </NavigationMenuLink>
+                    </li>
+                    <li>
+                      <NavigationMenuLink asChild>
+                        <Link to="/privacy" className="block p-2 hover:bg-muted rounded-md">
+                          Privacy Policy
+                        </Link>
+                      </NavigationMenuLink>
+                    </li>
+                  </ul>
+                </NavigationMenuContent>
+              </NavigationMenuItem>
+            </NavigationMenuList>
+          </NavigationMenu>
         </nav>
       </div>
     </header>
