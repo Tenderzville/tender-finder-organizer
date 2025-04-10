@@ -3,8 +3,6 @@ import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.42.7";
 import { corsHeaders } from "../_shared/cors.ts";
 
-const SCRAPE_INTERVAL_MINUTES = 5;
-
 serve(async (req) => {
   // Handle CORS
   if (req.method === 'OPTIONS') {
@@ -30,7 +28,8 @@ serve(async (req) => {
           .from('scraping_logs')
           .insert({
             status: 'started',
-            tenders_found: 0,
+            source: 'scheduler',
+            records_found: 0,
             error_message: null,
           });
         
@@ -53,7 +52,8 @@ serve(async (req) => {
             .from('scraping_logs')
             .insert({
               status: 'error',
-              tenders_found: 0,
+              source: 'scheduler',
+              records_found: 0,
               error_message: scrapeError.message || "Unknown error during function invocation",
             });
             
@@ -67,7 +67,8 @@ serve(async (req) => {
           .from('scraping_logs')
           .insert({
             status: scrapeData?.success ? 'success' : 'error',
-            tenders_found: scrapeData?.tenders_scraped || 0,
+            source: 'scheduler',
+            records_found: scrapeData?.tenders_scraped || 0,
             error_message: scrapeData?.error || null,
           });
           
@@ -80,29 +81,20 @@ serve(async (req) => {
           .from('scraping_logs')
           .insert({
             status: 'error',
-            tenders_found: 0,
+            source: 'scheduler',
+            records_found: 0,
             error_message: error.message || "Unknown error in background process",
           });
       }
     };
 
     // Use Deno's waitUntil to continue processing after response is sent
-    // This works specifically in Deno Deploy environment
-    try {
-      // @ts-ignore - Deno Deploy specific API
-      Deno.core.opAsync("op_wait_until", backgroundProcess());
-      console.log("Background process registered with waitUntil");
-    } catch (error) {
-      console.error("Error registering waitUntil:", error);
-      // Fallback - Just start the process without waiting
-      backgroundProcess();
-      console.log("Background process started without waitUntil");
-    }
+    EdgeRuntime.waitUntil(backgroundProcess());
 
     return new Response(
       JSON.stringify({
         success: true,
-        message: `Scheduler initiated. Running tender scraper in the background every ${SCRAPE_INTERVAL_MINUTES} minutes.`,
+        message: `Scheduler initiated. Running tender scraper in the background at 8am and 4pm.`,
         timestamp: new Date().toISOString()
       }),
       {

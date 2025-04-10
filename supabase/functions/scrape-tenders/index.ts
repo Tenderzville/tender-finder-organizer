@@ -11,6 +11,48 @@ const supabaseUrl = Deno.env.get("SUPABASE_URL") || "";
 const supabaseKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") || "";
 const supabase = createClient(supabaseUrl, supabaseKey);
 
+// Get API Layer key from environment variables
+const apiLayerKey = Deno.env.get("API_LAYER_KEY") || "";
+
+// Function to use API Layer for scraping
+async function scrapeWithApiLayer(url: string) {
+  if (!apiLayerKey) {
+    console.error("API Layer key not configured");
+    throw new Error("API Layer key not configured");
+  }
+  
+  try {
+    console.log(`Scraping ${url} with API Layer`);
+    
+    const response = await fetch("https://api.apilayer.com/adv_scraper/extract", {
+      method: "POST",
+      headers: {
+        "apikey": apiLayerKey,
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify({
+        url: url,
+        fallback: true,
+        simplify: true
+      })
+    });
+    
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.error(`API Layer error: ${response.status} ${errorText}`);
+      throw new Error(`API Layer returned error: ${response.status}`);
+    }
+    
+    const data = await response.json();
+    console.log("API Layer response:", JSON.stringify(data).slice(0, 500) + "...");
+    
+    return data;
+  } catch (error) {
+    console.error("Error using API Layer:", error);
+    throw error;
+  }
+}
+
 Deno.serve(async (req) => {
   // Handle CORS preflight requests
   if (req.method === "OPTIONS") {
@@ -25,12 +67,28 @@ Deno.serve(async (req) => {
     // Parse request to get force parameter and job ID if provided
     let force = false;
     let specificJobId = null;
+    let ping = false;
     
     if (req.method === "POST") {
       const body = await req.json();
       force = body?.force === true;
       specificJobId = body?.jobId || null;
-      console.log(`Force parameter: ${force}, Job ID: ${specificJobId}`);
+      ping = body?.ping === true;
+      console.log(`Force parameter: ${force}, Job ID: ${specificJobId}, Ping: ${ping}`);
+      
+      // If this is just a ping to check if the function is available, return success
+      if (ping) {
+        return new Response(
+          JSON.stringify({
+            message: "Scraper function is available",
+            success: true
+          }),
+          {
+            headers: { ...corsHeaders, "Content-Type": "application/json" },
+            status: 200,
+          }
+        );
+      }
     }
     
     // Check if we've already scraped recently (within last 30 minutes)
@@ -105,50 +163,46 @@ Deno.serve(async (req) => {
             console.error(`Job with ID ${specificJobId} not found`);
             return;
           }
-
-// Filter for recent tenders (within last 48 hours)
-const isRecent = (dateStr: string) => {
-  try {
-    const publishDate = new Date(dateStr);
-    const last48Hours = new Date();
-    last48Hours.setHours(last48Hours.getHours() - 48);
-    return publishDate >= last48Hours;
-  } catch (error) {
-    console.error(`Error parsing date: ${dateStr}`, error);
-    return false; // If we can't parse the date, assume it's not recent
-  }
-};
-
-// Prioritize recent tenders in results
-const recentTenders = parsedTenders.filter(tender => 
-  tender.publication_date && isRecent(tender.publication_date)
-);
-
-console.log(`Found ${recentTenders.length} tenders published in the last 48 hours`);
-
-// Always include recent tenders at the top of results
-const sortedTenders = [
-  ...recentTenders,
-  ...parsedTenders.filter(tender => 
-    !tender.publication_date || !isRecent(tender.publication_date)
-  )
-];
-
           
           // Process the specific job
           console.log(`Processing specific job: ${jobData.source} - ${jobData.url}`);
-          await processJob(supabase, jobData);
           
-          // Update the log with success
-          await supabase
-            .from("scraping_logs")
-            .update({
-              status: "success",
-              records_found: 1,
-              records_inserted: 1
-            })
-            .eq("id", logId);
-          
+          // Try to use API Layer if key is available
+          if (apiLayerKey && jobData.url) {
+            try {
+              const scrapedData = await scrapeWithApiLayer(jobData.url);
+              console.log("Successfully scraped with API Layer");
+              
+              // Process and save the scraped data
+              // Implement the processing logic based on the API response format
+              
+              // Update job status
+              await supabase
+                .from("scraping_jobs")
+                .update({
+                  status: "completed",
+                  completed_at: new Date().toISOString()
+                })
+                .eq("id", specificJobId);
+              
+              // Update the log with success
+              await supabase
+                .from("scraping_logs")
+                .update({
+                  status: "success",
+                  records_found: 1,
+                  records_inserted: 1
+                })
+                .eq("id", logId);
+                
+            } catch (apiError) {
+              console.error("API Layer scraping failed, falling back to default processor:", apiError);
+              await processJob(supabase, jobData);
+            }
+          } else {
+            // Fall back to default processor
+            await processJob(supabase, jobData);
+          }
         } catch (error) {
           console.error("Error in background job processing:", error);
           

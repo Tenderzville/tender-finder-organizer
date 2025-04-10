@@ -12,6 +12,7 @@ import { RefreshCw, AlertTriangle } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { TenderStatusBadge } from "@/components/ui/tender-status-badge";
 
 const Tenders = () => {
   const [language, setLanguage] = useState<'en' | 'sw'>('en');
@@ -50,36 +51,16 @@ const Tenders = () => {
     try {
       toast({
         title: "Refreshing tenders",
-        description: "Triggering the tender scraper...",
+        description: "Retrieving latest tender data...",
       });
       
-      // Try to invoke the edge function to run the scrapers
-      try {
-        const { data, error } = await supabase.functions.invoke('scrape-tenders', {
-          body: { force: true }
-        });
-        
-        if (error) {
-          console.error("Error invoking scraper:", error);
-          throw error;
-        }
-        
-        console.log("Scraper response:", data);
-        await fetchTenders();
-        
-        toast({
-          title: "Tenders updated",
-          description: "Successfully refreshed tenders data.",
-        });
-      } catch (err) {
-        console.error("Could not run scraper, falling back to database fetch:", err);
-        await fetchTenders();
-        
-        toast({
-          title: "Tenders refreshed",
-          description: "Fetched latest tenders from the database.",
-        });
-      }
+      // Try to fetch fresh data
+      await fetchTenders();
+      
+      toast({
+        title: "Tenders updated",
+        description: "Successfully refreshed tenders data.",
+      });
     } catch (err) {
       console.error("Error refreshing tenders:", err);
       setApiError("Failed to refresh tenders. Please try again later.");
