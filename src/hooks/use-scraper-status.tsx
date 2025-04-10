@@ -11,6 +11,7 @@ export interface ScraperStatusData {
   sources: {name: string, count: number, status: string}[];
   diagnostics: any | null;
   apiLayerConfigured: boolean;
+  apiLayerStatus?: string;
 }
 
 export function useScraperStatus() {
@@ -65,7 +66,8 @@ export function useScraperStatus() {
               }
             ],
             diagnostics: functionData.diagnostics || null,
-            apiLayerConfigured: functionData.api_layer_available || false
+            apiLayerConfigured: functionData.api_layer_available || false,
+            apiLayerStatus: functionData.api_layer_status || undefined
           });
           
           return;

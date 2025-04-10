@@ -1,11 +1,12 @@
 
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Loader2, RotateCw } from "lucide-react";
+import { Loader2, RotateCw, Info } from "lucide-react";
 import { ScraperSourceItem } from "./ScraperSourceItem";
 import { ScraperDiagnostics } from "./ScraperDiagnostics";
 import { useScraperStatus } from "@/hooks/use-scraper-status";
 import { Badge } from "@/components/ui/badge";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 
 export function ScraperStatus() {
   const { status, isRefreshing, fetchStatus, renderRelativeTime } = useScraperStatus();
@@ -45,7 +46,23 @@ export function ScraperStatus() {
         
         <div className="mt-4 mb-2">
           <div className="flex justify-between items-center text-sm">
-            <span>API Layer Integration:</span>
+            <div className="flex items-center">
+              <span>API Layer Integration:</span>
+              <TooltipProvider>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <span className="ml-1 cursor-help">
+                      <Info className="h-3 w-3 text-muted-foreground" />
+                    </span>
+                  </TooltipTrigger>
+                  <TooltipContent>
+                    <p className="max-w-xs">
+                      API Layer is used for advanced web scraping to collect tender data from various sources.
+                    </p>
+                  </TooltipContent>
+                </Tooltip>
+              </TooltipProvider>
+            </div>
             <Badge variant={status.apiLayerConfigured ? "success" : "destructive"}>
               {status.apiLayerConfigured ? "Configured" : "Not Configured"}
             </Badge>

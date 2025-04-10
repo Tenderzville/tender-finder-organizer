@@ -72,8 +72,32 @@ serve(async (req) => {
       console.error("Error counting tenders:", countError);
     }
     
-    // Check API Layer key availability
+    // Check API Layer key availability and validity
     const apiLayerAvailable = apiLayerKey ? true : false;
+    let apiLayerConfigStatus = "Not configured";
+    
+    if (apiLayerKey) {
+      try {
+        // Just check if the API Layer key is valid by making a simple request
+        const testResponse = await fetch("https://api.apilayer.com/adv_scraper/status", {
+          method: "GET",
+          headers: {
+            "apikey": apiLayerKey
+          }
+        });
+        
+        if (testResponse.ok) {
+          apiLayerConfigStatus = "Configured and working";
+          console.log("API Layer key is valid");
+        } else {
+          apiLayerConfigStatus = "Configured but not working";
+          console.error("API Layer key is invalid:", await testResponse.text());
+        }
+      } catch (error) {
+        console.error("Error checking API Layer key:", error);
+        apiLayerConfigStatus = "Configured but error checking";
+      }
+    }
     
     // Find the latest successful scrape
     const latestSuccessfulScrape = scrapingLogs?.find(log => log.status === 'success')?.created_at || null;
@@ -86,6 +110,7 @@ serve(async (req) => {
       latest_successful_scrape: latestSuccessfulScrape,
       edge_function_timeout: "30 seconds",
       scraper_available: scraperAvailable,
+      api_layer_status: apiLayerConfigStatus,
       api_layer_key_configured: apiLayerAvailable,
       ping_error: pingError,
       database_connection: "OK"
@@ -98,6 +123,7 @@ serve(async (req) => {
         latest_tenders: latestTenders || [],
         scraper_available: scraperAvailable,
         api_layer_available: apiLayerAvailable,
+        api_layer_status: apiLayerConfigStatus,
         last_check: new Date().toISOString(),
         message: "Status check completed",
         diagnostics

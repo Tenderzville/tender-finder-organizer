@@ -142,19 +142,39 @@ const Tenders = () => {
           </div>
         )}
         
-        <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
-          <div className="lg:col-span-3">
-            <TenderList 
-              tenders={displayTenders}
-              isLoading={isLoadingTenders}
-              error={errorTenders || (apiError ? new Error(apiError) : null)}
-              onRetry={fetchTenders}
-            />
+        {(isLoadingTenders && tenders.length === 0) ? (
+          <div className="flex justify-center items-center p-8">
+            <RefreshCw className="h-8 w-8 animate-spin text-primary" />
+            <span className="ml-2 text-lg">Loading tenders...</span>
           </div>
-          <div className="lg:col-span-1 space-y-6">
-            <ScraperStatus />
+        ) : (
+          <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
+            <div className="lg:col-span-3">
+              <TenderList 
+                tenders={displayTenders}
+                isLoading={isLoadingTenders && tenders.length === 0}
+                error={errorTenders || (apiError ? new Error(apiError) : null)}
+                onRetry={fetchTenders}
+              />
+              
+              {displayTenders.length === 0 && !isLoadingTenders && !apiError && (
+                <div className="text-center p-12 bg-white rounded-lg border border-gray-100 shadow-sm">
+                  <h3 className="text-lg font-medium text-gray-900 mb-2">No tenders available</h3>
+                  <p className="text-gray-500 mb-4">Try refreshing to fetch the latest tender opportunities.</p>
+                  <Button 
+                    onClick={handleRefreshTenders}
+                    disabled={isRefreshing}
+                  >
+                    {isRefreshing ? 'Refreshing...' : 'Refresh Tenders'}
+                  </Button>
+                </div>
+              )}
+            </div>
+            <div className="lg:col-span-1 space-y-6">
+              <ScraperStatus />
+            </div>
           </div>
-        </div>
+        )}
       </main>
     </div>
   );
