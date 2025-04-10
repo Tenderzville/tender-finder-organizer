@@ -63,6 +63,66 @@ serve(async (req) => {
       console.error("Error fetching latest tenders:", tendersError);
     }
     
+    // Check if we need to create sample tenders
+    if (!latestTenders || latestTenders.length === 0) {
+      console.log("No tenders found, creating sample tenders");
+      
+      // Create sample tenders
+      const sampleTenders = [
+        {
+          title: "Office Supplies Procurement",
+          description: "Procurement of office supplies including stationery, printer cartridges, and office equipment.",
+          deadline: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(), // 7 days from now
+          contact_info: "procurement@example.com",
+          fees: "KES 50,000",
+          prerequisites: "Must be a registered supplier.",
+          category: "Supplies",
+          location: "Nairobi",
+          tender_url: "https://example.com/tenders/office-supplies"
+        },
+        {
+          title: "IT Infrastructure Development",
+          description: "Development of IT infrastructure including servers, networking, and security systems.",
+          deadline: new Date(Date.now() + 14 * 24 * 60 * 60 * 1000).toISOString(), // 14 days from now
+          contact_info: "it@example.com",
+          fees: "KES 2,000,000",
+          prerequisites: "ISO 27001 certification required.",
+          category: "IT",
+          location: "Mombasa",
+          tender_url: "https://example.com/tenders/it-infrastructure",
+          affirmative_action: { type: "youth", percentage: 30 }
+        },
+        {
+          title: "Road Construction Project",
+          description: "Construction of a 5km tarmac road including drainage systems and street lighting.",
+          deadline: new Date(Date.now() + 21 * 24 * 60 * 60 * 1000).toISOString(), // 21 days from now
+          contact_info: "infrastructure@example.com",
+          fees: "KES 50,000,000",
+          prerequisites: "Must have completed at least 3 similar projects.",
+          category: "Construction",
+          location: "Kisumu",
+          tender_url: "https://example.com/tenders/road-construction"
+        }
+      ];
+      
+      try {
+        const { data, error } = await supabase
+          .from('tenders')
+          .insert(sampleTenders)
+          .select();
+          
+        if (error) {
+          console.error("Error creating sample tenders:", error);
+        } else {
+          console.log(`Created ${data.length} sample tenders`);
+          // Update the latestTenders array with the newly created samples
+          latestTenders = data;
+        }
+      } catch (error) {
+        console.error("Error creating sample tenders:", error);
+      }
+    }
+    
     // Get total tenders count
     const { count: totalTenders, error: countError } = await supabase
       .from('tenders')

@@ -41,6 +41,82 @@ const Tenders = () => {
     });
   }, [fetchTenders]);
   
+  // Function to initialize sample tenders if none exist
+  const initializeSampleTenders = async () => {
+    if (displayTenders.length === 0) {
+      try {
+        setIsRefreshing(true);
+        
+        // Create sample tenders if none exist
+        console.log("Creating sample tenders...");
+        const { data: existingTenders, error: checkError } = await supabase
+          .from('tenders')
+          .select('count', { count: 'exact', head: true });
+          
+        if (checkError) {
+          console.error("Error checking tenders:", checkError);
+          throw checkError;
+        }
+        
+        // If no tenders exist, create sample ones
+        if (existingTenders === 0 || existingTenders === null) {
+          const sampleTenders = [
+            {
+              title: "Office Supplies Procurement",
+              description: "Procurement of office supplies including stationery, printer cartridges, and office equipment.",
+              deadline: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(), // 7 days from now
+              contact_info: "procurement@example.com",
+              fees: "KES 50,000",
+              prerequisites: "Must be a registered supplier.",
+              category: "Supplies",
+              location: "Nairobi",
+              tender_url: "https://example.com/tenders/office-supplies"
+            },
+            {
+              title: "IT Infrastructure Development",
+              description: "Development of IT infrastructure including servers, networking, and security systems.",
+              deadline: new Date(Date.now() + 14 * 24 * 60 * 60 * 1000).toISOString(), // 14 days from now
+              contact_info: "it@example.com",
+              fees: "KES 2,000,000",
+              prerequisites: "ISO 27001 certification required.",
+              category: "IT",
+              location: "Mombasa",
+              tender_url: "https://example.com/tenders/it-infrastructure",
+              affirmative_action: { type: "youth", percentage: 30 }
+            }
+          ];
+          
+          const { error: insertError } = await supabase
+            .from('tenders')
+            .insert(sampleTenders);
+            
+          if (insertError) {
+            console.error("Error inserting sample tenders:", insertError);
+            throw insertError;
+          }
+          
+          toast({
+            title: "Sample tenders created",
+            description: "Created sample tenders for demonstration",
+          });
+          
+          // Refresh tenders after creating samples
+          await fetchTenders();
+        }
+      } catch (err) {
+        console.error("Error initializing sample tenders:", err);
+        setApiError("Failed to initialize tenders. Please try again.");
+        toast({
+          title: "Error",
+          description: "Could not create sample tenders",
+          variant: "destructive"
+        });
+      } finally {
+        setIsRefreshing(false);
+      }
+    }
+  };
+  
   const handleRefreshTenders = async () => {
     if (isRefreshing) return;
     
@@ -53,26 +129,40 @@ const Tenders = () => {
         description: "Retrieving latest tender data...",
       });
       
-      // Trigger a fresh scrape using the API Layer
-      const { data: scrapeResult, error: scrapeError } = await supabase.functions.invoke(
-        'scrape-tenders',
-        {
-          body: { 
-            force: true,
-            useApiLayer: true 
-          }
-        }
-      );
+      // Check if we need to create sample data
+      const { count, error: countError } = await supabase
+        .from('tenders')
+        .select('*', { count: 'exact', head: true });
       
-      if (scrapeError) {
-        console.error("Error triggering scrape:", scrapeError);
-        throw scrapeError;
+      if (countError) {
+        console.error("Error counting tenders:", countError);
+        throw countError;
       }
       
-      console.log("Scrape result:", scrapeResult);
-      
-      // Wait a moment for data to be processed
-      await new Promise(resolve => setTimeout(resolve, 2000));
+      if (count === 0) {
+        await initializeSampleTenders();
+      } else {
+        // Trigger a fresh scrape using the API Layer
+        const { data: scrapeResult, error: scrapeError } = await supabase.functions.invoke(
+          'scrape-tenders',
+          {
+            body: { 
+              force: true,
+              useApiLayer: true 
+            }
+          }
+        );
+        
+        if (scrapeError) {
+          console.error("Error triggering scrape:", scrapeError);
+          throw scrapeError;
+        }
+        
+        console.log("Scrape result:", scrapeResult);
+        
+        // Wait a moment for data to be processed
+        await new Promise(resolve => setTimeout(resolve, 2000));
+      }
       
       // Try to fetch fresh data
       await fetchTenders();
@@ -81,6 +171,11 @@ const Tenders = () => {
         title: "Tenders updated",
         description: "Successfully refreshed tenders data.",
       });
+      
+      // If still no tenders, create samples
+      if (tenders.length === 0) {
+        await initializeSampleTenders();
+      }
     } catch (err) {
       console.error("Error refreshing tenders:", err);
       setApiError("Failed to refresh tenders. Please try again later.");
@@ -93,6 +188,13 @@ const Tenders = () => {
       setIsRefreshing(false);
     }
   };
+
+  // Initialize sample tenders if none exist on component mount
+  useEffect(() => {
+    if (displayTenders.length === 0 && !isLoadingTenders && !apiError) {
+      initializeSampleTenders();
+    }
+  }, [displayTenders.length, isLoadingTenders, apiError]);
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -162,13 +264,13 @@ const Tenders = () => {
                   <h3 className="text-lg font-medium text-gray-900 mb-2">No tenders available</h3>
                   <p className="text-gray-500 mb-4">
                     Currently there are no tenders in the database. Click the refresh button to 
-                    trigger a scrape of the latest tender opportunities.
+                    trigger a scrape of the latest tender opportunities or create sample data.
                   </p>
                   <Button 
                     onClick={handleRefreshTenders}
                     disabled={isRefreshing}
                   >
-                    {isRefreshing ? 'Refreshing...' : 'Refresh Tenders'}
+                    {isRefreshing ? 'Refreshing...' : 'Create Sample Tenders'}
                   </Button>
                 </div>
               )}
