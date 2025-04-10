@@ -79,74 +79,12 @@ serve(async (req) => {
       }
     }
     
-    // Check if we have sample data
-    const { count, error: countError } = await supabase
-      .from('tenders')
-      .select('*', { count: 'exact', head: true });
-    
-    if (countError) {
-      throw countError;
-    }
-    
-    if (count === 0) {
-      console.log("Adding sample tenders...");
-      
-      // Add sample tenders
-      const sampleTenders = [
-        {
-          title: "Construction of Rural Health Centers",
-          description: "Project involves construction of 5 health centers in rural areas with modern facilities and equipment",
-          requirements: "Registered contractors with Class 5+ certification",
-          deadline: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(), // 30 days from now
-          contact_info: "Ministry of Health Kenya",
-          fees: "KES 50,000,000",
-          prerequisites: "Previous experience in healthcare construction",
-          category: "Construction",
-          subcategory: "Healthcare",
-          tender_url: "https://example.com/tenders/health-centers",
-          location: "Nairobi"
-        },
-        {
-          title: "Supply of IT Equipment to Schools",
-          description: "Supply and installation of computers, printers and networking equipment to 20 secondary schools",
-          requirements: "Registered IT suppliers with at least 5 years experience",
-          deadline: new Date(Date.now() + 14 * 24 * 60 * 60 * 1000).toISOString(), // 14 days from now
-          contact_info: "Ministry of Education",
-          fees: "KES 25,000,000",
-          prerequisites: "Must be an authorized dealer for major brands",
-          category: "IT",
-          subcategory: "Hardware",
-          tender_url: "https://example.com/tenders/school-it",
-          location: "Nairobi"
-        },
-        {
-          title: "Road Maintenance Works - Eastern Region",
-          description: "Maintenance and repair of 150km of roads in the Eastern region including drainage works and signage",
-          requirements: "NCA 2 and above contractors",
-          deadline: new Date(Date.now() + 21 * 24 * 60 * 60 * 1000).toISOString(), // 21 days from now
-          contact_info: "Kenya National Highways Authority",
-          fees: "KES 120,000,000",
-          prerequisites: "Equipment ownership or lease agreements required",
-          category: "Construction",
-          subcategory: "Roads",
-          tender_url: "https://example.com/tenders/eastern-roads",
-          location: "Eastern Kenya"
-        }
-      ];
-      
-      const { error: insertError } = await supabase
-        .from('tenders')
-        .insert(sampleTenders);
-      
-      if (insertError) {
-        throw insertError;
-      }
-    }
+    // IMPORTANT: We're not adding sample data anymore, only creating tables if needed
     
     return new Response(
       JSON.stringify({
         success: true,
-        message: "Database setup completed successfully",
+        message: "Database setup completed successfully. Tables created or verified.",
       }),
       {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },

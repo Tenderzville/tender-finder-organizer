@@ -41,12 +41,18 @@ export function useScraperStatus() {
         if (!functionError && functionData) {
           console.log("Received data from check-scraper-status function:", functionData);
           
+          // Count AGPO tenders
+          const { count: agpoCount } = await supabase
+            .from('tenders')
+            .select('count', { count: 'exact', head: true })
+            .not('affirmative_action', 'is', null);
+          
           // Update status with data from the function
           setStatus({
             lastRun: functionData.last_check || null,
             status: functionData.scraper_available ? 'idle' : 'failed',
             tendersFound: functionData.total_tenders || 0,
-            agpoTendersFound: 0, // We'll calculate this separately
+            agpoTendersFound: agpoCount || 0,
             sources: [
               { 
                 name: 'Tenders.go.ke', 
@@ -89,18 +95,23 @@ export function useScraperStatus() {
         const log = data[0];
 
         // Count AGPO tenders
-        const { data: agpoData } = await supabase
+        const { count: agpoCount } = await supabase
           .from('tenders')
-          .select('count')
+          .select('count', { count: 'exact', head: true })
           .not('affirmative_action', 'is', null);
+
+        // Get total tenders count
+        const { count: totalCount } = await supabase
+          .from('tenders')
+          .select('count', { count: 'exact', head: true });
 
         setStatus({
           lastRun: log.created_at,
           status: log.status === 'success' ? 'success' : 
                   log.status === 'in_progress' ? 'running' : 
                   log.status === 'error' ? 'failed' : 'idle',
-          tendersFound: log.records_found || 0,
-          agpoTendersFound: agpoData?.[0]?.count || 0,
+          tendersFound: totalCount || 0,
+          agpoTendersFound: agpoCount || 0,
           sources: [
             { 
               name: 'Tenders.go.ke', 
@@ -114,7 +125,7 @@ export function useScraperStatus() {
             },
             { 
               name: 'AGPO Tenders', 
-              count: agpoData?.[0]?.count || 0,
+              count: agpoCount || 0,
               status: 'idle'
             }
           ],
@@ -131,6 +142,11 @@ export function useScraperStatus() {
 
   useEffect(() => {
     fetchStatus();
+    
+    // Set up a refresh interval
+    const intervalId = setInterval(fetchStatus, 60000); // Refresh every minute
+    
+    return () => clearInterval(intervalId);
   }, []);
 
   const renderRelativeTime = (dateString: string | null) => {

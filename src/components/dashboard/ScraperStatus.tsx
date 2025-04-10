@@ -1,12 +1,13 @@
 
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Loader2, RotateCw, Info } from "lucide-react";
+import { Loader2, RotateCw, Info, AlertTriangle, CheckCircle } from "lucide-react";
 import { ScraperSourceItem } from "./ScraperSourceItem";
 import { ScraperDiagnostics } from "./ScraperDiagnostics";
 import { useScraperStatus } from "@/hooks/use-scraper-status";
 import { Badge } from "@/components/ui/badge";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+import { Alert, AlertDescription } from "@/components/ui/alert";
 
 export function ScraperStatus() {
   const { status, isRefreshing, fetchStatus, renderRelativeTime } = useScraperStatus();
@@ -68,6 +69,19 @@ export function ScraperStatus() {
             </Badge>
           </div>
         </div>
+        
+        {status.apiLayerStatus && (
+          <Alert variant={status.apiLayerStatus.includes("working") ? "default" : "warning"} className="mt-2 mb-3">
+            {status.apiLayerStatus.includes("working") ? (
+              <CheckCircle className="h-4 w-4" />
+            ) : (
+              <AlertTriangle className="h-4 w-4" />
+            )}
+            <AlertDescription className="text-xs">
+              {status.apiLayerStatus}
+            </AlertDescription>
+          </Alert>
+        )}
         
         <ScraperDiagnostics diagnostics={status.diagnostics} />
       </CardContent>

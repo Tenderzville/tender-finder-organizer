@@ -3,7 +3,7 @@ import { useParams, useNavigate } from "react-router-dom";
 import { Navigation } from "@/components/Navigation";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Calendar, Globe, Briefcase, ExternalLink, ArrowLeft, Share2 } from "lucide-react";
+import { Calendar, Globe, Briefcase, ExternalLink, ArrowLeft, Share2, RefreshCw } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
@@ -39,6 +39,7 @@ const TenderDetails = () => {
       }
 
       try {
+        // Request the tender details from the database
         const { data, error } = await supabase
           .from("tenders")
           .select("*")
@@ -47,6 +48,12 @@ const TenderDetails = () => {
 
         if (error) {
           console.error("Error fetching tender:", error);
+          
+          // Check if it's a "no rows" error, which happens when the tender doesn't exist
+          if (error.code === "PGRST116") {
+            throw new Error("Tender not found. It may have been removed or the ID is incorrect.");
+          }
+          
           throw error;
         }
 
@@ -103,6 +110,39 @@ const TenderDetails = () => {
     }
   };
 
+  const handleRefreshTender = async () => {
+    if (!tenderId) return;
+    
+    try {
+      toast({
+        title: "Refreshing",
+        description: "Fetching latest tender data...",
+      });
+      
+      await supabase.functions.invoke('scrape-tenders', {
+        body: { 
+          force: true,
+          specificTenderId: parseInt(tenderId, 10)
+        }
+      });
+      
+      await new Promise(resolve => setTimeout(resolve, 1000));
+      await refresh();
+      
+      toast({
+        title: "Refreshed",
+        description: "Tender information updated",
+      });
+    } catch (err) {
+      console.error("Error refreshing tender:", err);
+      toast({
+        title: "Refresh failed",
+        description: "Could not refresh tender data",
+        variant: "destructive",
+      });
+    }
+  };
+
   if (isLoading) {
     return (
       <div className="min-h-screen bg-gray-50">
@@ -132,9 +172,19 @@ const TenderDetails = () => {
                   ? `Error: ${error.message}`
                   : "The tender you're looking for doesn't exist or has been removed."}
               </p>
-              <Button onClick={() => navigate("/tenders")} className="mt-4">
-                Return to Tenders
-              </Button>
+              <div className="flex flex-col sm:flex-row gap-4 justify-center mt-6">
+                <Button onClick={() => navigate("/tenders")} className="mt-4">
+                  Return to Tenders
+                </Button>
+                <Button 
+                  onClick={handleRefreshTender} 
+                  variant="outline" 
+                  className="mt-4 flex items-center gap-2"
+                >
+                  <RefreshCw className="h-4 w-4" />
+                  Try Refreshing
+                </Button>
+              </div>
             </div>
           </div>
         </main>
@@ -259,14 +309,11 @@ const TenderDetails = () => {
                 
                 <Button
                   variant="outline"
-                  onClick={() => {
-                    toast({
-                      title: "Notification Set",
-                      description: "You'll be notified about updates to this tender.",
-                    });
-                  }}
+                  onClick={handleRefreshTender}
+                  className="flex items-center"
                 >
-                  Set Reminder
+                  <RefreshCw className="mr-2 h-4 w-4" />
+                  Refresh Tender Data
                 </Button>
               </div>
             </div>

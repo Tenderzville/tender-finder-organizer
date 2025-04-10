@@ -142,7 +142,7 @@ const Tenders = () => {
           </div>
         )}
         
-        {(isLoadingTenders && tenders.length === 0) ? (
+        {(isLoadingTenders && displayTenders.length === 0) ? (
           <div className="flex justify-center items-center p-8">
             <RefreshCw className="h-8 w-8 animate-spin text-primary" />
             <span className="ml-2 text-lg">Loading tenders...</span>
@@ -152,7 +152,7 @@ const Tenders = () => {
             <div className="lg:col-span-3">
               <TenderList 
                 tenders={displayTenders}
-                isLoading={isLoadingTenders && tenders.length === 0}
+                isLoading={isLoadingTenders && displayTenders.length === 0}
                 error={errorTenders || (apiError ? new Error(apiError) : null)}
                 onRetry={fetchTenders}
               />
@@ -160,7 +160,10 @@ const Tenders = () => {
               {displayTenders.length === 0 && !isLoadingTenders && !apiError && (
                 <div className="text-center p-12 bg-white rounded-lg border border-gray-100 shadow-sm">
                   <h3 className="text-lg font-medium text-gray-900 mb-2">No tenders available</h3>
-                  <p className="text-gray-500 mb-4">Try refreshing to fetch the latest tender opportunities.</p>
+                  <p className="text-gray-500 mb-4">
+                    Currently there are no tenders in the database. Click the refresh button to 
+                    trigger a scrape of the latest tender opportunities.
+                  </p>
                   <Button 
                     onClick={handleRefreshTenders}
                     disabled={isRefreshing}
