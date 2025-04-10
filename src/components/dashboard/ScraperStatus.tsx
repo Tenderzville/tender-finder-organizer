@@ -5,6 +5,7 @@ import { Loader2, RotateCw } from "lucide-react";
 import { ScraperSourceItem } from "./ScraperSourceItem";
 import { ScraperDiagnostics } from "./ScraperDiagnostics";
 import { useScraperStatus } from "@/hooks/use-scraper-status";
+import { Badge } from "@/components/ui/badge";
 
 export function ScraperStatus() {
   const { status, isRefreshing, fetchStatus, renderRelativeTime } = useScraperStatus();
@@ -40,6 +41,15 @@ export function ScraperStatus() {
               status={source.status}
             />
           ))}
+        </div>
+        
+        <div className="mt-4 mb-2">
+          <div className="flex justify-between items-center text-sm">
+            <span>API Layer Integration:</span>
+            <Badge variant={status.apiLayerConfigured ? "success" : "destructive"}>
+              {status.apiLayerConfigured ? "Configured" : "Not Configured"}
+            </Badge>
+          </div>
         </div>
         
         <ScraperDiagnostics diagnostics={status.diagnostics} />

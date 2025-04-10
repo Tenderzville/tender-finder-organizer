@@ -10,6 +10,7 @@ export interface ScraperStatusData {
   agpoTendersFound: number;
   sources: {name: string, count: number, status: string}[];
   diagnostics: any | null;
+  apiLayerConfigured: boolean;
 }
 
 export function useScraperStatus() {
@@ -23,7 +24,8 @@ export function useScraperStatus() {
       { name: 'Private Sector', count: 0, status: 'idle' },
       { name: 'AGPO Tenders', count: 0, status: 'idle' }
     ],
-    diagnostics: null
+    diagnostics: null,
+    apiLayerConfigured: false
   });
   const [isRefreshing, setIsRefreshing] = useState(false);
 
@@ -62,7 +64,8 @@ export function useScraperStatus() {
                 status: functionData.scraper_available ? 'idle' : 'failed'
               }
             ],
-            diagnostics: functionData.diagnostics || null
+            diagnostics: functionData.diagnostics || null,
+            apiLayerConfigured: functionData.api_layer_available || false
           });
           
           return;
@@ -113,7 +116,8 @@ export function useScraperStatus() {
               status: 'idle'
             }
           ],
-          diagnostics: null
+          diagnostics: null,
+          apiLayerConfigured: log.source === 'api_layer'
         });
       }
     } catch (error) {

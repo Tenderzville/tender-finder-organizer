@@ -33,13 +33,14 @@ serve(async (req) => {
             error_message: null,
           });
         
-        // Call the scrape-tenders function
+        // Call the scrape-tenders function with the API Layer key
         const { data: scrapeData, error: scrapeError } = await supabase.functions.invoke(
           'scrape-tenders', 
           { 
             body: { 
               scheduled: true,
-              force: true  // Always force a fresh scrape when scheduled
+              force: true,  // Always force a fresh scrape when scheduled
+              useApiLayer: true  // Explicitly tell the function to use API Layer
             } 
           }
         );

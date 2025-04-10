@@ -12,7 +12,6 @@ import { RefreshCw, AlertTriangle } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { TenderStatusBadge } from "@/components/ui/tender-status-badge";
 
 const Tenders = () => {
   const [language, setLanguage] = useState<'en' | 'sw'>('en');
@@ -53,6 +52,27 @@ const Tenders = () => {
         title: "Refreshing tenders",
         description: "Retrieving latest tender data...",
       });
+      
+      // Trigger a fresh scrape using the API Layer
+      const { data: scrapeResult, error: scrapeError } = await supabase.functions.invoke(
+        'scrape-tenders',
+        {
+          body: { 
+            force: true,
+            useApiLayer: true 
+          }
+        }
+      );
+      
+      if (scrapeError) {
+        console.error("Error triggering scrape:", scrapeError);
+        throw scrapeError;
+      }
+      
+      console.log("Scrape result:", scrapeResult);
+      
+      // Wait a moment for data to be processed
+      await new Promise(resolve => setTimeout(resolve, 2000));
       
       // Try to fetch fresh data
       await fetchTenders();
