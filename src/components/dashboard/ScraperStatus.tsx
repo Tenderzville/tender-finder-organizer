@@ -71,7 +71,7 @@ export function ScraperStatus() {
         </div>
         
         {status.apiLayerStatus && (
-          <Alert variant={status.apiLayerStatus.includes("working") ? "default" : "warning"} className="mt-2 mb-3">
+          <Alert variant={status.apiLayerStatus.includes("working") ? "default" : "destructive"} className="mt-2 mb-3">
             {status.apiLayerStatus.includes("working") ? (
               <CheckCircle className="h-4 w-4" />
             ) : (

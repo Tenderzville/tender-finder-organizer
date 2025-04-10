@@ -23,7 +23,7 @@ const TenderDetails = () => {
     tender => tender.id === parseInt(tenderId || '0', 10)
   );
 
-  const { data: tender, isLoading, error } = useQuery({
+  const { data: tender, isLoading, error, refetch } = useQuery({
     queryKey: ["tender", tenderId],
     queryFn: async () => {
       if (!tenderId) throw new Error("No tender ID provided");
@@ -127,7 +127,7 @@ const TenderDetails = () => {
       });
       
       await new Promise(resolve => setTimeout(resolve, 1000));
-      await refresh();
+      await refetch();
       
       toast({
         title: "Refreshed",
