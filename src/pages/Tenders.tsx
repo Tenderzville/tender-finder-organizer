@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { Navigation } from "@/components/Navigation";
 import { TenderList } from '@/components/tenders/TenderList';
@@ -58,8 +57,8 @@ const Tenders = () => {
           throw checkError;
         }
         
-        // Fixed: The count value will be returned as a number, not an array
-        const tenderCount = existingTenders === null ? 0 : existingTenders;
+        // Properly handle the count response - it's returned as a number
+        const tenderCount = existingTenders || 0;
         
         // If no tenders exist, create sample ones
         if (tenderCount === 0) {
