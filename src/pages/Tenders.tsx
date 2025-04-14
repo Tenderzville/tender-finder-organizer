@@ -58,8 +58,11 @@ const Tenders = () => {
           throw checkError;
         }
         
+        // Fixed: The count value will be returned as a number, not an array
+        const tenderCount = existingTenders === null ? 0 : existingTenders;
+        
         // If no tenders exist, create sample ones
-        if (existingTenders === 0 || existingTenders === null) {
+        if (tenderCount === 0) {
           const sampleTenders = [
             {
               title: "Office Supplies Procurement",
