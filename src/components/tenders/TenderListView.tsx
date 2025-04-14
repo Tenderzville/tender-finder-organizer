@@ -1,3 +1,4 @@
+
 import React, { useCallback } from "react";
 import { format, parseISO } from "date-fns";
 import { useNavigate } from "react-router-dom";
@@ -29,7 +30,7 @@ interface TenderListViewProps {
   tendersToDisplay: Tender[];
   error: Error | null;
   isRefreshing: boolean;
-  onRefresh: () => void;
+  onRefresh: () => Promise<void>;
   onShowQualificationTool: () => void;
   translations: {
     latestTenders: string;

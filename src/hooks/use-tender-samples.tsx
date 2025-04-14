@@ -7,7 +7,7 @@ export function useTenderSamples() {
   const [isCreatingSamples, setIsCreatingSamples] = useState(false);
   const { toast } = useToast();
 
-  const initializeSampleTenders = async () => {
+  const initializeSampleTenders = async (): Promise<void> => {
     try {
       setIsCreatingSamples(true);
       
@@ -67,8 +67,6 @@ export function useTenderSamples() {
           description: "Created sample tenders for demonstration",
         });
       }
-
-      return true;
     } catch (err) {
       console.error("Error initializing sample tenders:", err);
       toast({
@@ -76,7 +74,6 @@ export function useTenderSamples() {
         description: "Could not create sample tenders",
         variant: "destructive"
       });
-      return false;
     } finally {
       setIsCreatingSamples(false);
     }

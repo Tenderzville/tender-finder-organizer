@@ -10,7 +10,7 @@ export function useTenderRefresh({ fetchTenders }: { fetchTenders: () => Promise
   const { toast } = useToast();
   const { initializeSampleTenders } = useTenderSamples();
 
-  const handleRefreshTenders = async () => {
+  const handleRefreshTenders = async (): Promise<void> => {
     if (isRefreshing) return;
     
     setIsRefreshing(true);
