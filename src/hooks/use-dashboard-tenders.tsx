@@ -8,7 +8,7 @@ export function useDashboardTenders() {
   const [isLoadingTenders, setIsLoadingTenders] = useState(true);
   const [errorTenders, setErrorTenders] = useState<Error | null>(null);
 
-  const fetchTenders = useCallback(async () => {
+  const fetchTenders = useCallback(async (): Promise<void> => {
     setIsLoadingTenders(true);
     setErrorTenders(null);
     
@@ -56,7 +56,6 @@ export function useDashboardTenders() {
                 }));
                 
                 setTenders(formattedTenders);
-                return formattedTenders;
               }
             }
           }
@@ -72,11 +71,9 @@ export function useDashboardTenders() {
       })) || [];
       
       setTenders(formattedTenders);
-      return formattedTenders;
     } catch (err) {
       console.error("Failed to fetch tenders:", err);
       setErrorTenders(err instanceof Error ? err : new Error("Failed to fetch tenders"));
-      return [];
     } finally {
       setIsLoadingTenders(false);
     }
