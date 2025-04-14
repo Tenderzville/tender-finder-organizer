@@ -1,3 +1,4 @@
+
 export type UserProfile = {
   id: string;
   user_id: string | null;
@@ -12,6 +13,8 @@ export type UserProfile = {
   } | null;
   premium_until: string | null;
   total_points: number | null;
+  onboarding_completed?: boolean;
+  user_type?: string;
 };
 
 export type UserPoints = {

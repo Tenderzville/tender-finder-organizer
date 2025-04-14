@@ -1,5 +1,4 @@
-
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
@@ -9,12 +8,48 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Checkbox } from "@/components/ui/checkbox";
 import { motion } from "framer-motion";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { useToast } from "@/hooks/use-toast";
+import { supabase } from "@/integrations/supabase/client";
 
 export default function Onboarding() {
   const navigate = useNavigate();
+  const { toast } = useToast();
   const [step, setStep] = useState(1);
   const [userType, setUserType] = useState<string | null>(null);
   const [interests, setInterests] = useState<string[]>([]);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+
+  useEffect(() => {
+    const checkOnboardingStatus = async () => {
+      try {
+        const { data: { session } } = await supabase.auth.getSession();
+        
+        if (session) {
+          const { data: profile } = await supabase
+            .from('profiles')
+            .select('onboarding_completed')
+            .eq('user_id', session.user.id)
+            .maybeSingle();
+            
+          if (profile?.onboarding_completed) {
+            console.log("Onboarding already completed, redirecting to dashboard");
+            navigate('/dashboard');
+          }
+        } else {
+          const hasCompletedOnboarding = localStorage.getItem('onboardingComplete') === 'true';
+          
+          if (hasCompletedOnboarding) {
+            console.log("Onboarding already completed (localStorage), redirecting to dashboard");
+            navigate('/dashboard');
+          }
+        }
+      } catch (error) {
+        console.error("Error checking onboarding status:", error);
+      }
+    };
+    
+    checkOnboardingStatus();
+  }, [navigate]);
 
   const interestOptions = [
     "IT & Telecommunications", 
@@ -43,13 +78,54 @@ export default function Onboarding() {
     );
   };
 
-  const handleComplete = () => {
-    // Save onboarding data
-    localStorage.setItem('onboardingComplete', 'true');
-    localStorage.setItem('userType', userType || '');
-    localStorage.setItem('interests', JSON.stringify(interests));
-
-    navigate('/dashboard');
+  const handleComplete = async () => {
+    setIsSubmitting(true);
+    
+    try {
+      localStorage.setItem('onboardingComplete', 'true');
+      localStorage.setItem('userType', userType || '');
+      localStorage.setItem('interests', JSON.stringify(interests));
+      
+      const { data: { session } } = await supabase.auth.getSession();
+      
+      if (session?.user) {
+        const { error } = await supabase
+          .from('profiles')
+          .upsert({
+            user_id: session.user.id,
+            onboarding_completed: true,
+            user_type: userType,
+            areas_of_expertise: interests
+          }, {
+            onConflict: 'user_id'
+          });
+          
+        if (error) {
+          console.error("Error saving onboarding data:", error);
+          toast({
+            title: "Error",
+            description: "Failed to save your preferences. But you can continue to the dashboard.",
+            variant: "destructive"
+          });
+        } else {
+          toast({
+            title: "Success",
+            description: "Your preferences have been saved successfully!",
+          });
+        }
+      }
+      
+      navigate('/dashboard');
+    } catch (error) {
+      console.error("Error in onboarding completion:", error);
+      toast({
+        title: "Error",
+        description: "Something went wrong. Please try again.",
+        variant: "destructive"
+      });
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   return (
@@ -157,7 +233,12 @@ export default function Onboarding() {
 
             <CardFooter className="flex justify-between pb-6 px-6">
               <Button variant="outline" onClick={() => setStep(1)}>Back</Button>
-              <Button onClick={handleComplete}>Finish Setup</Button>
+              <Button 
+                onClick={handleComplete} 
+                disabled={isSubmitting}
+              >
+                {isSubmitting ? 'Saving...' : 'Finish Setup'}
+              </Button>
             </CardFooter>
           </motion.div>
         )}

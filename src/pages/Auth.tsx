@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
@@ -31,17 +30,20 @@ const Auth = () => {
         if (session) {
           console.log("[Auth] Session exists, checking profile");
           try {
-            const { data: profile } = await supabase
+            // Check if user has completed onboarding before
+            const { data: onboardingStatus } = await supabase
               .from('profiles')
-              .select('id')
+              .select('onboarding_completed')
               .eq('user_id', session.user.id)
               .maybeSingle();
 
             const currentPath = window.location.pathname;
-            if (profile && currentPath === '/auth') {
-              console.log("[Auth] Profile exists, navigating to dashboard");
+            
+            // If onboarding is completed, go straight to dashboard
+            if (onboardingStatus?.onboarding_completed) {
+              console.log("[Auth] Onboarding already completed, navigating to dashboard");
               navigate("/dashboard");
-            } else if (!profile && currentPath !== '/onboarding') {
+            } else if (!onboardingStatus && currentPath !== '/onboarding') {
               console.log("[Auth] No profile found, navigating to onboarding");
               navigate("/onboarding");
             }
@@ -96,34 +98,33 @@ const Auth = () => {
           description: "Login successful! Redirecting to dashboard...",
         });
         
+        // Check if user has completed onboarding before redirecting
+        const checkOnboardingStatus = async () => {
+          try {
+            // This would be the real auth flow
+            // const { data, error } = await supabase.auth.signInWithPassword({
+            //   email: email.trim(),
+            //   password,
+            // });
+            
+            // For demo, we'll check local storage instead
+            const hasCompletedOnboarding = localStorage.getItem('onboardingComplete') === 'true';
+            
+            if (hasCompletedOnboarding) {
+              navigate('/dashboard');
+            } else {
+              navigate('/onboarding');
+            }
+          } catch (error) {
+            console.error("Error checking onboarding status:", error);
+            navigate('/dashboard'); // Default to dashboard on error
+          }
+        };
+        
         // Wait a moment then redirect
         setTimeout(() => {
-          navigate('/dashboard');
+          checkOnboardingStatus();
         }, 1500);
-        
-        /*
-        // Real authentication code:
-        const { data, error } = await supabase.auth.signInWithPassword({
-          email: email.trim(),
-          password,
-        });
-
-        if (error) throw error;
-        console.log("[Auth] Sign in successful:", data);
-        
-        // Check if profile exists
-        const { data: profile } = await supabase
-          .from('profiles')
-          .select('id')
-          .eq('user_id', data.user.id)
-          .single();
-          
-        if (profile) {
-          navigate('/dashboard');
-        } else {
-          navigate('/onboarding');
-        }
-        */
       } else {
         // For demo purposes, simulate successful registration
         toast({
@@ -135,29 +136,6 @@ const Auth = () => {
         setTimeout(() => {
           navigate('/onboarding');
         }, 1500);
-        
-        /*
-        // Real registration code:
-        const { data, error } = await supabase.auth.signUp({
-          email: email.trim(),
-          password,
-          options: {
-            emailRedirectTo: window.location.origin + '/dashboard',
-          }
-        });
-
-        if (error) throw error;
-        console.log("[Auth] Sign up successful:", data);
-        
-        if (data.session) {
-          navigate('/onboarding');
-        } else {
-          toast({
-            title: "Success",
-            description: "Account created successfully. Please check your email to verify your account.",
-          });
-        }
-        */
       }
     } catch (error: any) {
       console.error("[Auth] Auth error:", error);

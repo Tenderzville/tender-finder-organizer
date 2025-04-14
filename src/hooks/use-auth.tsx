@@ -12,6 +12,7 @@ interface AuthContextType {
   isLoading: boolean;
   signOut: () => Promise<void>;
   isAuthenticated: boolean;
+  hasCompletedOnboarding: boolean;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -20,6 +21,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   const [user, setUser] = useState<User | null>(null);
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [hasCompletedOnboarding, setHasCompletedOnboarding] = useState(false);
   const navigate = useNavigate();
   const { toast } = useToast();
 
@@ -43,7 +45,13 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
             console.error("Error fetching profile:", profileError);
           } else {
             setProfile(profileData as UserProfile);
+            // Check if onboarding is completed
+            setHasCompletedOnboarding(!!profileData?.onboarding_completed);
           }
+        } else {
+          // For demo/development: check local storage
+          const localOnboardingStatus = localStorage.getItem('onboardingComplete') === 'true';
+          setHasCompletedOnboarding(localOnboardingStatus);
         }
       } catch (error) {
         console.error("Auth initialization error:", error);
@@ -70,9 +78,15 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
               
             setProfile(profileData as UserProfile);
             
-            // Check if profile exists - if not, redirect to onboarding
-            if (!profileData && window.location.pathname !== '/onboarding') {
-              navigate('/onboarding');
+            // Check if onboarding is completed
+            const onboardingCompleted = !!profileData?.onboarding_completed;
+            setHasCompletedOnboarding(onboardingCompleted);
+            
+            // Check if profile exists - if not or onboarding not completed, redirect to onboarding
+            if (!profileData || !onboardingCompleted) {
+              if (window.location.pathname !== '/onboarding') {
+                navigate('/onboarding');
+              }
             } else if (profileData && window.location.pathname === '/auth') {
               navigate('/dashboard');
             }
@@ -81,6 +95,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
           }
         } else if (event === 'SIGNED_OUT') {
           setProfile(null);
+          setHasCompletedOnboarding(false);
           navigate('/');
         }
       }
@@ -115,6 +130,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     isLoading,
     signOut,
     isAuthenticated: !!user,
+    hasCompletedOnboarding,
   };
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
