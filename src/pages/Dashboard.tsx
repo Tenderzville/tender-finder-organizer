@@ -19,6 +19,8 @@ import { ProfileCard } from "@/components/dashboard/ProfileCard";
 import { QuickActionButtons } from "@/components/dashboard/QuickActionButtons";
 import { OfflineIndicator } from "@/components/dashboard/OfflineIndicator";
 import { DashboardHeader } from "@/components/dashboard/DashboardHeader";
+import { ScraperStatus } from "@/components/dashboard/ScraperStatus";
+import { ScraperDebugInfo } from "@/components/dashboard/ScraperDebugInfo";
 import { useDashboardTenders } from "@/hooks/use-dashboard-tenders";
 import { useTenderSharingActions } from "@/components/dashboard/TenderSharingActions";
 import { useDashboardNavigation } from "@/components/dashboard/DashboardNavigation";
@@ -31,6 +33,7 @@ const Dashboard = () => {
   const { isOnline, offlineData, syncData } = useOfflineMode();
   const { points } = usePoints({ userId: userData?.id || null });
   const [language, setLanguage] = useState<'en' | 'sw'>('en');
+  const [showDebugInfo, setShowDebugInfo] = useState(false);
   
   const { 
     tenders, 
@@ -85,7 +88,16 @@ const Dashboard = () => {
     } else if (isInitialized) {
       setIsLoading(false);
     }
-  }, [isAuthenticated, isInitialized, toast]);
+    
+    // Show debug info if there are zero tenders after 3 seconds
+    const timer = setTimeout(() => {
+      if (tenders.length === 0) {
+        setShowDebugInfo(true);
+      }
+    }, 3000);
+    
+    return () => clearTimeout(timer);
+  }, [isAuthenticated, isInitialized, toast, tenders.length]);
 
   if (isLoading || !isInitialized) {
     return (
@@ -100,6 +112,16 @@ const Dashboard = () => {
       </div>
     );
   }
+
+  // Show debug button after waiting for a while with no tenders
+  const debugButton = tenders.length === 0 || showDebugInfo ? (
+    <button 
+      onClick={() => setShowDebugInfo(!showDebugInfo)}
+      className="text-xs text-gray-500 hover:text-gray-700 mt-2 underline"
+    >
+      {showDebugInfo ? "Hide Diagnostics" : "Show Advanced Diagnostics"}
+    </button>
+  ) : null;
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -118,12 +140,21 @@ const Dashboard = () => {
 
         <ProfileCard userData={userData} />
 
-        <TenderList 
-          tenders={tenders}
-          isLoading={isLoadingTenders}
-          error={errorTenders}
-          onRetry={fetchTenders}
-        />
+        <div className="grid grid-cols-1 lg:grid-cols-4 gap-6 mt-8">
+          <div className="lg:col-span-3">
+            <TenderList 
+              tenders={tenders}
+              isLoading={isLoadingTenders}
+              error={errorTenders}
+              onRetry={fetchTenders}
+            />
+            {debugButton}
+          </div>
+          <div className="lg:col-span-1">
+            <ScraperStatus />
+            {showDebugInfo && <ScraperDebugInfo />}
+          </div>
+        </div>
 
         {!isLoadingTenders && !errorTenders && tenders.length > 0 && (
           <div className="mt-8">

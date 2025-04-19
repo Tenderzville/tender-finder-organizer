@@ -12,6 +12,7 @@ export function useTenderFeed() {
   const [forceStableView, setForceStableView] = useState(false);
   const [language, setLanguage] = useState<'en' | 'sw'>('en');
   const [showQualificationTool, setShowQualificationTool] = useState(false);
+  const [retryAttempts, setRetryAttempts] = useState(0);
 
   useEffect(() => {
     setForceStableView(true);
@@ -30,12 +31,26 @@ export function useTenderFeed() {
   } = useQuery({
     queryKey: ["dashboard-tenders"],
     queryFn: async () => {
-      console.log("TenderFeed: Fetching latest tenders");
+      console.log("TenderFeed: Fetching latest tenders, attempt #", retryAttempts + 1);
       
       // First ensure we have tenders
       const checkResult = await ensureTendersExist();
       if (!checkResult.success) {
         console.log("Initial tender check failed, will try direct database query");
+      } else if (checkResult.sampleTendersCreated && checkResult.tenders) {
+        // If we just created sample tenders, return them directly
+        console.log("Using newly created sample tenders");
+        const formattedTenders = checkResult.tenders.map(tender => ({
+          ...tender,
+          affirmative_action: parseTenderAffirmativeAction(tender.affirmative_action)
+        }));
+        
+        return {
+          latest_tenders: formattedTenders,
+          total_tenders: formattedTenders.length,
+          last_scrape: new Date().toISOString(),
+          source: "direct_sample_creation"
+        };
       }
       
       const { data: latestTenders, error: tendersError } = await supabase
@@ -69,12 +84,12 @@ export function useTenderFeed() {
         if (retriedTenders && retriedTenders.length > 0) {
           console.log(`Successfully fetched ${retriedTenders.length} tenders after retry`);
           
-          const { count, error: countError } = await supabase
+          const queryResult = await supabase
             .from('tenders')
             .select('*', { count: 'exact', head: true });
           
-          if (countError) {
-            console.error("Error counting tenders:", countError);
+          if (queryResult.error) {
+            console.error("Error counting tenders:", queryResult.error);
           }
           
           const formattedTenders = retriedTenders.map(tender => ({
@@ -84,19 +99,19 @@ export function useTenderFeed() {
           
           return {
             latest_tenders: formattedTenders,
-            total_tenders: count || retriedTenders.length,
+            total_tenders: queryResult.count || retriedTenders.length,
             last_scrape: new Date().toISOString(),
             source: "database_after_retry"
           };
         }
       }
       
-      const { count, error: countError } = await supabase
+      const queryResult = await supabase
         .from('tenders')
         .select('*', { count: 'exact', head: true });
       
-      if (countError) {
-        console.error("Error counting tenders:", countError);
+      if (queryResult.error) {
+        console.error("Error counting tenders:", queryResult.error);
       }
       
       const formattedTenders = latestTenders?.map(tender => ({
@@ -106,14 +121,14 @@ export function useTenderFeed() {
       
       return {
         latest_tenders: formattedTenders,
-        total_tenders: count || 0,
+        total_tenders: queryResult.count || 0,
         last_scrape: new Date().toISOString(),
         source: "database"
       };
     },
     staleTime: 1000 * 60 * 5,
     refetchInterval: false,
-    retry: 3, // Increase retry count
+    retry: 3, 
     refetchOnWindowFocus: false,
     gcTime: 1000 * 60 * 10
   });
@@ -126,10 +141,51 @@ export function useTenderFeed() {
     const initialFetch = async () => {
       try {
         if (isMounted) {
+          // Set a retry attempt counter to help with debugging
+          setRetryAttempts(prev => prev + 1);
           await refetch();
         }
       } catch (err) {
         console.error("Failed initial tender feed fetch:", err);
+        
+        // If we fail 3 times, try to create sample tenders directly
+        if (retryAttempts >= 2) {
+          try {
+            console.log("Multiple fetch attempts failed. Creating fallback sample tenders");
+            // Create sample tenders directly in this component as a last resort
+            const sampleTenders = [
+              {
+                title: "Emergency Fallback Tender",
+                description: "This is a fallback tender created when normal data fetching failed.",
+                deadline: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(),
+                category: "Emergency",
+                location: "Nairobi"
+              },
+              {
+                title: "Backup IT Services Tender",
+                description: "Emergency IT services tender created as a fallback.",
+                deadline: new Date(Date.now() + 10 * 24 * 60 * 60 * 1000).toISOString(),
+                category: "IT",
+                location: "Nairobi",
+                affirmative_action: { type: "youth", percentage: 30 }
+              }
+            ];
+            
+            const { data: createdData, error: createError } = await supabase
+              .from('tenders')
+              .insert(sampleTenders)
+              .select();
+              
+            if (createError) {
+              console.error("Error creating fallback tenders:", createError);
+            } else if (createdData) {
+              console.log("Created fallback tenders:", createdData);
+              await refetch();
+            }
+          } catch (fallbackErr) {
+            console.error("Failed to create fallback tenders:", fallbackErr);
+          }
+        }
       }
     };
     
@@ -138,7 +194,7 @@ export function useTenderFeed() {
     return () => {
       isMounted = false;
     };
-  }, [refetch]);
+  }, [refetch, retryAttempts]);
 
   const refreshTenderFeed = useCallback(async () => {
     if (isRefreshing) return;
