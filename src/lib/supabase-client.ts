@@ -54,7 +54,7 @@ export const forceTriggerScraper = async () => {
 export const ensureTendersExist = async () => {
   try {
     // First check if tenders exist
-    const { data: tenders, error: tendersError } = await supabase
+    const { data, error: tendersError, count } = await supabase
       .from('tenders')
       .select('count', { count: 'exact', head: true });
     
@@ -64,12 +64,12 @@ export const ensureTendersExist = async () => {
     }
     
     // If no tenders exist, force trigger the scraper
-    if (tenders.count === 0) {
+    if (count === 0) {
       console.log("No tenders found, forcing scraper to run");
       return await forceTriggerScraper();
     }
     
-    return { success: true, count: tenders.count };
+    return { success: true, count };
   } catch (error) {
     console.error('Error in ensureTendersExist:', error);
     return { success: false, error };
