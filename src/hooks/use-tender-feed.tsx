@@ -103,8 +103,9 @@ export function useTenderFeed() {
         description: "Starting the tender scraping process...",
       });
       
+      console.log("Invoking scrape-tenders function with force: true");
       const { data: result, error: invokeError } = await supabase.functions.invoke('scrape-tenders', {
-        body: { force: true }
+        body: { force: true, useApiLayer: true }
       });
       
       if (invokeError) {
