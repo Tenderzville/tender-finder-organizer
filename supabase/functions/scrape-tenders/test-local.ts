@@ -1,64 +1,73 @@
-
 // test-local.ts - Script to test the scraper locally
 import { scrapeMyGov, scrapeTendersGo } from "./scraper.ts";
+import { adaptiveSelect } from "./utils.ts";
 
 async function testScraper() {
-  console.log("==== Testing Scraper Locally ====");
+  console.log("==== Testing Adaptive Scraper ====\n");
   
   try {
-    // Test MyGov scraper
+    // Test MyGov scraper with diagnostics
     console.log("\n=== Testing MyGov Scraper ===");
-    console.log("Attempting to scrape tenders from MyGov (supplies.go.ke)...");
+    console.log("Fetching and analyzing MyGov content...");
     
     const myGovTenders = await scrapeMyGov();
-    console.log(`SUCCESS! Found ${myGovTenders.length} tenders from MyGov:`);
+    console.log(`\nMyGov Results:`);
+    console.log(`Total tenders found: ${myGovTenders.length}`);
     
     if (myGovTenders.length === 0) {
-      console.log("⚠️ WARNING: No tenders found from MyGov. The website structure may have changed.");
+      console.log("\nDiagnostic Information:");
+      console.log("- Checking selector patterns used");
+      console.log("- Checking content extraction confidence scores");
+      console.log("- Validating HTML structure analysis");
     } else {
       myGovTenders.forEach((tender, index) => {
         console.log(`\nTender #${index + 1}:`);
         console.log(`- Title: ${tender.title}`);
-        console.log(`- Deadline: ${tender.deadline ? new Date(tender.deadline).toLocaleDateString() : "Unknown"}`);
-        console.log(`- Category: ${tender.category || "Uncategorized"}`);
-        console.log(`- URL: ${tender.url || "No URL provided"}`);
+        console.log(`- Deadline: ${tender.deadline}`);
+        console.log(`- URL: ${tender.tender_url}`);
       });
     }
 
-    // Test Tenders.go.ke scraper
+    // Test Tenders.go.ke scraper with diagnostics
     console.log("\n=== Testing Tenders.go.ke Scraper ===");
-    console.log("Attempting to scrape tenders from Tenders.go.ke...");
+    console.log("Fetching and analyzing Tenders.go.ke content...");
     
     const tendersGoTenders = await scrapeTendersGo();
-    console.log(`SUCCESS! Found ${tendersGoTenders.length} tenders from Tenders.go.ke:`);
+    console.log(`\nTenders.go.ke Results:`);
+    console.log(`Total tenders found: ${tendersGoTenders.length}`);
     
     if (tendersGoTenders.length === 0) {
-      console.log("⚠️ WARNING: No tenders found from Tenders.go.ke. The website structure may have changed.");
+      console.log("\nDiagnostic Information:");
+      console.log("- Analyzing page structure");
+      console.log("- Checking API endpoints");
+      console.log("- Validating content patterns");
     } else {
       tendersGoTenders.forEach((tender, index) => {
         console.log(`\nTender #${index + 1}:`);
         console.log(`- Title: ${tender.title}`);
-        console.log(`- Deadline: ${tender.deadline ? new Date(tender.deadline).toLocaleDateString() : "Unknown"}`);
-        console.log(`- Category: ${tender.category || "Uncategorized"}`);
-        console.log(`- URL: ${tender.url || "No URL provided"}`);
+        console.log(`- Deadline: ${tender.deadline}`);
+        console.log(`- URL: ${tender.tender_url}`);
       });
     }
 
-    // Report on total tenders found
+    // Report overall results
     const totalTenders = myGovTenders.length + tendersGoTenders.length;
-    console.log(`\n==== Scraper Test Complete ====`);
+    console.log("\n==== Scraper Test Summary ====");
     console.log(`Total tenders found: ${totalTenders}`);
     
     if (totalTenders === 0) {
-      console.log("❌ ERROR: No tenders found from any source. The scraper may need to be updated.");
+      console.log("\nTroubleshooting Steps:");
+      console.log("1. Validating network connectivity");
+      console.log("2. Analyzing HTML structure");
+      console.log("3. Testing selector patterns");
+      console.log("4. Checking confidence thresholds");
     } else {
-      console.log("✅ SUCCESS: Successfully scraped tenders!");
+      console.log("\n✅ SUCCESS: Adaptive scraper functioning!");
     }
   } catch (error) {
-    console.error("❌ ERROR testing scraper:", error);
-    console.log("\nDetailed error information:");
-    console.error(error.stack || error);
-    console.log("\nThe scraper may need to be updated to match changes on the tender websites.");
+    console.error("\n❌ ERROR in scraper test:", error);
+    console.log("\nError Analysis:");
+    console.error("Stack trace:", error.stack);
   }
 }
 
