@@ -10,7 +10,7 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/comp
 import { Alert, AlertDescription } from "@/components/ui/alert";
 
 export function ScraperStatus() {
-  const { status, isRefreshing, fetchStatus, renderRelativeTime } = useScraperStatus();
+  const { status, isRefreshing, fetchStatus, renderRelativeTime, triggerScraper } = useScraperStatus();
 
   return (
     <Card className="shadow-md">
@@ -20,7 +20,7 @@ export function ScraperStatus() {
           <Button 
             variant="ghost" 
             size="sm" 
-            onClick={fetchStatus} 
+            onClick={triggerScraper} 
             disabled={isRefreshing}
             className="h-8 px-2"
           >

@@ -2,6 +2,7 @@
 import { useState, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { formatDistanceToNow } from "date-fns";
+import { checkScraperStatus, forceTriggerScraper } from "@/lib/supabase-client";
 
 export interface ScraperStatusData {
   lastRun: string | null;
@@ -35,52 +36,54 @@ export function useScraperStatus() {
       setIsRefreshing(true);
       
       // Try to call the check-scraper-status edge function
-      try {
-        const { data: functionData, error: functionError } = await supabase.functions.invoke('check-scraper-status');
+      const { data: functionData, error: functionError } = await checkScraperStatus();
+      
+      if (!functionError && functionData) {
+        console.log("Received data from check-scraper-status function:", functionData);
         
-        if (!functionError && functionData) {
-          console.log("Received data from check-scraper-status function:", functionData);
-          
-          // Count AGPO tenders
-          const { count: agpoCount } = await supabase
-            .from('tenders')
-            .select('count', { count: 'exact', head: true })
-            .not('affirmative_action', 'is', null);
-          
-          // Update status with data from the function
-          setStatus({
-            lastRun: functionData.last_check || null,
-            status: functionData.scraper_available ? 'idle' : 'failed',
-            tendersFound: functionData.total_tenders || 0,
-            agpoTendersFound: agpoCount || 0,
-            sources: [
-              { 
-                name: 'Tenders.go.ke', 
-                count: functionData.latest_tenders?.filter((t: any) => t.source === 'tenders.go.ke')?.length || 0,
-                status: functionData.scraper_available ? 'idle' : 'failed'
-              },
-              { 
-                name: 'Private Sector', 
-                count: functionData.latest_tenders?.filter((t: any) => t.source === 'private')?.length || 0,
-                status: functionData.scraper_available ? 'idle' : 'failed'
-              },
-              { 
-                name: 'AGPO Tenders', 
-                count: functionData.latest_tenders?.filter((t: any) => 
-                  t.affirmative_action && t.affirmative_action.type !== 'none')?.length || 0,
-                status: functionData.scraper_available ? 'idle' : 'failed'
-              }
-            ],
-            diagnostics: functionData.diagnostics || null,
-            apiLayerConfigured: functionData.api_layer_available || false,
-            apiLayerStatus: functionData.api_layer_status || undefined
-          });
-          
-          return;
-        }
-      } catch (e) {
-        console.error("Error invoking check-scraper-status function:", e);
+        // Count AGPO tenders
+        const { count: agpoCount } = await supabase
+          .from('tenders')
+          .select('count', { count: 'exact', head: true })
+          .not('affirmative_action', 'is', null);
+        
+        // Update status with data from the function
+        setStatus({
+          lastRun: functionData.last_check || null,
+          status: functionData.scraper_available ? 'idle' : 'failed',
+          tendersFound: functionData.total_tenders || 0,
+          agpoTendersFound: agpoCount || 0,
+          sources: [
+            { 
+              name: 'Tenders.go.ke', 
+              count: functionData.latest_tenders?.filter((t: any) => t.source === 'tenders.go.ke')?.length || 0,
+              status: functionData.scraper_available ? 'idle' : 'failed'
+            },
+            { 
+              name: 'Private Sector', 
+              count: functionData.latest_tenders?.filter((t: any) => t.source === 'private')?.length || 0,
+              status: functionData.scraper_available ? 'idle' : 'failed'
+            },
+            { 
+              name: 'AGPO Tenders', 
+              count: functionData.latest_tenders?.filter((t: any) => 
+                t.affirmative_action && t.affirmative_action.type !== 'none')?.length || 0,
+              status: functionData.scraper_available ? 'idle' : 'failed'
+            }
+          ],
+          diagnostics: functionData.diagnostics || null,
+          apiLayerConfigured: functionData.api_layer_available || false,
+          apiLayerStatus: functionData.api_layer_status || undefined
+        });
+        
+        return;
+      } else {
+        console.error("Error getting scraper status from function:", functionError);
       }
+
+      // If function fails, force trigger scraper to get fresh data
+      console.log("Function call failed, triggering scraper directly");
+      await forceTriggerScraper();
 
       // Fallback: Fetch status from database directly
       const { data, error } = await supabase
@@ -135,16 +138,25 @@ export function useScraperStatus() {
       }
     } catch (error) {
       console.error('Error fetching scraper status:', error);
+      
+      // Trigger the scraper as a last resort
+      try {
+        console.log("Triggering scraper due to error in status check");
+        await forceTriggerScraper();
+      } catch (triggerError) {
+        console.error("Failed to trigger scraper:", triggerError);
+      }
     } finally {
       setIsRefreshing(false);
     }
   };
 
   useEffect(() => {
+    // Initial fetch
     fetchStatus();
     
     // Set up a refresh interval
-    const intervalId = setInterval(fetchStatus, 60000); // Refresh every minute
+    const intervalId = setInterval(fetchStatus, 30000); // Refresh every 30 seconds
     
     return () => clearInterval(intervalId);
   }, []);
@@ -158,10 +170,35 @@ export function useScraperStatus() {
     }
   };
 
+  // Add a manual trigger function
+  const triggerScraper = async () => {
+    try {
+      setIsRefreshing(true);
+      console.log("Manually triggering scraper");
+      
+      const result = await forceTriggerScraper();
+      
+      if (result.success) {
+        // Wait a moment for the operation to begin
+        await new Promise(resolve => setTimeout(resolve, 3000));
+        
+        // Then fetch the status
+        await fetchStatus();
+      } else {
+        console.error("Failed to trigger scraper:", result.error);
+      }
+    } catch (error) {
+      console.error("Error triggering scraper:", error);
+    } finally {
+      setIsRefreshing(false);
+    }
+  };
+
   return {
     status,
     isRefreshing,
     fetchStatus,
-    renderRelativeTime
+    renderRelativeTime,
+    triggerScraper
   };
 }
