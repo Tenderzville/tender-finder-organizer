@@ -1,79 +1,99 @@
 import { DOMParser } from "https://deno.land/x/deno_dom@v0.1.38/deno-dom-wasm.ts";
 
-// Retry mechanism for fetching sources with optional proxy support
-export async function fetchSourceWithRetry(url: string, proxyUrl?: string, options?: RequestInit, maxRetries = 3): Promise<string> {
-  let retries = 0;
-  
-  while (retries < maxRetries) {
+// Fetch wrapper using native Deno client
+async function denoFetch(url: string): Promise<Response> {
+  const cmd = new Deno.Command("curl", {
+    args: [
+      "--insecure", // Skip SSL verification
+      "-L", // Follow redirects
+      "-s", // Silent mode
+      "-A", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) Chrome/120.0.0.0 Safari/537.36",
+      url
+    ]
+  });
+
+  try {
+    const { stdout } = await cmd.output();
+    const text = new TextDecoder().decode(stdout);
+    
+    return new Response(text, {
+      status: text ? 200 : 404,
+      headers: new Headers({
+        'content-type': 'text/html'
+      })
+    });
+  } catch (error: unknown) {
+    const errorMessage = error instanceof Error ? error.message : String(error);
+    throw new Error(`Failed to fetch ${url}: ${errorMessage}`);
+  }
+}
+
+// Retry mechanism for fetching sources
+export async function fetchSourceWithRetry(url: string): Promise<string> {
+  const maxRetries = 3;
+  const baseDelay = 1000;
+
+  for (let attempt = 1; attempt <= maxRetries; attempt++) {
     try {
-      console.log(`Fetching URL: ${url} (attempt ${retries + 1})${proxyUrl ? ' via proxy' : ''}`);
+      const response = await denoFetch(url);
       
-      // Basic headers to mimic a browser
-      const defaultHeaders = {
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36',
-        'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
-        'Accept-Language': 'en-US,en;q=0.9',
-        'Cache-Control': 'no-cache',
-        'Pragma': 'no-cache',
-      };
-      
-      let response;
-      
-      if (proxyUrl) {
-        // Use proxy if available
-        response = await fetch(proxyUrl, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            ...(options?.headers || defaultHeaders)
-          },
-          body: JSON.stringify({ url, ...options }),
-        });
-      } else {
-        // Direct fetch without proxy, merging provided options with defaults
-        const mergedOptions: RequestInit = {
-          headers: {
-            ...defaultHeaders,
-            ...(options?.headers || {})
-          },
-          ...options
-        };
-        // If options has headers, they'll override the default headers we just set
-        if (options?.headers) {
-          mergedOptions.headers = {
-            ...defaultHeaders,
-            ...options.headers
-          };
-        }
-        
-        response = await fetch(url, mergedOptions);
+      if (response.ok) {
+        return await response.text();
       }
       
-      if (!response.ok) {
-        throw new Error(`HTTP error! Status: ${response.status}`);
-      }
+      console.log(`Attempt ${attempt} failed for ${url}`);
       
-      return await response.text();
-    } catch (error) {
-      console.error(`Error fetching ${url}: ${error.message}`);
-      retries++;
-      
-      if (retries >= maxRetries) {
-        console.error(`Max retries reached for ${url}`);
-        return ""; // Return empty string after max retries
+      if (attempt === maxRetries) {
+        throw new Error(`Failed to fetch after ${maxRetries} attempts`);
       }
       
       // Exponential backoff
-      await new Promise(r => setTimeout(r, 1000 * Math.pow(2, retries)));
+      const delay = baseDelay * Math.pow(2, attempt - 1);
+      await new Promise(resolve => setTimeout(resolve, delay));
+    } catch (error: unknown) {
+      if (attempt === maxRetries) {
+        const errorMessage = error instanceof Error ? error.message : String(error);
+        throw new Error(`Failed to fetch ${url}: ${errorMessage}`);
+      }
+      console.error(`Attempt ${attempt} error:`, error instanceof Error ? error.message : String(error));
     }
   }
-  
-  return "";
+
+  throw new Error(`Failed to fetch content from ${url}`);
+}
+
+// Function to fetch MyGov content
+export async function fetchMyGovContent(): Promise<string> {
+  const urls = [
+    "http://www.mygov.go.ke/all-tenders",
+    "http://mygov.go.ke/all-tenders",
+    "http://www.mygov.go.ke/tenders",
+    "http://mygov.go.ke/tenders"
+  ];
+
+  for (const url of urls) {
+    try {
+      console.log(`Attempting to fetch from ${url}...`);
+      const response = await denoFetch(url);
+
+      if (response.ok) {
+        const html = await response.text();
+        if (html && html.length > 1000 && (html.includes('tender') || html.includes('Tender'))) {
+          console.log(`Successfully fetched content from ${url}`);
+          return html;
+        }
+      }
+    } catch (error: unknown) {
+      console.error(`Error fetching from ${url}:`, error instanceof Error ? error.message : String(error));
+    }
+  }
+
+  throw new Error("Could not fetch tender content from any MyGov URL");
 }
 
 // Parse date from various formats
-export function parseDate(dateStr: string): Date | null {
-  if (!dateStr) return null;
+export function parseDate(dateStr: string): Date {
+  if (!dateStr) return new Date();
   
   // Try standard formats
   const date = new Date(dateStr);
@@ -83,11 +103,12 @@ export function parseDate(dateStr: string): Date | null {
   const ddmmyyyy = /(\d{1,2})[\/\.-]?(\d{1,2})[\/\.-]?(\d{4})/;
   const ddmmyyyyMatch = dateStr.match(ddmmyyyy);
   if (ddmmyyyyMatch) {
-    return new Date(
+    const parsedDate = new Date(
       parseInt(ddmmyyyyMatch[3]), // year
       parseInt(ddmmyyyyMatch[2]) - 1, // month (0-indexed)
       parseInt(ddmmyyyyMatch[1]) // day
     );
+    if (!isNaN(parsedDate.getTime())) return parsedDate;
   }
   
   // Try to extract date from text
@@ -103,10 +124,14 @@ export function parseDate(dateStr: string): Date | null {
     const month = months[textMatch[2].toLowerCase().substring(0, 3)];
     const year = parseInt(textMatch[3]);
     
-    return new Date(year, month, day);
+    const parsedDate = new Date(year, month, day);
+    if (!isNaN(parsedDate.getTime())) return parsedDate;
   }
   
-  return null;
+  // Default to current date plus 14 days if parsing fails
+  const defaultDate = new Date();
+  defaultDate.setDate(defaultDate.getDate() + 14);
+  return defaultDate;
 }
 
 // Function to select elements using XPath
@@ -121,16 +146,18 @@ export function XPathSelect(html: string, xpath: string): string[] {
     }
     
     const result: string[] = [];
-    const nodes = document.evaluate(xpath, document, null, 0, null);
+    const nodes = document.querySelectorAll(xpath); // Using querySelector instead of evaluate
     
-    let node;
-    while (node = nodes.iterateNext()) {
-      result.push(node.textContent || "");
-    }
+    nodes.forEach(node => {
+      if (node.textContent) {
+        result.push(node.textContent);
+      }
+    });
     
     return result;
-  } catch (error) {
-    console.error(`XPath selection error: ${error.message}`);
+  } catch (error: unknown) {
+    const errorMessage = error instanceof Error ? error.message : String(error);
+    console.error(`XPath selection error: ${errorMessage}`);
     return [];
   }
 }

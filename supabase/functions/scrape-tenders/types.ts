@@ -26,3 +26,19 @@ export interface ScrapingResult {
   data?: any;
   message?: string;
 }
+
+export interface Tender {
+  title: string;
+  description: string;
+  deadline: string;
+  contact_info: string;
+  category: string;
+  location: string;
+  tender_url?: string;
+  requirements: string;
+  fees: string | null;
+  prerequisites: string | null;
+  points_required: number;
+  url?: string;
+  source?: string;
+}
