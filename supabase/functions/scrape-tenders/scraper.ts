@@ -1,5 +1,5 @@
-import { format, addDays, subDays } from "https://esm.sh/date-fns@2.30.0";
-import { fetchSourceWithRetry, parseDate, adaptiveSelect, extractKeywords } from "./utils.ts";
+import { subDays } from "https://esm.sh/date-fns@2.30.0";
+import { fetchSourceWithRetry, parseDate } from "./utils.ts";
 import type { Tender } from "./types.ts";
 import * as cheerio from "https://esm.sh/cheerio@1.0.0-rc.12";
 
@@ -12,7 +12,7 @@ interface TenderCandidate {
 }
 
 // Extract tenders using adaptive scraping
-async function extractTendersAdaptively(html: string, baseUrl: string): Promise<TenderCandidate[]> {
+function extractTendersAdaptively(html: string, baseUrl: string): Promise<TenderCandidate[]> {
   const candidates: TenderCandidate[] = [];
   
   console.log("\nAnalyzing page content:");
@@ -123,9 +123,11 @@ export async function scrapeMyGov(): Promise<Tender[]> {
     
     // Convert high-confidence candidates to tenders
     for (const candidate of candidates) {
-      if (candidate.confidence >= 0.7) { // Higher threshold for final inclusion
-        const deadlineDate = parseDate(candidate.deadlineText);
-        
+      const deadlineDate = parseDate(candidate.deadlineText);
+      const now = new Date();
+      
+      // Include tender if it has a valid deadline and hasn't expired yet
+      if (deadlineDate && deadlineDate > now) {
         tenders.push({
           title: candidate.title,
           description: candidate.description,
@@ -140,7 +142,7 @@ export async function scrapeMyGov(): Promise<Tender[]> {
       }
     }
     
-    console.log(`MyGov adaptive scraping complete. Found ${tenders.length} high-confidence tenders.`);
+    console.log(`MyGov adaptive scraping complete. Found ${tenders.length} active tenders.`);
     return tenders;
   } catch (error) {
     console.error("Error in scrapeMyGov:", error);
@@ -164,11 +166,13 @@ export async function scrapeTendersGo(): Promise<Tender[]> {
     // Extract tender candidates using adaptive scraping
     const candidates = await extractTendersAdaptively(html, "https://tenders.go.ke/website/tenders/index");
     
-    // Convert high-confidence candidates to tenders
+    // Convert candidates to tenders if they are still active
     for (const candidate of candidates) {
-      if (candidate.confidence >= 0.7) {
-        const deadlineDate = parseDate(candidate.deadlineText);
-        
+      const deadlineDate = parseDate(candidate.deadlineText);
+      const now = new Date();
+      
+      // Include tender if it has a valid deadline and hasn't expired yet
+      if (deadlineDate && deadlineDate > now) {
         tenders.push({
           title: candidate.title,
           description: candidate.description,
@@ -183,7 +187,7 @@ export async function scrapeTendersGo(): Promise<Tender[]> {
       }
     }
     
-    console.log(`Tenders.go.ke adaptive scraping complete. Found ${tenders.length} high-confidence tenders.`);
+    console.log(`Tenders.go.ke scraping complete. Found ${tenders.length} active tenders.`);
     return tenders;
   } catch (error) {
     console.error("Error in scrapeTendersGo:", error);

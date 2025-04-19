@@ -1,8 +1,7 @@
-
 import { useState, useEffect } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
-import { Loader2, AlertCircle, RefreshCw, ArrowUpRight } from "lucide-react";
+import { Loader2, AlertCircle, RefreshCw, ArrowUpRight, RotateCw, AlertTriangle } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Separator } from "@/components/ui/separator";
@@ -109,95 +108,74 @@ export const ScraperStatus = () => {
   }
 
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle className="flex justify-between items-center">
-          <span>Scraper Status</span>
-          <Badge variant={data.scraper_available ? "success" : "destructive"}>
-            {data.scraper_available ? "Available" : "Unavailable"}
-          </Badge>
+    <Card className="shadow-md">
+      <CardHeader className="pb-2">
+        <CardTitle className="text-lg font-medium flex items-center justify-between">
+          Scraper Status
+          <Button 
+            variant="ghost" 
+            size="sm" 
+            onClick={triggerScraper} 
+            disabled={isRefreshing}
+            className="h-8 px-2"
+          >
+            {isRefreshing ? <Loader2 className="h-4 w-4 animate-spin" /> : <RotateCw className="h-4 w-4" />}
+          </Button>
         </CardTitle>
         <CardDescription>
-          Monitor and manage tender scraping operations
+          Last run: {data.lastRun 
+            ? format(new Date(data.lastRun), "PPp")
+            : 'Never'}
         </CardDescription>
       </CardHeader>
-      <CardContent className="space-y-4">
-        <div>
-          <h3 className="text-sm font-medium mb-2">Latest Scraping Logs</h3>
-          {data.scraping_logs && data.scraping_logs.length > 0 ? (
-            <div className="space-y-3">
-              {data.scraping_logs.map((log: any) => (
-                <div key={log.id} className="bg-muted p-3 rounded-md text-sm">
-                  <div className="flex justify-between items-center mb-1">
-                    <span className="font-medium">Source: {log.source}</span>
-                    <Badge variant={log.status === 'success' ? "success" : "destructive"}>
-                      {log.status}
-                    </Badge>
-                  </div>
-                  <div className="grid grid-cols-1 gap-2 mt-2 text-xs">
-                    {log.records_found !== null && (
-                      <div>Records Found: {log.records_found}</div>
-                    )}
-                    {log.records_inserted !== null && (
-                      <div>Records Inserted: {log.records_inserted}</div>
-                    )}
-                    {log.error_message && (
-                      <div className="text-red-500">Error: {log.error_message}</div>
-                    )}
-                    <div>Time: {log.created_at ? format(new Date(log.created_at), "PPp") : "Unknown"}</div>
-                  </div>
-                </div>
-              ))}
-            </div>
-          ) : (
-            <p className="text-sm text-muted-foreground">No scraping logs available.</p>
-          )}
-        </div>
-        
-        <Separator />
-        
-        <div>
-          <h3 className="text-sm font-medium mb-2">Database Status</h3>
-          <div className="grid grid-cols-2 gap-4">
-            <div className="bg-muted p-3 rounded-md">
-              <div className="text-sm font-medium">Total Tenders</div>
-              <div className="text-2xl font-bold">{data.total_tenders || 0}</div>
-            </div>
-            <div className="bg-muted p-3 rounded-md">
-              <div className="text-sm font-medium">Latest Run</div>
-              <div className="text-sm">
-                {data.scraping_logs && data.scraping_logs.length > 0
-                  ? format(new Date(data.scraping_logs[0].created_at), "PPp")
-                  : "Never"}
+      <CardContent>
+        <div className="space-y-3">
+          {data.sources.map((source, i) => (
+            <div key={i} className="bg-muted p-3 rounded-md text-sm">
+              <div className="flex justify-between items-center mb-1">
+                <span className="font-medium">Source: {source.name}</span>
+                <Badge variant={source.status === 'success' ? "success" : "destructive"}>
+                  {source.status}
+                </Badge>
+              </div>
+              <div className="grid grid-cols-1 gap-2 mt-2 text-xs">
+                {source.count !== null && (
+                  <div>Records Found: {source.count}</div>
+                )}
+                {source.lastSuccess && (
+                  <div>Last Success: {format(new Date(source.lastSuccess), "PPp")}</div>
+                )}
+                {source.errorMessage && (
+                  <div className="text-red-500">Error: {source.errorMessage}</div>
+                )}
               </div>
             </div>
+          ))}
+        </div>
+        
+        <div className="mt-4 space-y-2">
+          <div className="flex justify-between items-center text-sm">
+            <span>Total Tenders Found:</span>
+            <Badge variant="secondary">{data.tendersFound}</Badge>
           </div>
+          <div className="flex justify-between items-center text-sm">
+            <span>New Tenders (Last 24h):</span>
+            <Badge variant="success">{data.newTendersCount}</Badge>
+          </div>
+          {data.errorCount > 0 && (
+            <Alert variant="destructive" className="mt-2">
+              <AlertTriangle className="h-4 w-4" />
+              <AlertDescription>
+                {data.errorCount} error{data.errorCount > 1 ? 's' : ''} occurred during scraping
+              </AlertDescription>
+            </Alert>
+          )}
         </div>
       </CardContent>
-      <CardFooter className="flex justify-between">
-        <Button 
-          variant="outline" 
-          size="sm" 
-          onClick={() => refetch()} 
-          className="flex items-center gap-1"
-        >
-          <RefreshCw className="h-4 w-4" /> Refresh Status
-        </Button>
-        <Button 
-          onClick={triggerScraper} 
-          disabled={isRefreshing}
-          className="flex items-center gap-1"
-        >
-          {isRefreshing ? (
-            <>
-              <Loader2 className="h-4 w-4 animate-spin" /> Running...
-            </>
-          ) : (
-            <>
-              <ArrowUpRight className="h-4 w-4" /> Run Scraper Now
-            </>
-          )}
-        </Button>
+      <CardFooter className="pt-2">
+        <div className="w-full text-sm text-center text-muted-foreground">
+          Next scheduled run in: {data.nextRunIn}
+        </div>
       </CardFooter>
     </Card>
   );

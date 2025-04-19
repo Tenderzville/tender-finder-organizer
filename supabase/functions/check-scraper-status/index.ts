@@ -1,4 +1,3 @@
-
 // supabase/functions/check-scraper-status/index.ts
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.42.7"
@@ -7,6 +6,62 @@ const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 }
+
+// Get detailed scraping metrics
+const getScrapingMetrics = async (supabase: SupabaseClient) => {
+  const last24Hours = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
+  
+  // Get total tenders
+  const { count: totalTenders } = await supabase
+    .from('tenders')
+    .select('*', { count: 'exact', head: true });
+
+  // Get new tenders in last 24 hours
+  const { count: newTenders } = await supabase
+    .from('tenders')
+    .select('*', { count: 'exact', head: true })
+    .gte('created_at', last24Hours);
+
+  // Get successful scrapes in last 24 hours
+  const { data: recentLogs } = await supabase
+    .from('scraping_logs')
+    .select('*')
+    .gte('created_at', last24Hours);
+
+  const successfulScrapes = recentLogs?.filter(log => log.status === 'success').length || 0;
+  const failedScrapes = recentLogs?.filter(log => log.status === 'error').length || 0;
+
+  // Get source-specific metrics
+  const sources = ['mygov', 'tenders.go.ke', 'private'];
+  const sourceMetrics = await Promise.all(sources.map(async (source) => {
+    const { data: logs } = await supabase
+      .from('scraping_logs')
+      .select('*')
+      .eq('source', source)
+      .order('created_at', { ascending: false })
+      .limit(1);
+
+    const lastLog = logs?.[0];
+    
+    return {
+      name: source,
+      status: lastLog?.status || 'unknown',
+      count: lastLog?.records_found || 0,
+      lastSuccess: lastLog?.status === 'success' ? lastLog.created_at : null,
+      errorMessage: lastLog?.error_message || null
+    };
+  }));
+
+  return {
+    totalTenders,
+    newTendersCount: newTenders,
+    successfulScrapes,
+    failedScrapes,
+    sources: sourceMetrics,
+    lastRun: recentLogs?.[0]?.created_at || null,
+    nextRunIn: '30 minutes' // Default schedule
+  };
+};
 
 serve(async (req) => {
   // Handle CORS
@@ -27,66 +82,30 @@ serve(async (req) => {
 
     console.log("Checking scraper status...");
 
-    // Get the latest scraper logs
-    const { data: scrapingLogs, error: logsError } = await supabase
-      .from('scraping_logs')
-      .select('*')
-      .order('created_at', { ascending: false })
-      .limit(5);
-
-    if (logsError) {
-      console.error("Error fetching scraping logs:", logsError);
-      throw logsError;
-    }
-
-    // Get the total number of tenders
-    const { count: totalTenders, error: countError } = await supabase
-      .from('tenders')
-      .select('*', { count: 'exact', head: true });
-
-    if (countError) {
-      console.error("Error counting tenders:", countError);
-      throw countError;
-    }
-
-    // Get the latest tenders
-    const { data: latestTenders, error: tendersError } = await supabase
-      .from('tenders')
-      .select('*')
-      .order('created_at', { ascending: false })
-      .limit(5);
-
-    if (tendersError) {
-      console.error("Error fetching latest tenders:", tendersError);
-      throw tendersError;
-    }
-
-    // Check if scraper is available
-    const scraperAvailable = true; // We assume it's available since we can check status
-
+    const metrics = await getScrapingMetrics(supabase);
+    
     return new Response(
       JSON.stringify({
-        scraping_logs: scrapingLogs,
-        total_tenders: totalTenders,
-        latest_tenders: latestTenders,
-        scraper_available: scraperAvailable,
-        message: "Status check completed"
+        ...metrics,
+        success: true,
+        message: "Status check completed successfully"
       }),
       {
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
         status: 200,
       }
     );
-  } catch (error) {
-    console.error("Error checking scraper status:", error);
 
+  } catch (error) {
+    console.error("Error in check-scraper-status:", error);
     return new Response(
       JSON.stringify({
-        success: false,
         error: error.message,
+        success: false,
+        message: "Failed to check scraper status"
       }),
       {
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
         status: 500,
       }
     );
