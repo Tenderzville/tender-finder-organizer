@@ -6,24 +6,28 @@ import { RefreshCw, Bug, Database, Loader2 } from "lucide-react";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { supabase } from "@/integrations/supabase/client";
 import { forceTriggerScraper } from "@/lib/supabase-client";
+import { useToast } from "@/hooks/use-toast";
 
 export function ScraperDebugInfo() {
   const [isLoading, setIsLoading] = useState(false);
   const [tenderCount, setTenderCount] = useState<number | null>(null);
   const [lastError, setLastError] = useState<string | null>(null);
   const [isForcing, setIsForcing] = useState(false);
+  const { toast } = useToast();
 
   const checkDatabase = async () => {
     setIsLoading(true);
     try {
-      // Check tender count
+      // Check tender count - use proper count query format
       const { count, error: countError } = await supabase
         .from('tenders')
         .select('*', { count: 'exact', head: true });
         
       if (countError) {
+        console.error("Database count error:", countError);
         setLastError(`Database count error: ${countError.message}`);
       } else {
+        console.log(`Found ${count} tenders in database check`);
         setTenderCount(count);
       }
       
@@ -50,6 +54,11 @@ export function ScraperDebugInfo() {
   const createEmergencyTenders = async () => {
     setIsForcing(true);
     try {
+      toast({
+        title: "Creating sample tenders",
+        description: "Adding sample tenders to the database...",
+      });
+      
       const sampleTenders = [
         {
           title: "Emergency Sample Tender",
@@ -75,13 +84,30 @@ export function ScraperDebugInfo() {
         
       if (error) {
         setLastError(`Error creating samples: ${error.message}`);
+        toast({
+          title: "Error",
+          description: `Failed to create samples: ${error.message}`,
+          variant: "destructive"
+        });
       } else {
         setLastError(null);
+        toast({
+          title: "Success",
+          description: `Created ${data.length} sample tenders`,
+        });
         await checkDatabase();
+        
+        // Reload the page to show the new tenders
+        window.location.reload();
       }
     } catch (err) {
       console.error("Error creating samples:", err);
       setLastError(err instanceof Error ? err.message : "Unknown error");
+      toast({
+        title: "Error",
+        description: "Could not create sample tenders",
+        variant: "destructive"
+      });
     } finally {
       setIsForcing(false);
     }
@@ -90,18 +116,41 @@ export function ScraperDebugInfo() {
   const forceScraping = async () => {
     setIsForcing(true);
     try {
+      toast({
+        title: "Forcing scraper",
+        description: "Triggering scraper to fetch latest tenders...",
+      });
+      
       const result = await forceTriggerScraper();
       if (!result.success) {
         setLastError(`Error forcing scraper: ${JSON.stringify(result.error)}`);
+        toast({
+          title: "Error",
+          description: "Failed to trigger scraper",
+          variant: "destructive"
+        });
       } else {
         setLastError(null);
+        toast({
+          title: "Scraper triggered",
+          description: "Successfully triggered scraper",
+        });
+        
         // Wait a moment for scraping to complete
         await new Promise(resolve => setTimeout(resolve, 3000));
         await checkDatabase();
+        
+        // Reload the page to show the new tenders
+        window.location.reload();
       }
     } catch (err) {
       console.error("Error forcing scraper:", err);
       setLastError(err instanceof Error ? err.message : "Unknown error");
+      toast({
+        title: "Error",
+        description: "Could not trigger scraper",
+        variant: "destructive"
+      });
     } finally {
       setIsForcing(false);
     }
@@ -109,6 +158,11 @@ export function ScraperDebugInfo() {
 
   useEffect(() => {
     checkDatabase();
+    
+    // Set up a refresh interval
+    const intervalId = setInterval(checkDatabase, 10000); // Check every 10 seconds
+    
+    return () => clearInterval(intervalId);
   }, []);
 
   return (

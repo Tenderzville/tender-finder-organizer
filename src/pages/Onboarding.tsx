@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
@@ -16,35 +15,8 @@ export default function Onboarding() {
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   useEffect(() => {
-    const checkOnboardingStatus = async () => {
-      try {
-        const { data: { session } } = await supabase.auth.getSession();
-        
-        if (session) {
-          const { data: profile } = await supabase
-            .from('profiles')
-            .select('onboarding_completed')
-            .eq('user_id', session.user.id)
-            .maybeSingle();
-            
-          if (profile?.onboarding_completed) {
-            console.log("Onboarding already completed, redirecting to dashboard");
-            navigate('/dashboard');
-          }
-        } else {
-          const hasCompletedOnboarding = localStorage.getItem('onboardingComplete') === 'true';
-          
-          if (hasCompletedOnboarding) {
-            console.log("Onboarding already completed (localStorage), redirecting to dashboard");
-            navigate('/dashboard');
-          }
-        }
-      } catch (error) {
-        console.error("Error checking onboarding status:", error);
-      }
-    };
-    
-    checkOnboardingStatus();
+    // Skip onboarding for now and redirect directly to dashboard
+    navigate('/dashboard');
   }, [navigate]);
 
   const interestOptions = [
@@ -136,63 +108,17 @@ export default function Onboarding() {
           transition={{ duration: 0.5 }}
         >
           <CardContent className="p-6 pt-8">
-            <h3 className="text-xl font-semibold mb-4">What are you interested in?</h3>
-            <p className="text-muted-foreground mb-6">Select categories to see related tenders</p>
-
-            <div className="mb-6">
-              <Select onValueChange={(value) => {
-                if (value && !interests.includes(value)) {
-                  setInterests(prev => [...prev, value]);
-                }
-              }}>
-                <SelectTrigger className="w-full">
-                  <SelectValue placeholder="Add a category" />
-                </SelectTrigger>
-                <SelectContent>
-                  {interestOptions.map((option) => (
-                    <SelectItem key={option} value={option} disabled={interests.includes(option)}>
-                      {option}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-              {interests.map((interest) => (
-                <div 
-                  key={interest}
-                  className="border rounded-lg p-3 flex items-center space-x-3 cursor-pointer transition-colors bg-primary/10 border-primary"
-                >
-                  <Checkbox 
-                    id={`interest-${interest}`}
-                    checked={true}
-                    onCheckedChange={() => handleInterestToggle(interest)}
-                  />
-                  <label 
-                    htmlFor={`interest-${interest}`}
-                    className="flex-grow cursor-pointer"
-                  >
-                    {interest}
-                  </label>
-                </div>
-              ))}
-            </div>
-            
-            {interests.length === 0 && (
-              <p className="text-center text-muted-foreground mt-4">
-                Add categories you're interested in from the dropdown above
-              </p>
-            )}
+            <h3 className="text-xl font-semibold mb-4">Redirecting to Dashboard...</h3>
+            <p className="text-muted-foreground mb-6">You'll be redirected to the dashboard automatically.</p>
           </CardContent>
 
           <CardFooter className="flex justify-between pb-6 px-6">
-            <Button variant="ghost" onClick={() => navigate('/dashboard')}>Skip</Button>
+            <Button variant="ghost" onClick={() => navigate('/dashboard')}>Go to Dashboard</Button>
             <Button 
-              onClick={handleComplete} 
+              onClick={() => navigate('/dashboard')} 
               disabled={isSubmitting}
             >
-              {isSubmitting ? 'Saving...' : 'Finish Setup'}
+              {isSubmitting ? 'Loading...' : 'Go to Dashboard'}
             </Button>
           </CardFooter>
         </motion.div>

@@ -18,6 +18,14 @@ export const supabase = createClient(
       persistSession: true,
       autoRefreshToken: true,
       detectSessionInUrl: true,
+      storageKey: 'tender-track-auth',
+      storage: localStorage
+    },
+    global: {
+      fetch: (...args) => {
+        console.log('Supabase fetch call:', args[0]);
+        return fetch(...args);
+      }
     }
   }
 );
