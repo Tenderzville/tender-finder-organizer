@@ -22,9 +22,9 @@ export const supabase = createClient(
       storage: localStorage
     },
     global: {
-      fetch: (...args) => {
-        console.log('Supabase fetch call:', args[0]);
-        return fetch(...args);
+      fetch: (input: RequestInfo | URL, init?: RequestInit) => {
+        console.log('Supabase fetch call:', input);
+        return fetch(input, init);
       }
     }
   }
