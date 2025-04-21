@@ -13,6 +13,7 @@ import { TenderContent } from "@/components/tenders/TenderContent";
 const Tenders = () => {
   const [language, setLanguage] = useState<'en' | 'sw'>('en');
   const { isOnline, offlineData, syncData } = useOfflineMode();
+  const [apiError, setApiError] = useState<string | null>(null);
   
   const { 
     tenders, 
@@ -21,13 +22,7 @@ const Tenders = () => {
     fetchTenders 
   } = useDashboardTenders();
 
-  const {
-    handleRefreshTenders,
-    isRefreshing,
-    apiError,
-    setApiError
-  } = useTenderRefresh({ fetchTenders });
-
+  const { isRefreshing, refreshTenderFeed } = useTenderRefresh();
   const { initializeSampleTenders } = useTenderSamples();
   
   // Use offline data if not online
@@ -39,7 +34,7 @@ const Tenders = () => {
       console.error("Error in initial tenders fetch:", err);
       setApiError("Failed to load tenders. Please try refreshing.");
     });
-  }, [fetchTenders, setApiError]);
+  }, [fetchTenders]);
   
   // Initialize sample tenders if none exist on component mount
   useEffect(() => {
@@ -47,6 +42,11 @@ const Tenders = () => {
       initializeSampleTenders();
     }
   }, [displayTenders.length, isLoadingTenders, apiError, initializeSampleTenders]);
+
+  const handleRefreshTenders = () => {
+    setApiError(null);
+    refreshTenderFeed();
+  };
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -82,3 +82,4 @@ const Tenders = () => {
 };
 
 export default Tenders;
+

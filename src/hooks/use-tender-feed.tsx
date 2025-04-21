@@ -1,5 +1,5 @@
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useToast } from "@/hooks/use-toast";
 import { ensureTendersExist } from "@/lib/supabase-client";
@@ -113,3 +113,4 @@ export function useTenderFeed() {
     refetch
   };
 }
+

@@ -32,3 +32,4 @@ export async function getTotalTendersCount() {
   
   return queryResult.count || 0;
 }
+
