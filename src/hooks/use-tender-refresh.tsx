@@ -1,86 +1,52 @@
 
 import { useState } from "react";
-import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
-import { useTenderSamples } from "@/hooks/use-tender-samples";
+import { forceTriggerScraper } from "@/lib/supabase-client";
 
-export function useTenderRefresh({ fetchTenders }: { fetchTenders: () => Promise<any> }) {
+export function useTenderRefresh() {
   const [isRefreshing, setIsRefreshing] = useState(false);
-  const [apiError, setApiError] = useState<string | null>(null);
   const { toast } = useToast();
-  const { initializeSampleTenders } = useTenderSamples();
 
-  const handleRefreshTenders = async (): Promise<void> => {
+  const refreshTenderFeed = async () => {
     if (isRefreshing) return;
     
     setIsRefreshing(true);
-    setApiError(null);
     
     try {
       toast({
-        title: "Refreshing tenders",
-        description: "Retrieving latest tender data...",
+        title: "Refreshing Tenders",
+        description: "Starting the tender scraping process...",
       });
       
-      // Check if we need to create sample data
-      const { count, error: countError } = await supabase
-        .from('tenders')
-        .select('*', { count: 'exact', head: true });
+      const result = await forceTriggerScraper();
       
-      if (countError) {
-        console.error("Error counting tenders:", countError);
-        throw countError;
+      if (!result.success) {
+        throw new Error("Failed to trigger scraper");
       }
       
-      if (count === 0) {
-        await initializeSampleTenders();
-      } else {
-        // Trigger a fresh scrape using the API Layer
-        const { data: scrapeResult, error: scrapeError } = await supabase.functions.invoke(
-          'scrape-tenders',
-          {
-            body: { 
-              force: true,
-              useApiLayer: true 
-            }
-          }
-        );
-        
-        if (scrapeError) {
-          console.error("Error triggering scrape:", scrapeError);
-          throw scrapeError;
-        }
-        
-        console.log("Scrape result:", scrapeResult);
-        
-        // Wait a moment for data to be processed
-        await new Promise(resolve => setTimeout(resolve, 2000));
-      }
-      
-      // Try to fetch fresh data
-      await fetchTenders();
+      // Wait to allow scraping to complete
+      await new Promise(resolve => setTimeout(resolve, 5000));
       
       toast({
-        title: "Tenders updated",
-        description: "Successfully refreshed tenders data.",
+        title: "Feed Refreshed",
+        description: `Tender data refreshed successfully`,
       });
     } catch (err) {
-      console.error("Error refreshing tenders:", err);
-      setApiError("Failed to refresh tenders. Please try again later.");
+      console.error("Failed to refresh tender feed:", err);
       toast({
-        title: "Refresh failed",
+        title: "Refresh Error",
         description: "Could not refresh tenders. Please try again later.",
-        variant: "destructive"
+        variant: "destructive",
       });
     } finally {
-      setIsRefreshing(false);
+      setTimeout(() => {
+        setIsRefreshing(false);
+      }, 500);
     }
   };
 
   return {
-    handleRefreshTenders,
     isRefreshing,
-    apiError,
-    setApiError
+    refreshTenderFeed
   };
 }
