@@ -7,7 +7,7 @@ export function useTenderRefresh() {
   const [isRefreshing, setIsRefreshing] = useState(false);
   const { toast } = useToast();
 
-  const refreshTenderFeed = async () => {
+  const refreshTenderFeed = async (): Promise<void> => {
     if (isRefreshing) return;
     
     setIsRefreshing(true);
@@ -50,4 +50,3 @@ export function useTenderRefresh() {
     refreshTenderFeed
   };
 }
-

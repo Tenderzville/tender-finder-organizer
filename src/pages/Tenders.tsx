@@ -43,9 +43,10 @@ const Tenders = () => {
     }
   }, [displayTenders.length, isLoadingTenders, apiError, initializeSampleTenders]);
 
-  const handleRefreshTenders = () => {
+  // Modified to return a Promise as required by the component props
+  const handleRefreshTenders = async (): Promise<void> => {
     setApiError(null);
-    refreshTenderFeed();
+    return refreshTenderFeed();
   };
 
   return (
@@ -82,4 +83,3 @@ const Tenders = () => {
 };
 
 export default Tenders;
-
