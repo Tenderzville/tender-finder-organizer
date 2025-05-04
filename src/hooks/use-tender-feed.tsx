@@ -2,7 +2,6 @@
 import { useState, useEffect } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useToast } from "@/hooks/use-toast";
-import { ensureTendersExist } from "@/lib/supabase-client";
 import { fetchLatestTenders, getTotalTendersCount } from "@/utils/tenderFetching";
 import { useTenderRefresh } from "@/hooks/use-tender-refresh";
 import { useSampleTenders } from "@/hooks/use-sample-tenders";
@@ -35,19 +34,6 @@ export function useTenderFeed() {
     queryKey: ["dashboard-tenders"],
     queryFn: async () => {
       console.log("TenderFeed: Fetching latest tenders, attempt #", retryAttempts + 1);
-      
-      const checkResult = await ensureTendersExist();
-      
-      if (!checkResult.success) {
-        console.log("Initial tender check failed, will try direct database query");
-      } else if (checkResult.sampleTendersCreated && checkResult.tenders) {
-        return {
-          latest_tenders: checkResult.tenders,
-          total_tenders: checkResult.tenders.length,
-          last_scrape: new Date().toISOString(),
-          source: "direct_sample_creation"
-        };
-      }
       
       const latestTenders = await fetchLatestTenders();
       const totalTenders = await getTotalTendersCount();
@@ -113,4 +99,3 @@ export function useTenderFeed() {
     refetch
   };
 }
-
