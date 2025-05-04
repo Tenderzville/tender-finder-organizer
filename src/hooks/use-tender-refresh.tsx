@@ -1,7 +1,7 @@
 
 import { useState } from "react";
 import { useToast } from "@/hooks/use-toast";
-import { forceTriggerScraper } from "@/lib/supabase-client";
+import { forceTriggerScraper, supabase } from "@/lib/supabase-client";
 
 export function useTenderRefresh() {
   const [isRefreshing, setIsRefreshing] = useState(false);
