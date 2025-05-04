@@ -4,7 +4,6 @@ import { Navigation } from "@/components/Navigation";
 import { useOfflineMode } from '@/hooks/use-offline-mode';
 import { useDashboardTenders } from "@/hooks/use-dashboard-tenders";
 import { useTenderRefresh } from "@/hooks/use-tender-refresh";
-import { useTenderSamples } from "@/hooks/use-tender-samples";
 import { TenderRefreshButton } from "@/components/tenders/TenderRefreshButton";
 import { TenderErrorAlert } from "@/components/tenders/TenderErrorAlert";
 import { OfflineAlert } from "@/components/tenders/OfflineAlert";
@@ -23,7 +22,6 @@ const Tenders = () => {
   } = useDashboardTenders();
 
   const { isRefreshing, refreshTenderFeed } = useTenderRefresh();
-  const { initializeSampleTenders } = useTenderSamples();
   
   // Use offline data if not online
   const displayTenders = isOnline ? tenders : offlineData.tenders;
@@ -32,16 +30,9 @@ const Tenders = () => {
     // Initial data fetch
     fetchTenders().catch(err => {
       console.error("Error in initial tenders fetch:", err);
-      setApiError("Failed to load tenders. Please try refreshing.");
+      setApiError("Failed to load tenders. Please use the refresh button to trigger the scraper.");
     });
   }, [fetchTenders]);
-  
-  // Initialize sample tenders if none exist on component mount
-  useEffect(() => {
-    if (displayTenders.length === 0 && !isLoadingTenders && !apiError) {
-      initializeSampleTenders();
-    }
-  }, [displayTenders.length, isLoadingTenders, apiError, initializeSampleTenders]);
 
   // Modified to return a Promise as required by the component props
   const handleRefreshTenders = async (): Promise<void> => {

@@ -24,13 +24,15 @@ export function useTenderRefresh() {
         throw new Error("Failed to trigger scraper");
       }
       
-      // Wait to allow scraping to complete
-      await new Promise(resolve => setTimeout(resolve, 5000));
-      
       toast({
-        title: "Feed Refreshed",
-        description: `Tender data refreshed successfully`,
+        title: "Scraper Triggered",
+        description: "Tender scraping in progress, refreshing page...",
       });
+      
+      // Force reload the page to get the new data after a short delay
+      setTimeout(() => {
+        window.location.reload();
+      }, 2000);
     } catch (err) {
       console.error("Failed to refresh tender feed:", err);
       toast({
