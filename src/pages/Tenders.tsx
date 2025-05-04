@@ -8,6 +8,7 @@ import { TenderRefreshButton } from "@/components/tenders/TenderRefreshButton";
 import { TenderErrorAlert } from "@/components/tenders/TenderErrorAlert";
 import { OfflineAlert } from "@/components/tenders/OfflineAlert";
 import { TenderContent } from "@/components/tenders/TenderContent";
+import { Alert, AlertTitle, AlertDescription } from "@/components/ui/alert";
 
 const Tenders = () => {
   const [language, setLanguage] = useState<'en' | 'sw'>('en');
@@ -32,7 +33,23 @@ const Tenders = () => {
       console.error("Error in initial tenders fetch:", err);
       setApiError("Failed to load tenders. Please use the refresh button to trigger the scraper.");
     });
-  }, [fetchTenders]);
+    
+    // Check if we need to automatically trigger the scraper due to no tenders
+    const checkAndTriggerScraperIfNeeded = async () => {
+      if (tenders.length === 0 && !isRefreshing && isOnline) {
+        console.log("No tenders found, automatically triggering scraper...");
+        try {
+          await refreshTenderFeed();
+        } catch (error) {
+          console.error("Failed to auto-trigger scraper:", error);
+        }
+      }
+    };
+    
+    // Only run auto-trigger after a short delay to allow for initial data fetch
+    const timer = setTimeout(checkAndTriggerScraperIfNeeded, 2000);
+    return () => clearTimeout(timer);
+  }, [fetchTenders, tenders.length, isRefreshing, isOnline, refreshTenderFeed]);
 
   // Modified to return a Promise as required by the component props
   const handleRefreshTenders = async (): Promise<void> => {
@@ -52,8 +69,20 @@ const Tenders = () => {
           <TenderRefreshButton 
             isRefreshing={isRefreshing}
             onRefresh={handleRefreshTenders}
+            label="Refresh Tenders"
+            refreshingLabel="Refreshing Tenders..."
           />
         </div>
+
+        {displayTenders.length === 0 && !isLoadingTenders && (
+          <Alert className="mb-6 bg-amber-50 border-amber-200">
+            <AlertTitle className="text-amber-800">No Tenders Found</AlertTitle>
+            <AlertDescription className="text-amber-700">
+              Click the "Refresh Tenders" button in the top right corner to fetch real-time tenders from official sources.
+              This process may take 1-2 minutes to complete.
+            </AlertDescription>
+          </Alert>
+        )}
 
         {apiError && <TenderErrorAlert errorMessage={apiError} />}
 

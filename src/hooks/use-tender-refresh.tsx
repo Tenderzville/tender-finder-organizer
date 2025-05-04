@@ -25,14 +25,57 @@ export function useTenderRefresh() {
       }
       
       toast({
-        title: "Scraper Triggered",
-        description: "Tender scraping in progress, refreshing page...",
+        title: "Scraper Triggered Successfully",
+        description: "Tender scraping in progress, this may take a minute. The page will refresh automatically when complete.",
       });
       
-      // Force reload the page to get the new data after a short delay
-      setTimeout(() => {
-        window.location.reload();
-      }, 2000);
+      // Set up a longer polling interval to check for new tenders
+      let attempts = 0;
+      const maxAttempts = 5;
+      
+      const checkForTenders = async () => {
+        attempts++;
+        
+        const { count } = await supabase
+          .from('tenders')
+          .select('*', { count: 'exact', head: true });
+          
+        if (count && count > 0) {
+          toast({
+            title: "Tenders Found!",
+            description: `Found ${count} tenders. Refreshing page...`,
+          });
+          
+          // Force reload the page to get the new data
+          setTimeout(() => {
+            window.location.reload();
+          }, 1500);
+          
+          return;
+        }
+        
+        if (attempts < maxAttempts) {
+          toast({
+            title: "Still searching for tenders",
+            description: `Attempt ${attempts}/${maxAttempts}. This may take a moment...`,
+          });
+          
+          // Wait 15 seconds before checking again
+          setTimeout(checkForTenders, 15000);
+        } else {
+          toast({
+            title: "No tenders found",
+            description: "Try again later or contact support if the issue persists.",
+            variant: "destructive",
+          });
+          
+          setIsRefreshing(false);
+        }
+      };
+      
+      // Start checking for new tenders after a delay
+      setTimeout(checkForTenders, 5000);
+      
     } catch (err) {
       console.error("Failed to refresh tender feed:", err);
       toast({
@@ -40,10 +83,7 @@ export function useTenderRefresh() {
         description: "Could not refresh tenders. Please try again later.",
         variant: "destructive",
       });
-    } finally {
-      setTimeout(() => {
-        setIsRefreshing(false);
-      }, 500);
+      setIsRefreshing(false);
     }
   };
 

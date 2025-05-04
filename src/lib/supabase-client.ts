@@ -25,32 +25,51 @@ export const checkScraperStatus = async () => {
 // Function to force trigger the scraper with all necessary parameters
 export const forceTriggerScraper = async () => {
   try {
-    console.log("Force triggering scraper with comprehensive parameters");
+    console.log("Force triggering scraper with maximum priority");
     
-    // Trigger the scraper with comprehensive parameters
-    const { data, error } = await supabase.functions.invoke('scrape-tenders', {
+    // First check if there are already tenders in the database
+    const { count, error: countError } = await supabase
+      .from('tenders')
+      .select('*', { count: 'exact', head: true });
+    
+    if (countError) {
+      console.error('Error checking tenders count:', countError);
+    } else {
+      console.log('Current tenders in database:', count);
+    }
+    
+    // Trigger both the main scraper and private tenders scraper
+    const mainScraper = supabase.functions.invoke('scrape-tenders', {
       body: { 
         force: true, 
         useApiLayer: true,
         fullScrape: true,
         skipCache: true,
-        verboseLogging: true
+        verboseLogging: true,
+        priority: 1
       }
     });
     
-    console.log('Scraper invocation result:', { data, error });
+    const privateScraper = supabase.functions.invoke('scrape-private-tenders');
     
-    if (error) {
-      console.error('Error triggering scraper:', error);
-      return { success: false, error };
+    const [mainResult, privateResult] = await Promise.all([mainScraper, privateScraper]);
+    
+    if (mainResult.error || privateResult.error) {
+      console.error('Error triggering scrapers:', {
+        main: mainResult.error,
+        private: privateResult.error
+      });
+      return { success: false, error: mainResult.error || privateResult.error };
     }
     
-    console.log("Scraper trigger response:", data);
-    return { success: true, data };
+    console.log("Scraper trigger responses:", {
+      main: mainResult.data,
+      private: privateResult.data
+    });
+    
+    return { success: true, data: { main: mainResult.data, private: privateResult.data } };
   } catch (error) {
     console.error('Error in forceTriggerScraper:', error);
     return { success: false, error };
   }
 };
-
-// Remove ensureTendersExist function as we don't want to create sample data anymore
