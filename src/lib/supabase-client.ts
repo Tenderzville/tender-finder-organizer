@@ -41,6 +41,25 @@ export const fetchTendersViaBrowserAI = async () => {
   }
 };
 
+// Function to import tenders from sample sheets
+export const importTendersFromSheets = async () => {
+  try {
+    console.log("Importing tenders from sample sheets");
+    
+    const { data, error } = await supabase.functions.invoke('browser-ai-tenders/import-sample-sheets');
+    
+    if (error) {
+      console.error('Error importing tenders from sheets:', error);
+      return { success: false, error };
+    }
+    
+    return { success: true, data };
+  } catch (error) {
+    console.error('Error in importTendersFromSheets:', error);
+    return { success: false, error };
+  }
+};
+
 // Function to force trigger the scraper with all necessary parameters
 export const forceTriggerScraper = async () => {
   try {
@@ -57,7 +76,22 @@ export const forceTriggerScraper = async () => {
       console.log('Current tenders in database:', count);
     }
     
-    // Try Browser AI integration first
+    // Try importing from sheets first
+    try {
+      console.log("Attempting to import from sample sheets...");
+      const { data: sheetsData, error: sheetsError } = await supabase.functions.invoke('browser-ai-tenders/import-sample-sheets');
+      
+      if (sheetsError) {
+        console.error('Error importing from sheets:', sheetsError);
+      } else if (sheetsData?.success && sheetsData.totalImported > 0) {
+        console.log('Sheets import successful:', sheetsData);
+        return { success: true, data: sheetsData };
+      }
+    } catch (sheetsErr) {
+      console.error('Error calling sheets import:', sheetsErr);
+    }
+    
+    // Try Browser AI integration next
     try {
       console.log("Attempting Browser AI tender fetching...");
       const { data: browserAIData, error: browserAIError } = await supabase.functions.invoke('browser-ai-tenders/fetch-browser-ai');
@@ -72,7 +106,7 @@ export const forceTriggerScraper = async () => {
       console.error('Error calling Browser AI integration:', browserAIErr);
     }
     
-    // First try the direct API approach through check-scraper-status
+    // Next try the direct API approach through check-scraper-status
     console.log("Attempting direct API tender fetching...");
     const { data: statusData, error: statusError } = await supabase.functions.invoke('check-scraper-status');
     

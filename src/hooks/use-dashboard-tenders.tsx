@@ -32,18 +32,18 @@ export function useDashboardTenders() {
       
       // If no tenders are found, try to fetch from Browser AI
       if (!data || data.length === 0) {
-        console.log("No tenders found in database, trying Browser AI...");
+        console.log("No tenders found in database, trying multiple sources...");
         
         try {
-          // Try to fetch tenders from Browser AI
-          const { data: browserAIData, error: browserAIError } = await supabase.functions.invoke(
-            'browser-ai-tenders/fetch-browser-ai'
+          // First, try to import from sample sheets
+          const { data: sheetsData, error: sheetsError } = await supabase.functions.invoke(
+            'browser-ai-tenders/import-sample-sheets'
           );
           
-          if (browserAIError) {
-            console.error("Error fetching from Browser AI:", browserAIError);
-          } else if (browserAIData?.success) {
-            console.log(`Successfully fetched ${browserAIData.inserted} tenders from Browser AI`);
+          if (sheetsError) {
+            console.error("Error importing from sample sheets:", sheetsError);
+          } else if (sheetsData?.success && sheetsData.totalImported > 0) {
+            console.log(`Successfully imported ${sheetsData.totalImported} tenders from sample sheets`);
             
             // Refresh tenders from database
             const { data: refreshedData, error: refreshError } = await supabase
@@ -64,9 +64,40 @@ export function useDashboardTenders() {
               setIsLoadingTenders(false);
               return;
             }
+          } else {
+            // If sheets import didn't work, try Browser AI
+            const { data: browserAIData, error: browserAIError } = await supabase.functions.invoke(
+              'browser-ai-tenders/fetch-browser-ai'
+            );
+            
+            if (browserAIError) {
+              console.error("Error fetching from Browser AI:", browserAIError);
+            } else if (browserAIData?.success) {
+              console.log(`Successfully fetched ${browserAIData.inserted} tenders from Browser AI`);
+              
+              // Refresh tenders from database
+              const { data: refreshedData, error: refreshError } = await supabase
+                .from('tenders')
+                .select('*')
+                .order('created_at', { ascending: false });
+                
+              if (refreshError) {
+                console.error("Error fetching refreshed tenders:", refreshError);
+              } else if (refreshedData) {
+                // Transform the data to match the Tender type
+                const formattedTenders = refreshedData.map(tender => ({
+                  ...tender,
+                  affirmative_action: parseTenderAffirmativeAction(tender.affirmative_action)
+                }));
+                
+                setTenders(formattedTenders);
+                setIsLoadingTenders(false);
+                return;
+              }
+            }
           }
-        } catch (aiError) {
-          console.error("Browser AI fetch error:", aiError);
+        } catch (importError) {
+          console.error("Error importing tenders:", importError);
         }
         
         // If we get here, set empty array

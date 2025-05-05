@@ -1,7 +1,7 @@
 
 import { useState } from "react";
 import { useToast } from "@/hooks/use-toast";
-import { forceTriggerScraper, supabase, checkScraperStatus } from "@/lib/supabase-client";
+import { forceTriggerScraper, supabase, importTendersFromSheets } from "@/lib/supabase-client";
 
 export function useTenderRefresh() {
   const [isRefreshing, setIsRefreshing] = useState(false);
@@ -18,7 +18,27 @@ export function useTenderRefresh() {
         description: "Fetching real-time tenders using multiple methods...",
       });
       
-      // First try the Browser AI integration
+      // First try importing from sample sheets
+      try {
+        const sheetsResult = await importTendersFromSheets();
+        
+        if (sheetsResult.success && sheetsResult.data?.totalImported > 0) {
+          toast({
+            title: "Import Successful",
+            description: `Imported ${sheetsResult.data.totalImported} tenders from sample sheets. The page will refresh shortly.`,
+          });
+          
+          setTimeout(() => {
+            window.location.reload();
+          }, 1500);
+          
+          return;
+        }
+      } catch (sheetsErr) {
+        console.error("Sample sheets import failed:", sheetsErr);
+      }
+      
+      // Then try the Browser AI integration
       try {
         const { data: browserAIData, error: browserAIError } = await supabase.functions.invoke(
           'browser-ai-tenders/fetch-browser-ai'
@@ -42,9 +62,9 @@ export function useTenderRefresh() {
         console.error("Browser AI integration failed:", browserAIErr);
       }
       
-      // Then try the standard methods
+      // If sheets and Browser AI failed, try the standard methods
       // First check the status
-      const statusCheck = await checkScraperStatus();
+      const statusCheck = await supabase.functions.invoke('check-scraper-status');
       
       if (statusCheck.error) {
         console.error("Status check failed:", statusCheck.error);
@@ -114,7 +134,7 @@ export function useTenderRefresh() {
           
           // Check status every 2 attempts
           if (attempts % 2 === 0) {
-            const statusCheck = await checkScraperStatus();
+            const statusCheck = await supabase.functions.invoke('check-scraper-status');
             if (statusCheck.data?.api_scrape_successful || statusCheck.data?.direct_scrape_successful) {
               toast({
                 title: "Direct data access successful",
