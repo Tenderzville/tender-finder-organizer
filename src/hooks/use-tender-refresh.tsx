@@ -15,7 +15,7 @@ export function useTenderRefresh() {
     try {
       toast({
         title: "Refreshing Tenders",
-        description: "Starting the tender scraping process...",
+        description: "Fetching real-time tenders from official sources...",
       });
       
       // First check the status
@@ -25,7 +25,7 @@ export function useTenderRefresh() {
         console.error("Status check failed:", statusCheck.error);
         toast({
           title: "Status Check Failed",
-          description: "Could not verify scraper status. Will attempt scraping anyway.",
+          description: "Could not verify scraper status. Will attempt direct API access.",
           variant: "destructive",
         });
       } else {
@@ -40,13 +40,13 @@ export function useTenderRefresh() {
       }
       
       toast({
-        title: "Scraper Triggered Successfully",
-        description: "Tender scraping in progress, this may take a minute. The page will refresh automatically when complete.",
+        title: "Tender Fetching In Progress",
+        description: "Accessing tender data directly from the official API. The page will refresh automatically when complete.",
       });
       
-      // Set up a longer polling interval to check for new tenders
+      // Set up a polling interval to check for new tenders
       let attempts = 0;
-      const maxAttempts = 10;  // Increase max attempts
+      const maxAttempts = 10;
       
       const checkForTenders = async () => {
         attempts++;
@@ -83,17 +83,17 @@ export function useTenderRefresh() {
         
         if (attempts < maxAttempts) {
           toast({
-            title: "Still searching for tenders",
+            title: "Searching for tenders",
             description: `Attempt ${attempts}/${maxAttempts}. This may take a moment...`,
           });
           
-          // Check status after every 2 attempts
+          // Check status every 2 attempts
           if (attempts % 2 === 0) {
             const statusCheck = await checkScraperStatus();
-            if (statusCheck.data?.direct_scrape_successful) {
+            if (statusCheck.data?.api_scrape_successful || statusCheck.data?.direct_scrape_successful) {
               toast({
-                title: "Direct scrape successful",
-                description: "Found tenders via direct scraping. Refreshing page...",
+                title: "Direct data access successful",
+                description: "Found tenders via direct API access. Refreshing page...",
               });
               
               setTimeout(() => {
@@ -104,12 +104,12 @@ export function useTenderRefresh() {
             }
           }
           
-          // Wait 15 seconds before checking again
+          // Wait before checking again
           setTimeout(checkForTenders, 15000);
         } else {
           toast({
             title: "No tenders found",
-            description: "Try again later or contact support if the issue persists.",
+            description: "Could not retrieve tenders at this time. API access may be temporarily restricted.",
             variant: "destructive",
           });
           

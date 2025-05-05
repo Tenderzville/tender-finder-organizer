@@ -38,6 +38,24 @@ export const forceTriggerScraper = async () => {
       console.log('Current tenders in database:', count);
     }
     
+    // First try the direct API approach through check-scraper-status
+    console.log("Attempting direct API tender fetching...");
+    const { data: statusData, error: statusError } = await supabase.functions.invoke('check-scraper-status');
+    
+    if (statusError) {
+      console.error('Error checking scraper status:', statusError);
+    } else {
+      console.log('Scraper status check result:', statusData);
+      
+      // If the direct API method worked, return success
+      if (statusData.api_scrape_successful || statusData.direct_scrape_successful) {
+        console.log("Successfully fetched tenders via direct methods!");
+        return { success: true, data: statusData };
+      }
+    }
+    
+    // Fallback to the original scraper
+    console.log("Direct methods didn't yield results. Falling back to original scraper...");
     // Direct access to mygov.go.ke to attempt proxy bypass
     const { data: apiLayerData, error: apiLayerError } = await supabase.functions.invoke('scrape-tenders', {
       body: { 

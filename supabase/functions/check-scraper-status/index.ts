@@ -8,55 +8,109 @@ const supabaseUrl = Deno.env.get("SUPABASE_URL") || "";
 const supabaseKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") || "";
 const supabase = createClient(supabaseUrl, supabaseKey);
 
-// Bypass proxy to fetch real tender data
-async function fetchWithRetry(url, options = {}, maxRetries = 3) {
-  let retries = 0;
-  let lastError;
-
-  while (retries < maxRetries) {
-    try {
-      console.log(`Attempt ${retries + 1} - Fetching ${url}`);
-      const response = await fetch(url, {
-        ...options,
+// Direct API access to download tender data
+async function directApiScrape() {
+  try {
+    console.log("Attempting direct API scrape");
+    
+    // Attempt to fetch data from the Tenders API
+    const response = await fetch(
+      "https://www.tenders.go.ke/api/active-tenders?search=&perpage=50&sortby=&order=asc&page=1",
+      {
         headers: {
           'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/97.0.4692.71 Safari/537.36',
-          'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8',
-          'Accept-Language': 'en-US,en;q=0.9',
+          'Accept': 'application/json',
           'Cache-Control': 'no-cache',
-          ...options.headers
         },
         redirect: 'follow',
         signal: AbortSignal.timeout(30000),
-      });
-      
-      if (!response.ok) {
-        throw new Error(`HTTP error! Status: ${response.status}`);
       }
-      
-      return await response.text();
-    } catch (error) {
-      console.error(`Attempt ${retries + 1} failed:`, error);
-      lastError = error;
-      retries++;
-      
-      if (retries < maxRetries) {
-        // Exponential backoff
-        const delay = Math.pow(2, retries) * 1000;
-        await new Promise(resolve => setTimeout(resolve, delay));
+    );
+    
+    if (!response.ok) {
+      throw new Error(`HTTP error! Status: ${response.status}`);
+    }
+    
+    const data = await response.json();
+    console.log(`API returned ${data.data?.length || 0} tender records`);
+    
+    if (!data.data || data.data.length === 0) {
+      console.log("No tender data found in API response");
+      return {
+        success: false,
+        count: 0
+      };
+    }
+    
+    // Process tender data and insert into database
+    let insertedCount = 0;
+    for (const tender of data.data) {
+      try {
+        // Format tender data for insertion
+        const formattedTender = {
+          title: tender.title || 'Unknown Tender',
+          description: tender.description || `Tender from ${tender.pe?.name || 'Unknown Entity'}`,
+          deadline: tender.close_at ? new Date(tender.close_at).toISOString() : new Date(Date.now() + 14 * 24 * 60 * 60 * 1000).toISOString(),
+          contact_info: tender.pe?.name || 'Contact the procurement entity',
+          category: tender.procurementCategory?.title || 'Government',
+          location: 'Kenya',
+          tender_url: `https://www.tenders.go.ke/tender/view/${tender.id}`,
+          requirements: tender.description || 'See tender document for requirements'
+        };
+        
+        // Check if tender already exists
+        const { data: existingTender } = await supabase
+          .from("tenders")
+          .select("id")
+          .eq("title", formattedTender.title)
+          .limit(1);
+        
+        if (!existingTender || existingTender.length === 0) {
+          // Insert new tender
+          const { error: insertError } = await supabase
+            .from("tenders")
+            .insert([formattedTender]);
+            
+          if (insertError) {
+            console.error("Error inserting tender:", insertError);
+          } else {
+            insertedCount++;
+          }
+        }
+      } catch (error) {
+        console.error("Error processing tender:", error);
       }
     }
+    
+    console.log(`Successfully inserted ${insertedCount} new tenders from direct API`);
+    return {
+      success: true,
+      count: insertedCount
+    };
+  } catch (error) {
+    console.error("Error in direct API scrape:", error);
+    return {
+      success: false,
+      error: error.message
+    };
   }
-  
-  throw lastError;
 }
 
-// Function to directly scrape some basic tenders as a fallback
+// Fallback for direct website scraping
 async function directScrape() {
   try {
-    console.log("Attempting direct scrape as fallback");
+    console.log("Attempting direct website scrape as fallback");
     
     // Try to fetch from MyGov website
-    const html = await fetchWithRetry('https://www.mygov.go.ke/all-tenders');
+    const html = await fetch('https://www.mygov.go.ke/all-tenders', {
+      headers: {
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/97.0.4692.71 Safari/537.36',
+        'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8',
+        'Accept-Language': 'en-US,en;q=0.9',
+        'Cache-Control': 'no-cache',
+      },
+      signal: AbortSignal.timeout(30000),
+    }).then(res => res.text());
     
     // Look for tender tables
     const tableMatch = html.match(/<table[^>]*>([\s\S]*?)<\/table>/gi);
@@ -137,6 +191,32 @@ serve(async (req) => {
       pingError = error.message;
     }
     
+    // Get the total tender count
+    const { count: totalTenders, error: countError } = await supabase
+      .from('tenders')
+      .select('*', { count: 'exact', head: true });
+      
+    if (countError) {
+      console.error("Error counting tenders:", countError);
+    }
+    
+    // If we have no tenders, try direct API scraping
+    let directApiSuccess = false;
+    let directScrapeSuccessful = false;
+    let apiResult = null;
+    
+    if (!totalTenders || totalTenders === 0) {
+      console.log("No tenders found. Attempting direct API scrape...");
+      apiResult = await directApiScrape();
+      directApiSuccess = apiResult.success;
+      
+      // If API scrape fails, try direct website scraping
+      if (!directApiSuccess) {
+        console.log("Direct API scrape failed. Trying website scrape...");
+        directScrapeSuccessful = await directScrape();
+      }
+    }
+    
     // Get the latest scraping logs
     const { data: scrapingLogs, error: logsError } = await supabase
       .from('scraping_logs')
@@ -146,15 +226,6 @@ serve(async (req) => {
       
     if (logsError) {
       console.error("Error fetching scraping logs:", logsError);
-    }
-    
-    // Get the total tender count
-    const { count: totalTenders, error: countError } = await supabase
-      .from('tenders')
-      .select('*', { count: 'exact', head: true });
-      
-    if (countError) {
-      console.error("Error counting tenders:", countError);
     }
     
     // Get the latest tenders
@@ -168,12 +239,6 @@ serve(async (req) => {
       console.error("Error fetching latest tenders:", tendersError);
     }
     
-    // If we have no tenders, try direct scraping as fallback
-    let directScrapeSuccessful = false;
-    if (!totalTenders || totalTenders === 0) {
-      directScrapeSuccessful = await directScrape();
-    }
-    
     // Check if we have an API layer for external requests
     const apiLayerKey = Deno.env.get("API_LAYER_KEY");
     const apiLayerAvailable = !!apiLayerKey;
@@ -184,12 +249,14 @@ serve(async (req) => {
         status: "success",
         scraper_available: scraperAvailable,
         api_layer_available: apiLayerAvailable,
+        api_scrape_successful: directApiSuccess,
+        direct_scrape_successful: directScrapeSuccessful,
+        api_result: apiResult,
         ping_error: pingError,
         scraping_logs: scrapingLogs,
         total_tenders: totalTenders || 0,
         latest_tenders: latestTenders || [],
         last_check: new Date().toISOString(),
-        direct_scrape_successful: directScrapeSuccessful,
         diagnostics: {
           edge_function_working: true,
           database_connected: !logsError && !tendersError,
