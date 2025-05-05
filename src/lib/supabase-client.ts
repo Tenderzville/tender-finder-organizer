@@ -7,7 +7,7 @@ export { supabase };
 // Add a specific function for scraper status to centralize the logic
 export const checkScraperStatus = async () => {
   try {
-    // Try to call the edge function first
+    // Try to call the edge function directly
     const { data, error } = await supabase.functions.invoke('check-scraper-status');
     
     if (error) {
@@ -38,36 +38,30 @@ export const forceTriggerScraper = async () => {
       console.log('Current tenders in database:', count);
     }
     
-    // Trigger both the main scraper and private tenders scraper
-    const mainScraper = supabase.functions.invoke('scrape-tenders', {
+    // Direct access to mygov.go.ke to attempt proxy bypass
+    const { data: apiLayerData, error: apiLayerError } = await supabase.functions.invoke('scrape-tenders', {
       body: { 
         force: true, 
         useApiLayer: true,
         fullScrape: true,
         skipCache: true,
         verboseLogging: true,
-        priority: 1
+        priority: 1,
+        directUrls: [
+          'https://www.mygov.go.ke/all-tenders',
+          'https://tenders.go.ke/website/tenders/index'
+        ]
       }
     });
-    
-    const privateScraper = supabase.functions.invoke('scrape-private-tenders');
-    
-    const [mainResult, privateResult] = await Promise.all([mainScraper, privateScraper]);
-    
-    if (mainResult.error || privateResult.error) {
-      console.error('Error triggering scrapers:', {
-        main: mainResult.error,
-        private: privateResult.error
-      });
-      return { success: false, error: mainResult.error || privateResult.error };
+
+    if (apiLayerError) {
+      console.error('Error triggering main scraper:', apiLayerError);
+      return { success: false, error: apiLayerError };
     }
     
-    console.log("Scraper trigger responses:", {
-      main: mainResult.data,
-      private: privateResult.data
-    });
+    console.log("Scraper trigger response:", apiLayerData);
     
-    return { success: true, data: { main: mainResult.data, private: privateResult.data } };
+    return { success: true, data: apiLayerData };
   } catch (error) {
     console.error('Error in forceTriggerScraper:', error);
     return { success: false, error };
