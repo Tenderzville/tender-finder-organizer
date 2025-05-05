@@ -22,6 +22,25 @@ export const checkScraperStatus = async () => {
   }
 };
 
+// Function to trigger Browser AI tender fetching
+export const fetchTendersViaBrowserAI = async () => {
+  try {
+    console.log("Triggering Browser AI tender fetching");
+    
+    const { data, error } = await supabase.functions.invoke('browser-ai-tenders/fetch-browser-ai');
+    
+    if (error) {
+      console.error('Error fetching tenders via Browser AI:', error);
+      return { success: false, error };
+    }
+    
+    return { success: true, data };
+  } catch (error) {
+    console.error('Error in fetchTendersViaBrowserAI:', error);
+    return { success: false, error };
+  }
+};
+
 // Function to force trigger the scraper with all necessary parameters
 export const forceTriggerScraper = async () => {
   try {
@@ -36,6 +55,21 @@ export const forceTriggerScraper = async () => {
       console.error('Error checking tenders count:', countError);
     } else {
       console.log('Current tenders in database:', count);
+    }
+    
+    // Try Browser AI integration first
+    try {
+      console.log("Attempting Browser AI tender fetching...");
+      const { data: browserAIData, error: browserAIError } = await supabase.functions.invoke('browser-ai-tenders/fetch-browser-ai');
+      
+      if (browserAIError) {
+        console.error('Error with Browser AI integration:', browserAIError);
+      } else if (browserAIData?.success) {
+        console.log('Browser AI integration successful:', browserAIData);
+        return { success: true, data: browserAIData };
+      }
+    } catch (browserAIErr) {
+      console.error('Error calling Browser AI integration:', browserAIErr);
     }
     
     // First try the direct API approach through check-scraper-status

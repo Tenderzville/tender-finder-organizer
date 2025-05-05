@@ -15,9 +15,34 @@ export function useTenderRefresh() {
     try {
       toast({
         title: "Refreshing Tenders",
-        description: "Fetching real-time tenders from official sources...",
+        description: "Fetching real-time tenders using multiple methods...",
       });
       
+      // First try the Browser AI integration
+      try {
+        const { data: browserAIData, error: browserAIError } = await supabase.functions.invoke(
+          'browser-ai-tenders/fetch-browser-ai'
+        );
+        
+        if (browserAIError) {
+          console.error("Error with Browser AI integration:", browserAIError);
+        } else if (browserAIData?.success) {
+          toast({
+            title: "Browser AI Integration Success",
+            description: `Found ${browserAIData.inserted} tenders using Browser AI. The page will refresh shortly.`,
+          });
+          
+          setTimeout(() => {
+            window.location.reload();
+          }, 1500);
+          
+          return;
+        }
+      } catch (browserAIErr) {
+        console.error("Browser AI integration failed:", browserAIErr);
+      }
+      
+      // Then try the standard methods
       // First check the status
       const statusCheck = await checkScraperStatus();
       
@@ -41,7 +66,7 @@ export function useTenderRefresh() {
       
       toast({
         title: "Tender Fetching In Progress",
-        description: "Accessing tender data directly from the official API. The page will refresh automatically when complete.",
+        description: "Accessing tender data from multiple sources. The page will refresh automatically when complete.",
       });
       
       // Set up a polling interval to check for new tenders

@@ -1,5 +1,5 @@
 
-import { ArrowUpRight } from "lucide-react";
+import { ArrowUpRight, Bookmark, BookmarkCheck } from "lucide-react";
 import { TenderCard } from "@/components/TenderCard";
 import { Tender } from "@/types/tender";
 import { ShareAction } from "@/types/tenderCard";
@@ -11,9 +11,12 @@ interface AffirmativeActionTendersProps {
   language: 'en' | 'sw';
   shareEmail: (tender: Tender) => void;
   shareWhatsApp: (tender: Tender) => void;
+  onBookmark?: (tenderId: number) => void;
+  bookmarkedTenders?: number[];
   shareLabels: {
     email: string;
     whatsapp: string;
+    bookmark: string;
   };
 }
 
@@ -24,6 +27,8 @@ export const AffirmativeActionTenders = ({
   language,
   shareEmail,
   shareWhatsApp,
+  onBookmark,
+  bookmarkedTenders = [],
   shareLabels
 }: AffirmativeActionTendersProps) => {
   if (tenders.length === 0) return null;
@@ -33,6 +38,8 @@ export const AffirmativeActionTenders = ({
       <h2 className="text-xl font-semibold mb-4 text-green-700">{sectionTitle}</h2>
       <div className="grid gap-6 grid-cols-1 md:grid-cols-2 xl:grid-cols-2">
         {tenders.map((tender) => {
+          const isBookmarked = bookmarkedTenders.includes(tender.id);
+          
           const shareActions: ShareAction[] = [
             {
               icon: <ArrowUpRight className="h-4 w-4" />,
@@ -45,6 +52,17 @@ export const AffirmativeActionTenders = ({
               onClick: () => shareWhatsApp(tender)
             }
           ];
+          
+          // Add bookmark action if onBookmark handler is provided
+          if (onBookmark) {
+            shareActions.push({
+              icon: isBookmarked ? 
+                <BookmarkCheck className="h-4 w-4 text-green-600" /> : 
+                <Bookmark className="h-4 w-4" />,
+              label: isBookmarked ? "Bookmarked" : shareLabels.bookmark,
+              onClick: () => onBookmark(tender.id)
+            });
+          }
 
           return (
             <TenderCard

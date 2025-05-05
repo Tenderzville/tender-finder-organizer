@@ -15,8 +15,7 @@ interface DashboardTenderSectionProps {
   showDebugInfo: boolean;
   setShowDebugInfo: (show: boolean) => void;
   handleViewTenderDetails: (id: number) => void;
-  handleShareViaEmail: (id: number) => void;
-  handleShareViaWhatsApp: (id: number) => void;
+  handleBookmarkTender: (id: number) => void;
   navigate: (path: string) => void;
   language: 'en' | 'sw';
   userData: any;
@@ -30,8 +29,7 @@ export const DashboardTenderSection = ({
   showDebugInfo,
   setShowDebugInfo,
   handleViewTenderDetails,
-  handleShareViaEmail,
-  handleShareViaWhatsApp,
+  handleBookmarkTender,
   navigate,
   language,
   userData
@@ -44,6 +42,9 @@ export const DashboardTenderSection = ({
           isLoading={isLoadingTenders}
           error={errorTenders}
           onRetry={fetchTenders}
+          onBookmark={handleBookmarkTender}
+          onViewDetails={handleViewTenderDetails}
+          userId={userData?.id}
         />
         <DebugButton 
           showDebugInfo={showDebugInfo} 
@@ -65,12 +66,8 @@ export const DashboardTenderSection = ({
               language={language}
               shareActions={[
                 {
-                  label: "Share via Email",
-                  action: handleShareViaEmail
-                },
-                {
-                  label: "Share via WhatsApp",
-                  action: handleShareViaWhatsApp
+                  label: "Bookmark",
+                  action: handleBookmarkTender
                 }
               ]}
             />

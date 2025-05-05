@@ -1,28 +1,27 @@
 
 import { useState, useEffect } from "react";
 import { Navigation } from "@/components/Navigation";
-import { supabase } from "@/integrations/supabase/client";
+import { supabase } from "@/lib/supabase-client";
 import { useAuthState } from "@/hooks/useAuthState";
 import { useToast } from "@/hooks/use-toast";
 import { useOfflineMode } from '@/hooks/use-offline-mode';
 import { usePoints } from '@/hooks/use-points';
 import { ProfileCard } from "@/components/dashboard/ProfileCard";
-import { QuickActionButtons } from "@/components/dashboard/QuickActionButtons";
+import { SavedTendersCard } from "@/components/dashboard/SavedTenders";
+import { UserProfileCard } from "@/components/dashboard/UserProfile";
 import { OfflineIndicator } from "@/components/dashboard/OfflineIndicator";
 import { DashboardHeader } from "@/components/dashboard/DashboardHeader";
 import { useDashboardTenders } from "@/hooks/use-dashboard-tenders";
-import { useTenderSharingActions } from "@/components/dashboard/TenderSharingActions";
 import { useDashboardNavigation } from "@/components/dashboard/DashboardNavigation";
 import { DashboardLoading } from "@/components/dashboard/DashboardLoading";
 import { DashboardTenderSection } from "@/components/dashboard/DashboardTenderSection";
-import { DashboardCollaboration } from "@/components/dashboard/DashboardCollaboration";
 
 const Dashboard = () => {
   const { toast } = useToast();
   const { isAuthenticated, isInitialized } = useAuthState();
   const [isLoading, setIsLoading] = useState(true);
   const [userData, setUserData] = useState<any>(null);
-  const { isOnline, offlineData, syncData } = useOfflineMode();
+  const { isOnline } = useOfflineMode();
   const { points } = usePoints({ userId: userData?.id || null });
   const [language, setLanguage] = useState<'en' | 'sw'>('en');
   const [showDebugInfo, setShowDebugInfo] = useState(false);
@@ -34,7 +33,6 @@ const Dashboard = () => {
     fetchTenders 
   } = useDashboardTenders();
   
-  const { handleShareViaEmail, handleShareViaWhatsApp } = useTenderSharingActions();
   const { handleViewTenderDetails, navigate } = useDashboardNavigation();
 
   useEffect(() => {
@@ -90,6 +88,72 @@ const Dashboard = () => {
     return <DashboardLoading />;
   }
 
+  // Enable bookmarking functionality for tenders
+  const handleBookmarkTender = async (tenderId: number) => {
+    try {
+      if (!userData?.id) {
+        toast({
+          title: "Authentication Required",
+          description: "Please sign in to bookmark tenders",
+          variant: "destructive",
+        });
+        return;
+      }
+
+      const { data, error } = await supabase
+        .from("supplier_tender")
+        .select("*")
+        .eq("supplier_id", userData.id)
+        .eq("tender_id", tenderId)
+        .maybeSingle();
+
+      if (error) {
+        throw error;
+      }
+
+      if (data) {
+        // Tender is already bookmarked, remove it
+        const { error: deleteError } = await supabase
+          .from("supplier_tender")
+          .delete()
+          .eq("supplier_id", userData.id)
+          .eq("tender_id", tenderId);
+
+        if (deleteError) {
+          throw deleteError;
+        }
+
+        toast({
+          title: "Tender Removed",
+          description: "Tender has been removed from your bookmarks",
+        });
+      } else {
+        // Tender is not bookmarked, add it
+        const { error: insertError } = await supabase
+          .from("supplier_tender")
+          .insert([
+            { supplier_id: userData.id, tender_id: tenderId }
+          ]);
+
+        if (insertError) {
+          throw insertError;
+        }
+
+        toast({
+          title: "Tender Bookmarked",
+          description: "Tender has been added to your bookmarks",
+        });
+      }
+    } catch (error) {
+      console.error("Error toggling bookmark:", error);
+      toast({
+        title: "Error",
+        description: "Failed to update bookmarks. Please try again.",
+        variant: "destructive",
+      });
+    }
+  };
+
   return (
     <div className="min-h-screen bg-gray-50">
       <Navigation />
@@ -102,9 +166,20 @@ const Dashboard = () => {
 
         <OfflineIndicator isOnline={isOnline} language={language} />
 
-        <QuickActionButtons language={language} />
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8">
+          <div className="lg:col-span-2">
+            <ProfileCard userData={userData} />
+          </div>
+          <div>
+            {userData && <UserProfileCard userId={userData.id} />}
+          </div>
+        </div>
 
-        <ProfileCard userData={userData} />
+        {userData && (
+          <div className="mb-8">
+            <SavedTendersCard userId={userData.id} />
+          </div>
+        )}
 
         <DashboardTenderSection 
           tenders={tenders}
@@ -114,14 +189,11 @@ const Dashboard = () => {
           showDebugInfo={showDebugInfo}
           setShowDebugInfo={setShowDebugInfo}
           handleViewTenderDetails={handleViewTenderDetails}
-          handleShareViaEmail={handleShareViaEmail}
-          handleShareViaWhatsApp={handleShareViaWhatsApp}
+          handleBookmarkTender={handleBookmarkTender}
           navigate={navigate}
           language={language}
           userData={userData}
         />
-
-        <DashboardCollaboration />
       </main>
     </div>
   );

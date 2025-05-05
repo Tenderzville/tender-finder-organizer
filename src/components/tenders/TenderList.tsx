@@ -1,7 +1,7 @@
 
-import { useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useState, useEffect } from "react";
 import { useToast } from "@/hooks/use-toast";
+import { supabase } from "@/lib/supabase-client";
 import type { Tender } from "@/types/tender";
 import { TenderListLoading } from "@/components/tenders/TenderListLoading";
 import { TenderListError } from "@/components/tenders/TenderListError";
@@ -16,27 +16,66 @@ interface TenderListProps {
   tenders: Tender[];
   isLoading?: boolean;
   onRetry?: () => void;
+  onBookmark?: (tenderId: number) => void;
+  onViewDetails?: (tenderId: number) => void;
   error?: Error | null;
+  userId?: string;
 }
 
-export const TenderList = ({ tenders, isLoading = false, onRetry, error }: TenderListProps) => {
-  const navigate = useNavigate();
+export const TenderList = ({ 
+  tenders, 
+  isLoading = false, 
+  onRetry, 
+  onBookmark,
+  onViewDetails,
+  error,
+  userId 
+}: TenderListProps) => {
   const { toast } = useToast();
   const [language, setLanguage] = useState<'en' | 'sw'>('en');
+  const [bookmarkedTenders, setBookmarkedTenders] = useState<number[]>([]);
   const t = tenderListTranslations[language];
   const { handleShareByEmail, handleShareByWhatsApp } = useTenderSharing();
   
   const handleViewDetails = (tenderId: number) => {
-    navigate(`/tenders/${tenderId}`);
-    toast({
-      title: "Opening tender details",
-      description: "Loading complete tender information...",
-    });
+    if (onViewDetails) {
+      onViewDetails(tenderId);
+    } else {
+      toast({
+        title: "Opening tender details",
+        description: "Loading complete tender information...",
+      });
+    }
   };
   
   const toggleLanguage = () => {
     setLanguage(prev => prev === 'en' ? 'sw' : 'en');
   };
+  
+  // Fetch bookmarked tenders on component mount
+  useEffect(() => {
+    const fetchBookmarkedTenders = async () => {
+      if (!userId) return;
+      
+      try {
+        const { data, error } = await supabase
+          .from("supplier_tender")
+          .select("tender_id")
+          .eq("supplier_id", userId);
+          
+        if (error) {
+          console.error("Error fetching bookmarked tenders:", error);
+          return;
+        }
+        
+        setBookmarkedTenders(data.map(item => item.tender_id));
+      } catch (err) {
+        console.error("Unexpected error fetching bookmarks:", err);
+      }
+    };
+    
+    fetchBookmarkedTenders();
+  }, [userId]);
 
   // Loading state
   if (isLoading) {
@@ -82,7 +121,8 @@ export const TenderList = ({ tenders, isLoading = false, onRetry, error }: Tende
 
   const shareLabels = {
     email: t.shareEmail,
-    whatsapp: t.shareWhatsApp
+    whatsapp: t.shareWhatsApp,
+    bookmark: "Bookmark"
   };
 
   return (
@@ -100,6 +140,8 @@ export const TenderList = ({ tenders, isLoading = false, onRetry, error }: Tende
         language={language}
         shareEmail={handleShareByEmail}
         shareWhatsApp={handleShareByWhatsApp}
+        onBookmark={onBookmark}
+        bookmarkedTenders={bookmarkedTenders}
         shareLabels={shareLabels}
       />
       
@@ -109,6 +151,8 @@ export const TenderList = ({ tenders, isLoading = false, onRetry, error }: Tende
         language={language}
         shareEmail={handleShareByEmail}
         shareWhatsApp={handleShareByWhatsApp}
+        onBookmark={onBookmark}
+        bookmarkedTenders={bookmarkedTenders}
         shareLabels={shareLabels}
       />
     </div>
