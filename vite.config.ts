@@ -24,5 +24,12 @@ export default defineConfig(({ mode }) => ({
     },
     // Allow all hosts
     strictPort: true,
+    // Add the Lovable domain to allowed hosts
+    allowedHosts: [
+      'localhost',
+      '127.0.0.1',
+      '37ffde61-40d6-47ea-9f1e-41a9df4ec03b.lovableproject.com',
+      '.lovableproject.com'
+    ],
   },
 }));
