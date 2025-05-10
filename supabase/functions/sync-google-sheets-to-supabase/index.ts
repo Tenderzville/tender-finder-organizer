@@ -1,4 +1,4 @@
-
+// Import from the paths defined in import_map.json
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "@supabase/supabase-js";
 import { corsHeaders } from "../_shared/cors.ts";

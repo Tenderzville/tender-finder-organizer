@@ -1,5 +1,5 @@
 
-import { TenderList } from '@/components/tenders/TenderList';
+import TenderList from '@/components/tenders/TenderList';
 import { TenderLoadingState } from '@/components/tenders/TenderLoadingState';
 import { TenderEmptyState } from '@/components/tenders/TenderEmptyState';
 import { Tender } from "@/types/tender";

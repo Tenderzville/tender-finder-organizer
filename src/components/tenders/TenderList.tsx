@@ -1,3 +1,4 @@
+
 import React, { useCallback } from "react";
 import { format, parseISO } from "date-fns";
 import { useNavigate } from "react-router-dom";
@@ -25,38 +26,28 @@ import {
 } from "lucide-react";
 import { Tender } from "@/types/tender";
 
-interface TenderListViewProps {
-  tendersToDisplay: Tender[];
+interface TenderListProps {
+  tenders: Tender[];
+  isLoading: boolean;
   error: Error | null;
-  isRefreshing: boolean;
-  onRefresh: () => Promise<void>;
-  onShowQualificationTool: () => void;
-  translations: {
-    latestTenders: string;
-    browse: string;
-    recentlyAdded: string;
-    checkEligibility: string;
-    error: string;
-    errorDesc: string;
-    noTenders: string;
-    refreshTenders: string;
-    refreshing: string;
-    qualifyTool: string;
-  };
-  language: 'en' | 'sw';
+  onRetry: () => Promise<void>;
   onShare?: (tender: Tender) => void;
+  onBookmark?: (tenderId: number) => void;
+  onViewDetails?: (tenderId: number) => void;
+  userId?: string;
 }
 
-export const TenderListView = ({ 
-  tendersToDisplay,
-  error,
-  isRefreshing,
-  onRefresh,
-  onShowQualificationTool,
-  translations: t,
-  language,
-  onShare
-}: TenderListViewProps) => {
+// This component should be exported as the default export
+const TenderList = ({ 
+  tenders = [], 
+  isLoading, 
+  error, 
+  onRetry,
+  onShare,
+  onBookmark,
+  onViewDetails,
+  userId
+}: TenderListProps) => {
   const navigate = useNavigate();
   const { toast } = useToast();
 
@@ -80,8 +71,12 @@ export const TenderListView = ({
   }, [toast]);
 
   const handleViewTender = useCallback((tenderId: number) => {
-    navigate(`/tenders/${tenderId}`);
-  }, [navigate]);
+    if (onViewDetails) {
+      onViewDetails(tenderId);
+    } else {
+      navigate(`/tenders/${tenderId}`);
+    }
+  }, [navigate, onViewDetails]);
 
   const formatDate = useCallback((dateStr: string) => {
     try {
@@ -91,144 +86,131 @@ export const TenderListView = ({
     }
   }, []);
 
+  if (isLoading) {
+    return (
+      <div className="p-8 text-center">
+        <Loader2 className="h-8 w-8 animate-spin mx-auto mb-4 text-primary" />
+        <p className="text-muted-foreground">Loading tenders...</p>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <Alert variant="destructive" className="mb-4">
+        <AlertCircle className="h-4 w-4" />
+        <AlertTitle>Error loading tenders</AlertTitle>
+        <AlertDescription>
+          {error.message || "Unable to load tenders. Please try again later."}
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => onRetry()}
+            className="mt-2"
+          >
+            Retry
+          </Button>
+        </AlertDescription>
+      </Alert>
+    );
+  }
+
+  if (tenders.length === 0) {
+    return (
+      <div className="text-center py-12 bg-muted rounded-md">
+        <p className="text-muted-foreground mb-4">No tenders available at the moment.</p>
+        <Button 
+          variant="outline" 
+          size="sm"
+          onClick={() => onRetry()}
+        >
+          Refresh Tenders
+        </Button>
+      </div>
+    );
+  }
+
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle className="flex justify-between items-center">
-          <span>{t.latestTenders}</span>
-          <Badge variant={tendersToDisplay.length > 0 ? "default" : "outline"}>
-            {tendersToDisplay.length} Available
-          </Badge>
-        </CardTitle>
-        <CardDescription>
-          {t.browse}
-        </CardDescription>
-      </CardHeader>
-      <CardContent className="space-y-4">
-        <div>
-          <div className="flex justify-between mb-4">
-            <h3 className="text-sm font-medium">{t.recentlyAdded}</h3>
-            {tendersToDisplay.length > 0 && (
+    <div className="space-y-4">
+      {tenders.map((tender: Tender) => (
+        <div key={tender.id} className="bg-card p-4 rounded-md border">
+          <div className="flex justify-between items-start">
+            <h4 className="font-medium">{tender.title}</h4>
+            <div className="flex gap-2">
+              {onShare && (
+                <Button 
+                  variant="ghost" 
+                  size="icon"
+                  onClick={() => onShare(tender)}
+                  title="Share tender"
+                >
+                  <ArrowUpRight className="h-4 w-4" />
+                </Button>
+              )}
+              {onBookmark && (
+                <Button 
+                  variant="ghost" 
+                  size="icon"
+                  onClick={() => onBookmark(tender.id)}
+                  title="Bookmark tender"
+                >
+                  <Tag className="h-4 w-4" />
+                </Button>
+              )}
               <Button 
-                variant="outline" 
-                size="sm" 
-                onClick={onShowQualificationTool}
+                variant="ghost" 
+                size="icon"
+                onClick={() => handleViewTender(tender.id)}
+                title="View details"
               >
-                {t.checkEligibility}
+                <ExternalLink className="h-4 w-4" />
               </Button>
-            )}
+            </div>
           </div>
           
-          {error && (
-            <Alert variant="destructive" className="mb-4">
-              <AlertCircle className="h-4 w-4" />
-              <AlertTitle>{t.error}</AlertTitle>
-              <AlertDescription>
-                {t.errorDesc}
-              </AlertDescription>
-            </Alert>
-          )}
-          
-          {tendersToDisplay.length > 0 ? (
-            <div className="space-y-3">
-              {tendersToDisplay.map((tender: Tender) => (
-                <div key={tender.id} className="bg-muted p-3 rounded-md text-sm">
-                  <div className="flex justify-between items-start">
-                    <h4 className="font-medium mb-1">{tender.title}</h4>
-                    <div className="flex gap-2">
-                      {onShare && (
-                        <Button 
-                          variant="ghost" 
-                          size="icon"
-                          onClick={() => onShare(tender)}
-                          title="Share tender"
-                        >
-                          <ArrowUpRight className="h-4 w-4" />
-                        </Button>
-                      )}
-                      <Button 
-                        variant="ghost" 
-                        size="icon"
-                        onClick={() => handleViewTender(tender.id)}
-                        title="View details"
-                      >
-                        <ExternalLink className="h-4 w-4" />
-                      </Button>
-                    </div>
-                  </div>
-                  
-                  {tender.affirmative_action && (
-                    <div className="mt-1 mb-2">
-                      <Badge variant="outline" className="bg-green-50 text-green-700 hover:bg-green-100 border-green-200">
-                        {tender.affirmative_action.type === 'youth' ? 'Youth Opportunity' : 
-                          tender.affirmative_action.type === 'women' ? 'Women Opportunity' : 
-                          tender.affirmative_action.type === 'pwds' ? 'PWDs Opportunity' : 'Special Category'}
-                      </Badge>
-                    </div>
-                  )}
-                  
-                  <div className="grid grid-cols-2 gap-2 mt-2 text-xs">
-                    <div className="flex items-center">
-                      <Tag className="h-3 w-3 mr-1" />
-                      {tender.category || "Uncategorized"}
-                    </div>
-                    <div className="flex items-center">
-                      <MapPin className="h-3 w-3 mr-1" />
-                      {tender.location || "Not specified"}
-                    </div>
-                    <div className="flex items-center">
-                      <Calendar className="h-3 w-3 mr-1" />
-                      Deadline: {tender.deadline ? formatDate(tender.deadline) : "Unknown"}
-                    </div>
-                    <div>
-                      {tender.fees && `Value: ${tender.fees}`}
-                      {!tender.fees && "Value: Contact for pricing"}
-                    </div>
-                  </div>
-                </div>
-              ))}
-            </div>
-          ) : (
-            <div className="text-center py-6 bg-muted rounded-md">
-              <p className="text-sm text-muted-foreground mb-2">{t.noTenders}</p>
-              <Button 
-                variant="outline" 
-                size="sm"
-                onClick={onRefresh}
-              >
-                {t.refreshTenders}
-              </Button>
+          {tender.affirmative_action && (
+            <div className="mt-1 mb-2">
+              <Badge variant="outline" className="bg-green-50 text-green-700 hover:bg-green-100 border-green-200">
+                {tender.affirmative_action.type === 'youth' ? 'Youth Opportunity' : 
+                 tender.affirmative_action.type === 'women' ? 'Women Opportunity' : 
+                 tender.affirmative_action.type === 'pwds' ? 'PWDs Opportunity' : 'Special Category'}
+              </Badge>
             </div>
           )}
-        </div>
-      </CardContent>
-      <CardFooter>
-        <div className="w-full space-y-2">
-          <Button 
-            variant="outline" 
-            className="w-full flex items-center justify-center gap-2"
-            onClick={onRefresh}
-            disabled={isRefreshing}
-          >
-            {isRefreshing ? (
-              <Loader2 className="h-4 w-4 animate-spin" />
-            ) : (
-              <RefreshCw className="h-4 w-4" />
-            )}
-            {isRefreshing ? t.refreshing : t.refreshTenders}
-          </Button>
           
-          {tendersToDisplay.length > 0 && (
-            <Button 
-              variant="default" 
-              className="w-full"
-              onClick={onShowQualificationTool}
-            >
-              {t.qualifyTool}
-            </Button>
-          )}
+          <div className="grid grid-cols-2 gap-2 mt-2 text-xs">
+            <div className="flex items-center">
+              <Tag className="h-3 w-3 mr-1" />
+              {tender.category || "Uncategorized"}
+            </div>
+            <div className="flex items-center">
+              <MapPin className="h-3 w-3 mr-1" />
+              {tender.location || "Not specified"}
+            </div>
+            <div className="flex items-center">
+              <Calendar className="h-3 w-3 mr-1" />
+              Deadline: {tender.deadline ? formatDate(tender.deadline) : "Unknown"}
+            </div>
+            <div>
+              {tender.fees && `Value: ${tender.fees}`}
+              {!tender.fees && "Value: Contact for pricing"}
+            </div>
+          </div>
         </div>
-      </CardFooter>
-    </Card>
+      ))}
+      
+      <Button 
+        variant="outline" 
+        className="w-full"
+        onClick={() => onRetry()}
+      >
+        <RefreshCw className="h-4 w-4 mr-2" />
+        Refresh Tenders
+      </Button>
+    </div>
   );
 };
+
+// Export both the default export and named export
+export default TenderList;
+export { TenderList };

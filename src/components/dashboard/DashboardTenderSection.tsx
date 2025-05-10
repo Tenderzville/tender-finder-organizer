@@ -1,5 +1,5 @@
 
-import { TenderList } from '@/components/tenders/TenderList';
+import TenderList from '@/components/tenders/TenderList';
 import { CountyTenders } from '@/components/tenders/CountyTenders';
 import { TenderMatcher } from '@/components/ai/TenderMatcher';
 import { Tender } from "@/types/tender";
