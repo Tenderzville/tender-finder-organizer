@@ -4,11 +4,14 @@ import { TenderLoadingState } from '@/components/tenders/TenderLoadingState';
 import { TenderEmptyState } from '@/components/tenders/TenderEmptyState';
 import { Tender } from "@/types/tender";
 import { Button } from "@/components/ui/button";
-import { RefreshCw, FileSpreadsheet } from "lucide-react";
+import { RefreshCw, FileSpreadsheet, Share2 } from "lucide-react";
 import { Alert, AlertTitle, AlertDescription } from "@/components/ui/alert";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/lib/supabase-client";
 import { useState } from "react";
+import { generateSocialMediaPost } from "@/utils/tenderAnalysis";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { Textarea } from "@/components/ui/textarea";
 
 interface TenderContentProps {
   tenders: Tender[];
@@ -31,6 +34,8 @@ export const TenderContent = ({
 }: TenderContentProps) => {
   const { toast } = useToast();
   const [isImporting, setIsImporting] = useState(false);
+  const [selectedTender, setSelectedTender] = useState<Tender | null>(null);
+  const [socialPost, setSocialPost] = useState("");
   
   const handleDirectImport = async () => {
     try {
@@ -75,6 +80,42 @@ export const TenderContent = ({
     }
   };
   
+  const handleGenerateSocialPost = (tender: Tender) => {
+    setSelectedTender(tender);
+    setSocialPost(generateSocialMediaPost(tender));
+  };
+  
+  const handleShareSocialPost = async () => {
+    if (!selectedTender) return;
+    
+    try {
+      // Copy to clipboard
+      await navigator.clipboard.writeText(socialPost);
+      
+      toast({
+        title: "Copied to clipboard",
+        description: "The social media post has been copied to your clipboard."
+      });
+      
+      // Here we would normally also post directly to social media
+      // For now we're just tracking that a share action happened
+      await supabase.from('social_shares').insert({
+        platform: 'clipboard',
+        share_url: selectedTender.tender_url || '',
+        user_id: (await supabase.auth.getUser()).data.user?.id || 'anonymous',
+        verified: true
+      });
+      
+    } catch (err) {
+      console.error("Error sharing social post:", err);
+      toast({
+        title: "Share Error",
+        description: "Could not copy the social media post to clipboard.",
+        variant: "destructive",
+      });
+    }
+  };
+  
   return (
     <div className="grid grid-cols-1 gap-6">
       {(isLoading && tenders.length === 0) ? (
@@ -86,6 +127,7 @@ export const TenderContent = ({
             isLoading={isLoading && tenders.length === 0}
             error={error || (apiError ? new Error(apiError) : null)}
             onRetry={onRetry}
+            onShare={handleGenerateSocialPost}
           />
           
           {tenders.length === 0 && !isLoading && !apiError && (
@@ -146,6 +188,33 @@ export const TenderContent = ({
           </AlertDescription>
         </Alert>
       )}
+      
+      <Dialog>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Share on Social Media</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            <Textarea 
+              value={socialPost}
+              onChange={(e) => setSocialPost(e.target.value)}
+              className="min-h-[200px]"
+            />
+            <div className="flex justify-end">
+              <Button 
+                onClick={handleShareSocialPost}
+                className="flex items-center gap-2"
+              >
+                <Share2 className="h-4 w-4" />
+                Copy & Share
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+        <DialogTrigger asChild>
+          <span className="hidden">Open share dialog</span>
+        </DialogTrigger>
+      </Dialog>
     </div>
   );
 };

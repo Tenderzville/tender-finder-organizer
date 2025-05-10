@@ -16,3 +16,4 @@ verify_jwt = false
 
 [functions.sync-google-sheets-to-supabase]
 verify_jwt = false
+

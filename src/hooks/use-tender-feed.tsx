@@ -6,6 +6,7 @@ import { fetchLatestTenders, getTotalTendersCount } from "@/utils/tenderFetching
 import { useTenderRefresh } from "@/hooks/use-tender-refresh";
 import { useSampleTenders } from "@/hooks/use-sample-tenders";
 import type { Tender } from "@/types/tender";
+import { matchTenderToSupplier } from "@/utils/tenderAnalysis";
 
 export function useTenderFeed() {
   const { toast } = useToast();
@@ -15,6 +16,11 @@ export function useTenderFeed() {
   const [retryAttempts, setRetryAttempts] = useState(0);
   const { isRefreshing, refreshTenderFeed } = useTenderRefresh();
   const { createSampleTenders } = useSampleTenders();
+  const [userProfile, setUserProfile] = useState<{
+    areas_of_expertise: string[];
+    industry: string;
+    location: string;
+  } | null>(null);
 
   useEffect(() => {
     setForceStableView(true);
@@ -23,6 +29,16 @@ export function useTenderFeed() {
     }, 800);
     
     return () => clearTimeout(timer);
+  }, []);
+  
+  // Initialize a basic user profile as a fallback
+  useEffect(() => {
+    // In a real app, we'd fetch this from the user's profile
+    setUserProfile({
+      areas_of_expertise: ["IT & Telecommunications", "Construction"],
+      industry: "Technology",
+      location: "Nairobi"
+    });
   }, []);
 
   const { 
@@ -83,10 +99,19 @@ export function useTenderFeed() {
   }, [refetch, retryAttempts, createSampleTenders]);
 
   const tendersToDisplay = data?.latest_tenders as Tender[] || [];
+  
+  // If we have a user profile, sort tenders by match score
+  const sortedTenders = userProfile 
+    ? [...tendersToDisplay].sort((a, b) => {
+        const scoreA = matchTenderToSupplier(a, userProfile);
+        const scoreB = matchTenderToSupplier(b, userProfile);
+        return scoreB - scoreA;
+      })
+    : tendersToDisplay;
 
   return {
     data,
-    tendersToDisplay,
+    tendersToDisplay: sortedTenders,
     isLoading,
     error,
     isRefreshing,
@@ -96,6 +121,7 @@ export function useTenderFeed() {
     setShowQualificationTool,
     setLanguage,
     refreshTenderFeed,
-    refetch
+    refetch,
+    userProfile
   };
 }

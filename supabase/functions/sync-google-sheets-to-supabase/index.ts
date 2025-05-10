@@ -1,6 +1,6 @@
 
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2.42.7";
+import { createClient } from "@supabase/supabase-js";
 import { corsHeaders } from "../_shared/cors.ts";
 
 const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
@@ -92,6 +92,26 @@ function parseCsv(csv: string): Record<string, string>[] {
   }
 }
 
+// Generate a simple text embedding using average character codes
+// This is a placeholder for the actual embedding generation that would use Hugging Face
+function generateSimpleEmbedding(text: string): number[] {
+  const embedding: number[] = Array(384).fill(0);
+  const cleanText = text.toLowerCase().trim();
+  
+  if (cleanText.length === 0) {
+    return embedding;
+  }
+
+  // Use character codes to create a simple embedding
+  for (let i = 0; i < cleanText.length && i < embedding.length; i++) {
+    embedding[i % embedding.length] += cleanText.charCodeAt(i) / 255;
+  }
+  
+  // Normalize the embedding
+  const magnitude = Math.sqrt(embedding.reduce((sum, val) => sum + val * val, 0));
+  return embedding.map(val => magnitude > 0 ? val / magnitude : 0);
+}
+
 // Map fields from different CSV formats to our tender schema
 function mapFieldsToTender(csvData: Record<string, string>): Record<string, any> {
   // Find the right fields by checking available keys
@@ -145,10 +165,19 @@ function mapFieldsToTender(csvData: Record<string, string>): Record<string, any>
   } else {
     deadline = new Date(Date.now() + 14 * 24 * 60 * 60 * 1000).toISOString();
   }
+
+  const title = getField(['title', 'tender id', 'tender description']);
+  const description = getField(['description', 'tender description', 'desc']);
+  
+  // Create a text field for embedding
+  const textForEmbedding = `${title} ${description} ${getField(['procuring entity', 'entity', 'organization'])} ${getField(['category', 'type'])} ${getField(['location', 'county'])}`;
+  
+  // Generate a simple embedding for vector search
+  const embedding = generateSimpleEmbedding(textForEmbedding);
   
   return {
-    title: getField(['title', 'tender id', 'tender description']),
-    description: getField(['description', 'tender description', 'desc']),
+    title,
+    description,
     procuring_entity: getField(['procuring entity', 'entity', 'organization']),
     tender_no: getField(['tender no', 'tender id', 'id']),
     category: getField(['category', 'type']) || "Government",
@@ -157,7 +186,8 @@ function mapFieldsToTender(csvData: Record<string, string>): Record<string, any>
     tender_url: getField(['url', 'link', 'tender url']) || null,
     affirmative_action: affirmativeAction,
     source: "google-sheets",
-    points_required: 0  // Make imported tenders freely accessible
+    points_required: 0,  // Make imported tenders freely accessible
+    embedding  // Add the embedding for vector search
   };
 }
 
