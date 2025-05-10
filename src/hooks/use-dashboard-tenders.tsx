@@ -30,20 +30,24 @@ export function useDashboardTenders() {
       
       console.log(`Successfully fetched ${data?.length || 0} tenders from database`);
       
-      // If no tenders are found, try to fetch from Browser AI
+      // If no tenders are found, try to import from Google Sheets
       if (!data || data.length === 0) {
-        console.log("No tenders found in database, trying multiple sources...");
+        console.log("No tenders found in database, importing from Google Sheets...");
         
         try {
-          // First, try to import from sample sheets
+          // Try the direct sync-google-sheets-to-supabase function first
           const { data: sheetsData, error: sheetsError } = await supabase.functions.invoke(
-            'browser-ai-tenders/import-sample-sheets'
+            'sync-google-sheets-to-supabase'
           );
           
           if (sheetsError) {
-            console.error("Error importing from sample sheets:", sheetsError);
+            console.error("Error importing from Google Sheets:", sheetsError);
           } else if (sheetsData?.success && sheetsData.totalImported > 0) {
-            console.log(`Successfully imported ${sheetsData.totalImported} tenders from sample sheets`);
+            console.log(`Successfully imported ${sheetsData.totalImported} tenders from Google Sheets`);
+            toast({
+              title: "Import Successful",
+              description: `Imported ${sheetsData.totalImported} tenders from Google Sheets.`,
+            });
             
             // Refresh tenders from database
             const { data: refreshedData, error: refreshError } = await supabase
@@ -53,7 +57,7 @@ export function useDashboardTenders() {
               
             if (refreshError) {
               console.error("Error fetching refreshed tenders:", refreshError);
-            } else if (refreshedData) {
+            } else if (refreshedData && refreshedData.length > 0) {
               // Transform the data to match the Tender type
               const formattedTenders = refreshedData.map(tender => ({
                 ...tender,
@@ -65,7 +69,8 @@ export function useDashboardTenders() {
               return;
             }
           } else {
-            // If sheets import didn't work, try Browser AI
+            console.log("No tenders imported from Google Sheets, trying Browser AI...");
+            // Try Browser AI integration as a backup
             const { data: browserAIData, error: browserAIError } = await supabase.functions.invoke(
               'browser-ai-tenders/fetch-browser-ai'
             );

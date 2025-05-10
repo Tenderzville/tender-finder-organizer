@@ -31,23 +31,23 @@ const Tenders = () => {
     // Initial data fetch
     fetchTenders().catch(err => {
       console.error("Error in initial tenders fetch:", err);
-      setApiError("Failed to load tenders. Please use the refresh button to trigger the scraper.");
+      setApiError("Failed to load tenders. Please use the refresh button to try again.");
     });
     
-    // Check if we need to automatically trigger the scraper due to no tenders
-    const checkAndTriggerScraperIfNeeded = async () => {
+    // Check if we need to automatically trigger the import due to no tenders
+    const checkAndImportIfNeeded = async () => {
       if (tenders.length === 0 && !isRefreshing && isOnline) {
-        console.log("No tenders found, automatically triggering scraper...");
+        console.log("No tenders found, automatically triggering import...");
         try {
           await refreshTenderFeed();
         } catch (error) {
-          console.error("Failed to auto-trigger scraper:", error);
+          console.error("Failed to auto-trigger import:", error);
         }
       }
     };
     
-    // Only run auto-trigger after a short delay to allow for initial data fetch
-    const timer = setTimeout(checkAndTriggerScraperIfNeeded, 2000);
+    // Only run auto-import after a short delay to allow for initial data fetch
+    const timer = setTimeout(checkAndImportIfNeeded, 2000);
     return () => clearTimeout(timer);
   }, [fetchTenders, tenders.length, isRefreshing, isOnline, refreshTenderFeed]);
 
@@ -69,8 +69,8 @@ const Tenders = () => {
           <TenderRefreshButton 
             isRefreshing={isRefreshing}
             onRefresh={handleRefreshTenders}
-            label="Refresh Tenders"
-            refreshingLabel="Refreshing Tenders..."
+            label="Import Tenders"
+            refreshingLabel="Importing Tenders..."
           />
         </div>
 
@@ -78,8 +78,7 @@ const Tenders = () => {
           <Alert className="mb-6 bg-amber-50 border-amber-200">
             <AlertTitle className="text-amber-800">No Tenders Found</AlertTitle>
             <AlertDescription className="text-amber-700">
-              Click the "Refresh Tenders" button in the top right corner to fetch real-time tenders from official sources.
-              This process may take 1-2 minutes to complete.
+              Click the "Import Tenders" button in the top right corner to fetch the latest tenders from Google Sheets.
             </AlertDescription>
           </Alert>
         )}

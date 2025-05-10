@@ -3,9 +3,7 @@ import { TenderList } from '@/components/tenders/TenderList';
 import { CountyTenders } from '@/components/tenders/CountyTenders';
 import { TenderMatcher } from '@/components/ai/TenderMatcher';
 import { Tender } from "@/types/tender";
-import { DebugButton } from "./DebugButton";
 import { ScraperStatus } from "@/components/dashboard/ScraperStatus";
-import { ScraperDebugInfo } from "@/components/dashboard/ScraperDebugInfo";
 import { Button } from "@/components/ui/button";
 import { RefreshCw, FileSpreadsheet } from "lucide-react";
 import { supabase } from "@/lib/supabase-client";
@@ -51,7 +49,7 @@ export const DashboardTenderSection = ({
       });
 
       const { data, error } = await supabase.functions.invoke(
-        'browser-ai-tenders/import-sample-sheets'
+        'sync-google-sheets-to-supabase'
       );
 
       if (error) {
@@ -72,7 +70,7 @@ export const DashboardTenderSection = ({
       } else {
         toast({
           title: "Import Issue",
-          description: "No tenders were imported. Please check the sheets URLs.",
+          description: data?.message || "No tenders were imported. Please check the sheets URLs.",
           variant: "destructive",
         });
       }
@@ -89,13 +87,13 @@ export const DashboardTenderSection = ({
   };
 
   return (
-    <div className="grid grid-cols-1 lg:grid-cols-4 gap-6 mt-8">
+    <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mt-8">
       <div className="lg:col-span-3">
         {tenders.length === 0 && !isLoadingTenders && (
           <div className="flex flex-col items-center justify-center p-6 bg-amber-50 border border-amber-200 rounded-lg mb-6">
             <h3 className="text-lg font-medium text-amber-800 mb-2">No Tenders Found</h3>
             <p className="text-sm text-amber-700 mb-4 text-center">
-              We couldn't find any tenders in the database. You can import tenders from sample sheets or fetch them from Browser AI.
+              We couldn't find any tenders in the database. You can import tenders from sample sheets or refresh to try again.
             </p>
             <div className="flex flex-wrap gap-3 justify-center">
               <Button
@@ -112,7 +110,7 @@ export const DashboardTenderSection = ({
                 ) : (
                   <>
                     <FileSpreadsheet className="h-4 w-4 mr-2" />
-                    Import from Sample Sheets
+                    Import from Google Sheets
                   </>
                 )}
               </Button>
@@ -147,20 +145,11 @@ export const DashboardTenderSection = ({
           onViewDetails={handleViewTenderDetails}
           userId={userData?.id}
         />
-        <DebugButton 
-          showDebugInfo={showDebugInfo} 
-          setShowDebugInfo={setShowDebugInfo}
-          tenderCount={tenders.length}
-        />
-      </div>
-      <div className="lg:col-span-1">
-        <ScraperStatus />
-        {showDebugInfo && <ScraperDebugInfo />}
       </div>
 
       {!isLoadingTenders && !errorTenders && tenders.length > 0 && (
         <>
-          <div className="mt-8 lg:col-span-4">
+          <div className="mt-8 lg:col-span-3">
             <CountyTenders
               tenders={tenders}
               onViewDetails={handleViewTenderDetails}
@@ -174,7 +163,7 @@ export const DashboardTenderSection = ({
             />
           </div>
 
-          <div className="mt-8 lg:col-span-4">
+          <div className="mt-8 lg:col-span-3">
             <TenderMatcher 
               userProfile={{ 
                 areas_of_expertise: ["IT & Telecommunications", "Construction"],
