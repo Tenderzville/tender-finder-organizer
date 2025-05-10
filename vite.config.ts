@@ -17,6 +17,12 @@ export default defineConfig(({ mode }) => ({
   },
   server: {
     port: 8080,
-    host: "::"
+    host: "::",
+    hmr: {
+      // Enable HMR for all environments
+      clientPort: 443,
+    },
+    // Allow all hosts
+    strictPort: true,
   },
 }));
