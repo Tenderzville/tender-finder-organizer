@@ -191,10 +191,7 @@ const TenderList = ({
               
               {tender.tender_url && (
                 <Button
-                  as="a"
-                  href={tender.tender_url}
-                  target="_blank"
-                  rel="noopener noreferrer"
+                  onClick={() => window.open(tender.tender_url, '_blank', 'noopener,noreferrer')}
                   variant="outline"
                   size="sm"
                   className="flex items-center"
