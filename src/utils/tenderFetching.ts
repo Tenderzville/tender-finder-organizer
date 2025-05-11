@@ -1,35 +1,165 @@
 
 import { supabase } from "@/integrations/supabase/client";
-import { Tender } from "@/types/tender";
-import { parseTenderAffirmativeAction } from "@/types/tender";
+import { Tender, parseTenderAffirmativeAction, getTenderStatus } from "@/types/tender";
 
-export async function fetchLatestTenders() {
-  const { data: latestTenders, error: tendersError } = await supabase
-    .from('tenders')
-    .select('*')
-    .order('created_at', { ascending: false })
-    .limit(5);
+export async function fetchLatestTenders(): Promise<Tender[]> {
+  console.log("Fetching latest tenders from database...");
   
-  if (tendersError) {
-    console.error("Error fetching tenders from database:", tendersError);
-    throw tendersError;
+  try {
+    // First check if there are tenders already in the database
+    const { data: existingTenders, error: existingError } = await supabase
+      .from('tenders')
+      .select('*')
+      .order('created_at', { ascending: false })
+      .limit(10);
+      
+    if (existingError) {
+      console.error("Error fetching existing tenders:", existingError);
+      throw existingError;
+    }
+    
+    // If we have tenders, return them
+    if (existingTenders && existingTenders.length > 0) {
+      console.log(`Found ${existingTenders.length} existing tenders`);
+      return existingTenders.map(tender => ({
+        ...tender,
+        affirmative_action: parseTenderAffirmativeAction(tender.affirmative_action),
+        status: getTenderStatus(tender.deadline)
+      }));
+    }
+    
+    console.log("No existing tenders found, importing from Google Sheets...");
+    
+    // Try to import from Google Sheets
+    try {
+      const { data, error } = await supabase.functions.invoke('sync-google-sheets-to-supabase');
+      
+      if (error) {
+        console.error("Error importing from Google Sheets:", error);
+        throw error;
+      }
+      
+      console.log("Google Sheets import response:", data);
+      
+      // Fetch the newly imported tenders
+      const { data: importedTenders, error: importError } = await supabase
+        .from('tenders')
+        .select('*')
+        .order('created_at', { ascending: false })
+        .limit(10);
+        
+      if (importError) {
+        console.error("Error fetching imported tenders:", importError);
+        throw importError;
+      }
+      
+      if (importedTenders && importedTenders.length > 0) {
+        console.log(`Found ${importedTenders.length} imported tenders`);
+        return importedTenders.map(tender => ({
+          ...tender,
+          affirmative_action: parseTenderAffirmativeAction(tender.affirmative_action),
+          status: getTenderStatus(tender.deadline)
+        }));
+      }
+    } catch (importError) {
+      console.error("Error in Google Sheets import process:", importError);
+    }
+    
+    console.log("No tenders found or imported. Attempting direct API access...");
+    
+    // Try direct API access as a last resort
+    try {
+      const { data: apiData, error: apiError } = await supabase.functions.invoke('check-scraper-status');
+      
+      if (apiError) {
+        console.error("Error with direct API access:", apiError);
+        throw apiError;
+      }
+      
+      console.log("Direct API access response:", apiData);
+      
+      // Fetch any tenders that might have been added by the API access
+      const { data: apiTenders, error: apiFetchError } = await supabase
+        .from('tenders')
+        .select('*')
+        .order('created_at', { ascending: false })
+        .limit(10);
+        
+      if (apiFetchError) {
+        console.error("Error fetching API tenders:", apiFetchError);
+        throw apiFetchError;
+      }
+      
+      if (apiTenders && apiTenders.length > 0) {
+        console.log(`Found ${apiTenders.length} tenders from API access`);
+        return apiTenders.map(tender => ({
+          ...tender,
+          affirmative_action: parseTenderAffirmativeAction(tender.affirmative_action),
+          status: getTenderStatus(tender.deadline)
+        }));
+      }
+    } catch (apiError) {
+      console.error("Error in direct API access process:", apiError);
+    }
+    
+    // If all else fails, return an empty array
+    return [];
+  } catch (error) {
+    console.error("Error in fetchLatestTenders:", error);
+    throw error;
   }
-
-  return latestTenders?.map(tender => ({
-    ...tender,
-    affirmative_action: parseTenderAffirmativeAction(tender.affirmative_action)
-  })) || [];
 }
 
-export async function getTotalTendersCount() {
-  const queryResult = await supabase
-    .from('tenders')
-    .select('*', { count: 'exact', head: true });
-  
-  if (queryResult.error) {
-    console.error("Error counting tenders:", queryResult.error);
+export async function getTotalTendersCount(): Promise<number> {
+  try {
+    const queryResult = await supabase
+      .from('tenders')
+      .select('*', { count: 'exact', head: true });
+    
+    if (queryResult.error) {
+      console.error("Error counting tenders:", queryResult.error);
+      throw queryResult.error;
+    }
+    
+    return queryResult.count || 0;
+  } catch (error) {
+    console.error("Error in getTotalTendersCount:", error);
+    return 0;
   }
-  
-  return queryResult.count || 0;
 }
 
+export async function triggerGoogleSheetsSync(): Promise<{ success: boolean; message: string }> {
+  try {
+    console.log("Triggering Google Sheets sync...");
+    
+    const { data, error } = await supabase.functions.invoke('sync-google-sheets-to-supabase');
+    
+    if (error) {
+      console.error("Error triggering Google Sheets sync:", error);
+      return { 
+        success: false, 
+        message: `Error: ${error.message || "Failed to synchronize with Google Sheets"}` 
+      };
+    }
+    
+    if (data?.success) {
+      console.log(`Successfully imported ${data.totalImported || 0} tenders from Google Sheets`);
+      return { 
+        success: true, 
+        message: `Successfully imported ${data.totalImported || 0} tenders from Google Sheets` 
+      };
+    } else {
+      console.log("Google Sheets sync didn't report success:", data);
+      return { 
+        success: false, 
+        message: data?.message || "No tenders were imported from Google Sheets" 
+      };
+    }
+  } catch (error) {
+    console.error("Exception in triggerGoogleSheetsSync:", error);
+    return { 
+      success: false, 
+      message: `Exception: ${error.message || "An unexpected error occurred"}` 
+    };
+  }
+}
