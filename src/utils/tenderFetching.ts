@@ -1,4 +1,3 @@
-
 import { supabase } from "@/integrations/supabase/client";
 import { Tender, parseTenderAffirmativeAction, getTenderStatus } from "@/types/tender";
 
@@ -30,7 +29,7 @@ export async function fetchLatestTenders(): Promise<Tender[]> {
     
     console.log("No existing tenders found, importing from Google Sheets...");
     
-    // Try to import from Google Sheets
+    // Try to import from Google Sheets (now creates sample data)
     try {
       const { data, error } = await supabase.functions.invoke('sync-google-sheets-to-supabase');
       
@@ -63,43 +62,6 @@ export async function fetchLatestTenders(): Promise<Tender[]> {
       }
     } catch (importError) {
       console.error("Error in Google Sheets import process:", importError);
-    }
-    
-    console.log("No tenders found or imported. Attempting direct API access...");
-    
-    // Try direct API access as a last resort
-    try {
-      const { data: apiData, error: apiError } = await supabase.functions.invoke('check-scraper-status');
-      
-      if (apiError) {
-        console.error("Error with direct API access:", apiError);
-        throw apiError;
-      }
-      
-      console.log("Direct API access response:", apiData);
-      
-      // Fetch any tenders that might have been added by the API access
-      const { data: apiTenders, error: apiFetchError } = await supabase
-        .from('tenders')
-        .select('*')
-        .order('created_at', { ascending: false })
-        .limit(10);
-        
-      if (apiFetchError) {
-        console.error("Error fetching API tenders:", apiFetchError);
-        throw apiFetchError;
-      }
-      
-      if (apiTenders && apiTenders.length > 0) {
-        console.log(`Found ${apiTenders.length} tenders from API access`);
-        return apiTenders.map(tender => ({
-          ...tender,
-          affirmative_action: parseTenderAffirmativeAction(tender.affirmative_action),
-          status: getTenderStatus(tender.deadline)
-        }));
-      }
-    } catch (apiError) {
-      console.error("Error in direct API access process:", apiError);
     }
     
     // If all else fails, return an empty array
