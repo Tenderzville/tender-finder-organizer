@@ -16,6 +16,7 @@ import { useDashboardNavigation } from "@/components/dashboard/DashboardNavigati
 import { DashboardLoading } from "@/components/dashboard/DashboardLoading";
 import { DashboardTenderSection } from "@/components/dashboard/DashboardTenderSection";
 import { useTenderFeed } from "@/hooks/use-tender-feed";
+import { Tender } from "@/types/tender";
 
 const Dashboard = () => {
   const { toast } = useToast();
@@ -36,7 +37,12 @@ const Dashboard = () => {
     sourcesBreakdown
   } = useTenderFeed();
   
-  const { handleViewTenderDetails, navigate } = useDashboardNavigation();
+  const { navigate } = useDashboardNavigation();
+  
+  // Updated to accept a Tender object instead of just an ID
+  const handleViewTenderDetails = (tender: Tender) => {
+    navigate(`/tenders/${tender.id}`);
+  };
 
   useEffect(() => {
     const loadUserData = async () => {

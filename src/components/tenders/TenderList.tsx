@@ -13,7 +13,9 @@ interface TenderListProps {
   error: Error | null;
   onRetry?: () => void;
   onBookmark?: (id: number) => void;
+  // Change this prop to accept either id or tender
   onViewDetails?: (id: number) => void;
+  onSelect?: (tender: Tender) => void;
   userId?: string;
   onShare?: (tender: Tender) => void;
 }
@@ -25,6 +27,7 @@ const TenderList = ({
   onRetry,
   onBookmark,
   onViewDetails,
+  onSelect,
   userId,
   onShare
 }: TenderListProps) => {
@@ -166,9 +169,15 @@ const TenderList = ({
             </CardContent>
 
             <CardFooter className="pt-2 flex gap-2">
-              {onViewDetails && (
+              {(onViewDetails || onSelect) && (
                 <Button 
-                  onClick={() => onViewDetails(tender.id)} 
+                  onClick={() => {
+                    if (onViewDetails) {
+                      onViewDetails(tender.id);
+                    } else if (onSelect) {
+                      onSelect(tender);
+                    }
+                  }} 
                   variant="default" 
                   size="sm" 
                   className="flex-1"

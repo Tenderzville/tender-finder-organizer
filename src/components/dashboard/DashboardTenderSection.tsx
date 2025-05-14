@@ -72,7 +72,10 @@ export function DashboardTenderSection({
                     isLoading={isLoadingTenders}
                     error={errorTenders}
                     onRetry={fetchTenders}
-                    onSelect={handleViewTenderDetails}
+                    onViewDetails={(id) => {
+                      const tender = tenders.find(t => t.id === id);
+                      if (tender) handleViewTenderDetails(tender);
+                    }}
                     onBookmark={handleBookmarkTender}
                   />
                 )}
@@ -102,7 +105,10 @@ export function DashboardTenderSection({
                     isLoading={isLoadingTenders}
                     error={errorTenders}
                     onRetry={fetchTenders}
-                    onSelect={handleViewTenderDetails}
+                    onViewDetails={(id) => {
+                      const tender = tenders.find(t => t.id === id);
+                      if (tender) handleViewTenderDetails(tender);
+                    }}
                     onBookmark={handleBookmarkTender}
                   />
                 )}
