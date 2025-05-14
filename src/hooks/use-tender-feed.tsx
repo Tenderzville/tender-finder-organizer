@@ -21,6 +21,7 @@ export function useTenderFeed() {
     industry: string;
     location: string;
   } | null>(null);
+  const [lastScraped, setLastScraped] = useState<string | null>(null);
 
   useEffect(() => {
     setForceStableView(true);
@@ -54,6 +55,9 @@ export function useTenderFeed() {
       const latestTenders = await fetchLatestTenders();
       const totalTenders = await getTotalTendersCount();
       
+      // Update last scrape timestamp
+      setLastScraped(new Date().toISOString());
+      
       return {
         latest_tenders: latestTenders,
         total_tenders: totalTenders,
@@ -77,16 +81,26 @@ export function useTenderFeed() {
       try {
         if (isMounted) {
           setRetryAttempts(prev => prev + 1);
-          await refetch();
+          const result = await refetch();
+          
+          // If we have data but it's empty, try to refresh right away
+          if (result.data && (!result.data.latest_tenders || result.data.latest_tenders.length === 0)) {
+            toast({
+              title: "No tenders found",
+              description: "Fetching tenders from external sources...",
+            });
+            await refreshTenderFeed();
+          }
         }
       } catch (err) {
         console.error("Failed initial tender feed fetch:", err);
         
         if (retryAttempts >= 2) {
-          const createdTenders = await createSampleTenders();
-          if (createdTenders) {
-            await refetch();
-          }
+          toast({
+            title: "Fetching tenders",
+            description: "Using backup data sources...",
+          });
+          await refreshTenderFeed();
         }
       }
     };
@@ -96,7 +110,7 @@ export function useTenderFeed() {
     return () => {
       isMounted = false;
     };
-  }, [refetch, retryAttempts, createSampleTenders]);
+  }, [refetch, retryAttempts, refreshTenderFeed, toast]);
 
   const tendersToDisplay = data?.latest_tenders as Tender[] || [];
   
@@ -118,6 +132,7 @@ export function useTenderFeed() {
     forceStableView,
     language,
     showQualificationTool,
+    lastScraped,
     setShowQualificationTool,
     setLanguage,
     refreshTenderFeed,
