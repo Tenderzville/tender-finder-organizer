@@ -15,6 +15,7 @@ import { useDashboardTenders } from "@/hooks/use-dashboard-tenders";
 import { useDashboardNavigation } from "@/components/dashboard/DashboardNavigation";
 import { DashboardLoading } from "@/components/dashboard/DashboardLoading";
 import { DashboardTenderSection } from "@/components/dashboard/DashboardTenderSection";
+import { useTenderFeed } from "@/hooks/use-tender-feed";
 
 const Dashboard = () => {
   const { toast } = useToast();
@@ -25,13 +26,15 @@ const Dashboard = () => {
   const { points } = usePoints({ userId: userData?.id || null });
   const [language, setLanguage] = useState<'en' | 'sw'>('en');
   const [showDebugInfo, setShowDebugInfo] = useState(false);
-  
-  const { 
-    tenders, 
-    isLoadingTenders, 
-    errorTenders, 
-    fetchTenders 
-  } = useDashboardTenders();
+
+  const {
+    tendersToDisplay,
+    isLoading: isLoadingTenders,
+    error: errorTenders,
+    refreshTenderFeed,
+    lastScraped,
+    sourcesBreakdown
+  } = useTenderFeed();
   
   const { handleViewTenderDetails, navigate } = useDashboardNavigation();
 
@@ -76,19 +79,21 @@ const Dashboard = () => {
     }
     
     const timer = setTimeout(() => {
-      if (tenders.length === 0) {
+      if (tendersToDisplay.length === 0) {
         setShowDebugInfo(true);
+        // Auto-trigger refresh if no tenders
+        refreshTenderFeed();
       }
     }, 3000);
     
     return () => clearTimeout(timer);
-  }, [isAuthenticated, isInitialized, toast, tenders.length]);
+  }, [isAuthenticated, isInitialized, toast, tendersToDisplay.length, refreshTenderFeed]);
 
   if (isLoading || !isInitialized) {
     return <DashboardLoading />;
   }
 
-  // Enable bookmarking functionality for tenders
+  // Modified to return a Promise as required by the component props
   const handleBookmarkTender = async (tenderId: number) => {
     try {
       if (!userData?.id) {
@@ -182,10 +187,10 @@ const Dashboard = () => {
         )}
 
         <DashboardTenderSection 
-          tenders={tenders}
+          tenders={tendersToDisplay}
           isLoadingTenders={isLoadingTenders}
           errorTenders={errorTenders}
-          fetchTenders={fetchTenders}
+          fetchTenders={refreshTenderFeed}
           showDebugInfo={showDebugInfo}
           setShowDebugInfo={setShowDebugInfo}
           handleViewTenderDetails={handleViewTenderDetails}
@@ -193,6 +198,8 @@ const Dashboard = () => {
           navigate={navigate}
           language={language}
           userData={userData}
+          sourcesBreakdown={sourcesBreakdown}
+          lastScraped={lastScraped}
         />
       </main>
     </div>

@@ -8,28 +8,31 @@ const supabaseUrl = Deno.env.get("SUPABASE_URL") || "";
 const supabaseKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") || "";
 const supabase = createClient(supabaseUrl, supabaseKey);
 
-const BROWSER_AI_API_KEY = Deno.env.get("BROWSER_AI_API_KEY");
+const BROWSER_AI_API_KEY = Deno.env.get("BROWSER_AI_API_KEY") || "94aa65f3-e560-4acd-8930-ae77bfabc32d:7fe12098-15ed-46de-8e09-f0dd3ad80d1e";
 const TEAM_ID = "895b572b-11e4-4037-920a-77b01654a4c8";
-const ROBOT_ID = "f55e700b-f976-4a56-9bd5-9e837c70d9b7";
 
-async function fetchTendersFromBrowserAI() {
+// MYGOV Robot
+const MYGOV_ROBOT_ID = "ac84ba46-2da7-4a54-b083-48de0011fb36";
+// PPIP Robot
+const PPIP_ROBOT_ID = "f55e700b-f976-4a56-9bd5-9e837c70d9b7";
+
+async function fetchTendersFromBrowserAI(robotId = PPIP_ROBOT_ID, originUrl = "https://tenders.go.ke/tenders") {
   try {
-    if (!BROWSER_AI_API_KEY) {
-      throw new Error("Browser AI API key not configured");
-    }
-
-    console.log("Fetching tenders from Browser AI...");
+    console.log(`Fetching tenders from Browser AI using robot ${robotId} and URL ${originUrl}...`);
     
-    // Make API request to Browser AI
+    // Make API request to Browser AI (using v2 API as per documentation)
+    const apiUrl = `https://api.browse.ai/v2/robots/${robotId}/executions`;
+    
     const requestBody = {
-      robotId: ROBOT_ID,
-      input: { 
-        originUrl: "https://www.tenders.go.ke/tenders", 
+      inputParameters: { 
+        originUrl: originUrl, 
         tenders_list_limit: 9 
       }
     };
     
-    const response = await fetch(`https://api.browser.ai/v1/teams/${TEAM_ID}/runs`, {
+    console.log("Browser AI request body:", JSON.stringify(requestBody));
+    
+    const response = await fetch(apiUrl, {
       method: "POST",
       headers: {
         "Authorization": `Bearer ${BROWSER_AI_API_KEY}`,
@@ -39,20 +42,28 @@ async function fetchTendersFromBrowserAI() {
       body: JSON.stringify(requestBody)
     });
     
+    const responseText = await response.text();
+    console.log("Browser AI raw response:", responseText);
+    
     if (!response.ok) {
-      const errorText = await response.text();
-      console.error("Browser AI API error:", errorText);
-      throw new Error(`Browser AI API error: ${response.status} ${errorText}`);
+      throw new Error(`Browser AI API error: ${response.status} ${responseText}`);
     }
     
-    const data = await response.json();
-    console.log("Browser AI response:", data);
+    let data;
+    try {
+      data = JSON.parse(responseText);
+    } catch (parseError) {
+      throw new Error(`Failed to parse Browser AI response: ${parseError.message}`);
+    }
     
-    // Process and save tenders
-    if (data && data.output && Array.isArray(data.output.tenders)) {
+    console.log("Browser AI parsed response:", data);
+    
+    // Process and save tenders - adapt based on the actual response format
+    if (data && data.result && data.result.extractedData && Array.isArray(data.result.extractedData.tenders)) {
+      const tenders = data.result.extractedData.tenders;
       const insertedTenders = [];
       
-      for (const tender of data.output.tenders) {
+      for (const tender of tenders) {
         try {
           // Format tender data for our database schema
           const formattedTender = {
@@ -103,150 +114,67 @@ async function fetchTendersFromBrowserAI() {
   }
 }
 
-async function importFromGoogleSheet(sheetUrl: string) {
-  try {
-    console.log(`Attempting to import data from Google Sheet: ${sheetUrl}`);
-    
-    // First, try to fetch the sheet data as CSV (public access required)
-    // Replace /edit?usp=sharing with /export?format=csv
-    const exportUrl = sheetUrl.replace(/\/edit.*$/, '/export?format=csv');
-    console.log(`Converted sheet URL to export URL: ${exportUrl}`);
-    
-    const response = await fetch(exportUrl, {
-      headers: {
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/97.0.4692.71 Safari/537.36'
-      }
-    });
-    
-    if (!response.ok) {
-      throw new Error(`Failed to fetch Google Sheet data: ${response.status} ${response.statusText}`);
-    }
-    
-    const csvText = await response.text();
-    const rows = csvText.split('\n').map(row => row.split(',').map(cell => cell.trim().replace(/(^"|"$)/g, '')));
-    
-    const headers = rows[0];
-    const dataRows = rows.slice(1);
-    
-    console.log(`Found ${dataRows.length} rows of data with headers: ${headers.join(', ')}`);
-    
-    // Map CSV data to tender format
-    const tenders = [];
-    const insertedTenders = [];
-    
-    for (const row of dataRows) {
-      if (row.length < 3) continue; // Skip incomplete rows
-      
-      try {
-        const titleIndex = headers.findIndex(h => h.toLowerCase().includes('title'));
-        const descriptionIndex = headers.findIndex(h => h.toLowerCase().includes('desc'));
-        const deadlineIndex = headers.findIndex(h => h.toLowerCase().includes('dead'));
-        const entityIndex = headers.findIndex(h => h.toLowerCase().includes('entity') || h.toLowerCase().includes('organization'));
-        const categoryIndex = headers.findIndex(h => h.toLowerCase().includes('cat'));
-        const locationIndex = headers.findIndex(h => h.toLowerCase().includes('loc'));
-        const urlIndex = headers.findIndex(h => h.toLowerCase().includes('url') || h.toLowerCase().includes('link'));
-        const requirementsIndex = headers.findIndex(h => h.toLowerCase().includes('req'));
-
-        // Create tender object, using default values if columns aren't found
-        const tender = {
-          title: titleIndex >= 0 ? row[titleIndex] : row[0],
-          description: descriptionIndex >= 0 ? row[descriptionIndex] : `Tender imported from Google Sheets`,
-          deadline: deadlineIndex >= 0 ? parseDate(row[deadlineIndex]) : new Date(Date.now() + 14 * 24 * 60 * 60 * 1000).toISOString(),
-          contact_info: entityIndex >= 0 ? row[entityIndex] : "Contact the procurement entity",
-          category: categoryIndex >= 0 ? row[categoryIndex] : "Government",
-          location: locationIndex >= 0 ? row[locationIndex] : "Kenya",
-          tender_url: urlIndex >= 0 && row[urlIndex] ? row[urlIndex] : null,
-          requirements: requirementsIndex >= 0 ? row[requirementsIndex] : "See tender document for requirements",
-          source: "google-sheets"
-        };
-        
-        if (tender.title && tender.title.length > 3) {
-          tenders.push(tender);
-          
-          // Check if tender with same title exists
-          const { data: existingTender } = await supabase
-            .from("tenders")
-            .select("id")
-            .eq("title", tender.title)
-            .limit(1);
-          
-          if (!existingTender || existingTender.length === 0) {
-            // Insert new tender
-            const { data: insertData, error: insertError } = await supabase
-              .from("tenders")
-              .insert([tender])
-              .select();
-              
-            if (insertError) {
-              console.error("Error inserting tender from sheet:", insertError);
-            } else if (insertData) {
-              insertedTenders.push(insertData[0]);
-            }
-          }
-        }
-      } catch (error) {
-        console.error("Error processing row from sheet:", error);
-      }
-    }
-    
-    console.log(`Successfully inserted ${insertedTenders.length} tenders from Google Sheet`);
-    return { success: true, imported: insertedTenders.length, tenders: insertedTenders };
-  } catch (error) {
-    console.error("Error importing from Google Sheet:", error);
-    return { success: false, error: error.message };
-  }
-}
-
-// Helper function to parse various date formats
-function parseDate(dateStr: string): string {
-  if (!dateStr) return new Date(Date.now() + 14 * 24 * 60 * 60 * 1000).toISOString();
+// Function to fetch tenders from both robots
+async function fetchAllBrowserAITenders() {
+  console.log("Fetching tenders from all Browser AI robots...");
   
-  try {
-    // Try direct ISO parsing
-    const date = new Date(dateStr);
-    if (!isNaN(date.getTime())) return date.toISOString();
-    
-    // Try DD/MM/YYYY
-    const parts = dateStr.split(/[\/\-\.]/);
-    if (parts.length === 3) {
-      // Try both DD/MM/YYYY and MM/DD/YYYY
-      const date1 = new Date(`${parts[2]}-${parts[1]}-${parts[0]}`);
-      if (!isNaN(date1.getTime())) return date1.toISOString();
-      
-      const date2 = new Date(`${parts[2]}-${parts[0]}-${parts[1]}`);
-      if (!isNaN(date2.getTime())) return date2.toISOString();
-    }
-    
-    // Default to 14 days from now if parsing fails
-    return new Date(Date.now() + 14 * 24 * 60 * 60 * 1000).toISOString();
-  } catch (e) {
-    return new Date(Date.now() + 14 * 24 * 60 * 60 * 1000).toISOString();
-  }
-}
-
-// Function to import from both provided sheets
-async function importFromSampleSheets() {
-  const sheetUrls = [
-    "https://docs.google.com/spreadsheets/d/1X6li714ElTTiKd_jwo6Kt1vpjIalwxmuwUO-Kzg38I8/edit?usp=sharing", // PPIP
-    "https://docs.google.com/spreadsheets/d/1j7gokfil3TPBzZ_WrpCG2N_bP6DMeFtV_4HJgQkPQ0Q/edit?gid=710550239" // MYGOV
-  ];
-  
-  let totalImported = 0;
   const results = [];
+  let totalInserted = 0;
   
-  for (const url of sheetUrls) {
-    const result = await importFromGoogleSheet(url);
-    results.push(result);
-    if (result.success && result.imported) {
-      totalImported += result.imported;
-    }
+  // First fetch from PPIP robot
+  const ppipResult = await fetchTendersFromBrowserAI(PPIP_ROBOT_ID, "https://tenders.go.ke/tenders");
+  results.push({ source: "PPIP", result: ppipResult });
+  if (ppipResult.success && ppipResult.inserted) {
+    totalInserted += ppipResult.inserted;
+  }
+  
+  // Then fetch from MYGOV robot
+  const mygovResult = await fetchTendersFromBrowserAI(MYGOV_ROBOT_ID, "https://www.mygov.go.ke/all-tenders");
+  results.push({ source: "MYGOV", result: mygovResult });
+  if (mygovResult.success && mygovResult.inserted) {
+    totalInserted += mygovResult.inserted;
   }
   
   return {
-    success: true,
-    totalImported,
+    success: totalInserted > 0,
+    totalInserted,
     results
   };
+}
+
+// Remove all sample tenders function
+async function removeAllSampleTenders() {
+  try {
+    console.log("Removing all sample tenders...");
+    
+    // First delete tenders with hardcoded IDs (99991-99995)
+    const { error: hardcodedError } = await supabase
+      .from("tenders")
+      .delete()
+      .in("id", [99991, 99992, 99993, 99994, 99995]);
+    
+    if (hardcodedError) {
+      console.error("Error deleting hardcoded tenders:", hardcodedError);
+    }
+    
+    // Delete any tender that has a source indicating it's a sample
+    const { data: deletedSamples, error: samplesError } = await supabase
+      .from("tenders")
+      .delete()
+      .or('source.eq.sample,source.eq.sample_data,source.eq.fallback,description.ilike.%fallback%,description.ilike.%sample%')
+      .select();
+    
+    if (samplesError) {
+      console.error("Error deleting sample tenders:", samplesError);
+      return { success: false, error: samplesError.message };
+    }
+    
+    console.log(`Removed ${deletedSamples?.length || 0} sample tenders`);
+    return { success: true, removed: deletedSamples?.length || 0 };
+  } catch (error) {
+    console.error("Error in removeAllSampleTenders:", error);
+    return { success: false, error: error.message };
+  }
 }
 
 serve(async (req: Request) => {
@@ -272,15 +200,14 @@ serve(async (req: Request) => {
     let result;
     
     if (path === "fetch-browser-ai") {
-      // Fetch tenders from Browser AI
-      result = await fetchTendersFromBrowserAI();
-    } else if (path === "import-sheet") {
-      // Import from Google Sheets
-      const sheetUrl = (requestData as any).sheetUrl || "";
-      result = await importFromGoogleSheet(sheetUrl);
-    } else if (path === "import-sample-sheets") {
-      // Import from the sample sheets provided
-      result = await importFromSampleSheets();
+      // First remove any sample tenders
+      await removeAllSampleTenders();
+      
+      // Then fetch tenders from both robots
+      result = await fetchAllBrowserAITenders();
+    } else if (path === "remove-samples") {
+      // Just remove sample tenders
+      result = await removeAllSampleTenders();
     } else {
       // Default to status check
       result = { 
@@ -288,8 +215,7 @@ serve(async (req: Request) => {
         browser_ai_configured: !!BROWSER_AI_API_KEY,
         available_endpoints: [
           "fetch-browser-ai",
-          "import-sheet",
-          "import-sample-sheets"
+          "remove-samples"
         ]
       };
     }

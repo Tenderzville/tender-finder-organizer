@@ -4,9 +4,9 @@ import { useQuery } from "@tanstack/react-query";
 import { useToast } from "@/hooks/use-toast";
 import { fetchLatestTenders, getTotalTendersCount } from "@/utils/tenderFetching";
 import { useTenderRefresh } from "@/hooks/use-tender-refresh";
-import { useSampleTenders } from "@/hooks/use-sample-tenders";
 import type { Tender } from "@/types/tender";
 import { matchTenderToSupplier } from "@/utils/tenderAnalysis";
+import { supabase } from "@/integrations/supabase/client";
 
 export function useTenderFeed() {
   const { toast } = useToast();
@@ -15,13 +15,13 @@ export function useTenderFeed() {
   const [showQualificationTool, setShowQualificationTool] = useState(false);
   const [retryAttempts, setRetryAttempts] = useState(0);
   const { isRefreshing, refreshTenderFeed } = useTenderRefresh();
-  const { createSampleTenders } = useSampleTenders();
   const [userProfile, setUserProfile] = useState<{
     areas_of_expertise: string[];
     industry: string;
     location: string;
   } | null>(null);
   const [lastScraped, setLastScraped] = useState<string | null>(null);
+  const [sourcesBreakdown, setSourcesBreakdown] = useState<{name: string, count: number, status: string}[]>([]);
 
   useEffect(() => {
     setForceStableView(true);
@@ -52,17 +52,35 @@ export function useTenderFeed() {
     queryFn: async () => {
       console.log("TenderFeed: Fetching latest tenders, attempt #", retryAttempts + 1);
       
-      const latestTenders = await fetchLatestTenders();
+      // Direct database query to get tenders
+      const { data: latestTenders, error: tendersError } = await supabase
+        .from('tenders')
+        .select('*')
+        .order('created_at', { ascending: false });
+        
+      if (tendersError) {
+        console.error("Error fetching tenders:", tendersError);
+        throw tendersError;
+      }
+      
+      console.log(`Fetched ${latestTenders?.length || 0} tenders directly from database`);
+      
+      // Get total count
       const totalTenders = await getTotalTendersCount();
+      
+      // Calculate sources breakdown
+      const sources = calculateSourcesBreakdown(latestTenders || []);
+      setSourcesBreakdown(sources);
       
       // Update last scrape timestamp
       setLastScraped(new Date().toISOString());
       
       return {
-        latest_tenders: latestTenders,
+        latest_tenders: latestTenders || [],
         total_tenders: totalTenders,
         last_scrape: new Date().toISOString(),
-        source: "database"
+        source: "database",
+        sources_breakdown: sources
       };
     },
     staleTime: 1000 * 60 * 5,
@@ -98,7 +116,7 @@ export function useTenderFeed() {
         if (retryAttempts >= 2) {
           toast({
             title: "Fetching tenders",
-            description: "Using backup data sources...",
+            description: "Using direct API access...",
           });
           await refreshTenderFeed();
         }
@@ -123,6 +141,22 @@ export function useTenderFeed() {
       })
     : tendersToDisplay;
 
+  // Function to calculate sources breakdown
+  function calculateSourcesBreakdown(tenders: any[]) {
+    const sources: {[key: string]: number} = {};
+    
+    tenders.forEach(tender => {
+      const source = tender.source || 'Unknown';
+      sources[source] = (sources[source] || 0) + 1;
+    });
+    
+    return Object.entries(sources).map(([name, count]) => ({
+      name: name === 'browser-ai' ? 'Browser AI' : name.charAt(0).toUpperCase() + name.slice(1),
+      count,
+      status: 'active'
+    }));
+  }
+
   return {
     data,
     tendersToDisplay: sortedTenders,
@@ -133,6 +167,7 @@ export function useTenderFeed() {
     language,
     showQualificationTool,
     lastScraped,
+    sourcesBreakdown,
     setShowQualificationTool,
     setLanguage,
     refreshTenderFeed,

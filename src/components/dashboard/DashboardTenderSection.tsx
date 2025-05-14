@@ -1,14 +1,14 @@
 
-import TenderList from '@/components/tenders/TenderList';
-import { CountyTenders } from '@/components/tenders/CountyTenders';
-import { TenderMatcher } from '@/components/ai/TenderMatcher';
-import { Tender } from "@/types/tender";
-import { ScraperStatus } from "@/components/dashboard/ScraperStatus";
+import React from 'react';
 import { Button } from "@/components/ui/button";
-import { RefreshCw, FileSpreadsheet } from "lucide-react";
-import { supabase } from "@/lib/supabase-client";
-import { useState } from "react";
-import { useToast } from "@/hooks/use-toast";
+import { Card } from "@/components/ui/card";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { InfoIcon, AlertCircle } from "lucide-react";
+import { TenderEmptyState } from "@/components/tenders/TenderEmptyState";
+import { Tender } from "@/types/tender";
+import TenderList from "@/components/tenders/TenderList";
+import { TenderStats } from "@/components/dashboard/TenderStats";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 interface DashboardTenderSectionProps {
   tenders: Tender[];
@@ -17,14 +17,16 @@ interface DashboardTenderSectionProps {
   fetchTenders: () => Promise<void>;
   showDebugInfo: boolean;
   setShowDebugInfo: (show: boolean) => void;
-  handleViewTenderDetails: (id: number) => void;
-  handleBookmarkTender: (id: number) => void;
+  handleViewTenderDetails: (tender: Tender) => void;
+  handleBookmarkTender: (tenderId: number) => Promise<void>;
   navigate: (path: string) => void;
   language: 'en' | 'sw';
   userData: any;
+  sourcesBreakdown?: {name: string, count: number, status: string}[];
+  lastScraped?: string | null;
 }
 
-export const DashboardTenderSection = ({
+export function DashboardTenderSection({
   tenders,
   isLoadingTenders,
   errorTenders,
@@ -35,148 +37,136 @@ export const DashboardTenderSection = ({
   handleBookmarkTender,
   navigate,
   language,
-  userData
-}: DashboardTenderSectionProps) => {
-  const [isImporting, setIsImporting] = useState(false);
-  const { toast } = useToast();
-
-  const handleImportFromSheets = async () => {
-    try {
-      setIsImporting(true);
-      toast({
-        title: "Importing Tenders",
-        description: "Importing tender data from sample sheets...",
-      });
-
-      const { data, error } = await supabase.functions.invoke(
-        'sync-google-sheets-to-supabase'
-      );
-
-      if (error) {
-        toast({
-          title: "Import Failed",
-          description: `Error: ${error.message}`,
-          variant: "destructive",
-        });
-        return;
-      }
-
-      if (data?.success) {
-        toast({
-          title: "Import Successful",
-          description: `Imported ${data.totalImported} tenders from sheets. Refreshing...`,
-        });
-        await fetchTenders();
-      } else {
-        toast({
-          title: "Import Issue",
-          description: data?.message || "No tenders were imported. Please check the sheets URLs.",
-          variant: "destructive",
-        });
-      }
-    } catch (err) {
-      console.error("Error importing from sheets:", err);
-      toast({
-        title: "Import Error",
-        description: "An unexpected error occurred while importing from sheets.",
-        variant: "destructive",
-      });
-    } finally {
-      setIsImporting(false);
-    }
-  };
-
+  userData,
+  sourcesBreakdown = [],
+  lastScraped = null
+}: DashboardTenderSectionProps) {
   return (
-    <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mt-8">
-      <div className="lg:col-span-3">
-        {tenders.length === 0 && !isLoadingTenders && (
-          <div className="flex flex-col items-center justify-center p-6 bg-amber-50 border border-amber-200 rounded-lg mb-6">
-            <h3 className="text-lg font-medium text-amber-800 mb-2">No Tenders Found</h3>
-            <p className="text-sm text-amber-700 mb-4 text-center">
-              We couldn't find any tenders in the database. You can import tenders from sample sheets or refresh to try again.
-            </p>
-            <div className="flex flex-wrap gap-3 justify-center">
-              <Button
-                variant="outline"
-                onClick={handleImportFromSheets}
-                disabled={isImporting}
-                className="bg-white border-amber-300 text-amber-800 hover:bg-amber-100"
-              >
-                {isImporting ? (
-                  <>
-                    <RefreshCw className="h-4 w-4 mr-2 animate-spin" />
-                    Importing...
-                  </>
+    <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+      <div className="lg:col-span-2">
+        <Tabs defaultValue="all" className="w-full">
+          <TabsList className="mb-4">
+            <TabsTrigger value="all">All Tenders</TabsTrigger>
+            <TabsTrigger value="recommended">Recommended</TabsTrigger>
+            {userData && <TabsTrigger value="bookmarked">Bookmarked</TabsTrigger>}
+          </TabsList>
+          
+          <TabsContent value="all">
+            <Card>
+              <div className="p-6">
+                <div className="flex justify-between items-center mb-4">
+                  <h2 className="text-lg font-medium">{language === 'en' ? 'Available Tenders' : 'Zabuni Zilizopo'}</h2>
+                  <Button variant="outline" size="sm" onClick={() => navigate("/tenders")}>
+                    {language === 'en' ? 'View All' : 'Angalia Zote'}
+                  </Button>
+                </div>
+                
+                {tenders.length === 0 && !isLoadingTenders ? (
+                  <TenderEmptyState 
+                    onCreateSamples={fetchTenders}
+                    isRefreshing={isLoadingTenders}
+                  />
                 ) : (
-                  <>
-                    <FileSpreadsheet className="h-4 w-4 mr-2" />
-                    Import from Google Sheets
-                  </>
+                  <TenderList 
+                    tenders={tenders.slice(0, 5)} 
+                    isLoading={isLoadingTenders}
+                    error={errorTenders}
+                    onRetry={fetchTenders}
+                    onSelect={handleViewTenderDetails}
+                    onBookmark={handleBookmarkTender}
+                  />
                 )}
-              </Button>
-              <Button
-                variant="outline"
-                onClick={fetchTenders}
-                disabled={isLoadingTenders}
-                className="bg-white border-amber-300 text-amber-800 hover:bg-amber-100"
-              >
-                {isLoadingTenders ? (
-                  <>
-                    <RefreshCw className="h-4 w-4 mr-2 animate-spin" />
-                    Refreshing...
-                  </>
+              </div>
+            </Card>
+          </TabsContent>
+          
+          <TabsContent value="recommended">
+            <Card>
+              <div className="p-6">
+                <div className="flex justify-between items-center mb-4">
+                  <h2 className="text-lg font-medium">{language === 'en' ? 'Recommended Tenders' : 'Zabuni Zilizopendekezwa'}</h2>
+                </div>
+                
+                {tenders.length === 0 && !isLoadingTenders ? (
+                  <TenderEmptyState 
+                    onCreateSamples={fetchTenders}
+                    isRefreshing={isLoadingTenders}
+                  />
                 ) : (
-                  <>
-                    <RefreshCw className="h-4 w-4 mr-2" />
-                    Refresh Tenders
-                  </>
+                  <TenderList 
+                    tenders={tenders.filter(t => 
+                      t.category === 'IT & Telecommunications' || 
+                      t.category === 'Technology' ||
+                      t.location === 'Nairobi'
+                    ).slice(0, 5)} 
+                    isLoading={isLoadingTenders}
+                    error={errorTenders}
+                    onRetry={fetchTenders}
+                    onSelect={handleViewTenderDetails}
+                    onBookmark={handleBookmarkTender}
+                  />
                 )}
-              </Button>
-            </div>
-          </div>
+              </div>
+            </Card>
+          </TabsContent>
+          
+          <TabsContent value="bookmarked">
+            <Card>
+              <div className="p-6">
+                <div className="flex justify-between items-center mb-4">
+                  <h2 className="text-lg font-medium">{language === 'en' ? 'Bookmarked Tenders' : 'Zabuni Zilizohifadhiwa'}</h2>
+                </div>
+                
+                <Alert className="mb-4">
+                  <InfoIcon className="h-4 w-4" />
+                  <AlertTitle>Sign in to bookmark tenders</AlertTitle>
+                  <AlertDescription>
+                    You need to be signed in to bookmark and save tenders for later
+                  </AlertDescription>
+                </Alert>
+              </div>
+            </Card>
+          </TabsContent>
+        </Tabs>
+        
+        {errorTenders && (
+          <Alert variant="destructive" className="mt-4">
+            <AlertCircle className="h-4 w-4" />
+            <AlertTitle>Error</AlertTitle>
+            <AlertDescription>
+              {errorTenders.message || "Failed to load tenders"}
+            </AlertDescription>
+          </Alert>
         )}
-
-        <TenderList 
-          tenders={tenders}
-          isLoading={isLoadingTenders}
-          error={errorTenders}
-          onRetry={fetchTenders}
-          onBookmark={handleBookmarkTender}
-          onViewDetails={handleViewTenderDetails}
-          userId={userData?.id}
+        
+        {showDebugInfo && tenders.length === 0 && (
+          <Alert className="mt-4">
+            <InfoIcon className="h-4 w-4" />
+            <AlertTitle>No Tenders Found</AlertTitle>
+            <AlertDescription>
+              <p>Check the Browser AI edge function logs for more information about why tenders aren't being fetched.</p>
+              <Button 
+                variant="link" 
+                className="p-0 h-auto mt-2"
+                onClick={() => fetchTenders()}
+              >
+                Try Refreshing Data
+              </Button>
+            </AlertDescription>
+          </Alert>
+        )}
+      </div>
+      
+      <div>
+        <TenderStats
+          totalTenders={tenders.length}
+          loading={isLoadingTenders}
+          lastUpdated={lastScraped}
+          refreshing={isLoadingTenders}
+          onRefresh={fetchTenders}
+          sources={sourcesBreakdown}
         />
       </div>
-
-      {!isLoadingTenders && !errorTenders && tenders.length > 0 && (
-        <>
-          <div className="mt-8 lg:col-span-3">
-            <CountyTenders
-              tenders={tenders}
-              onViewDetails={handleViewTenderDetails}
-              language={language}
-              shareActions={[
-                {
-                  label: "Bookmark",
-                  action: handleBookmarkTender
-                }
-              ]}
-            />
-          </div>
-
-          <div className="mt-8 lg:col-span-3">
-            <TenderMatcher 
-              userProfile={{ 
-                areas_of_expertise: ["IT & Telecommunications", "Construction"],
-                industry: "Technology",
-                location: "Nairobi"
-              }}
-              language={language}
-              userId={userData?.id || null}
-              onViewDetails={(id) => navigate(`/tenders/${id}`)}
-            />
-          </div>
-        </>
-      )}
     </div>
   );
-};
+}
