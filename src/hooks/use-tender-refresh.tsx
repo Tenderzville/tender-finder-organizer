@@ -23,7 +23,23 @@ export function useTenderRefresh() {
 
       if (browserAIError) {
         console.error("Error fetching tenders via Browser AI:", browserAIError);
-        throw new Error(`Browser AI error: ${browserAIError.message}`);
+        
+        // Fallback to creating sample data
+        console.log("Browser AI failed, creating sample data");
+        const { data: sampleData, error: sampleError } = await supabase.functions.invoke(
+          'browser-ai-tenders/create-samples'
+        );
+        
+        if (sampleError) {
+          console.error("Error creating sample data:", sampleError);
+          throw new Error(`Failed to create sample data: ${sampleError.message}`);
+        }
+        
+        toast({
+          title: "Sample tenders created",
+          description: `Created ${sampleData?.totalInserted || 0} sample tenders for demonstration`,
+        });
+        return;
       }
 
       if (browserAIData?.success && browserAIData.totalInserted > 0) {
@@ -34,20 +50,20 @@ export function useTenderRefresh() {
         return;
       }
 
-      // If Browser AI doesn't work, try the scraper directly
-      console.log("No tenders from Browser AI, trying direct scraper");
-      const { data, error } = await supabase.functions.invoke('scrape-tenders', {
-        body: { force: true, useApiLayer: true }
-      });
+      // If Browser AI doesn't return tenders, create sample data
+      console.log("No tenders from Browser AI, creating sample data");
+      const { data: sampleData, error: sampleError } = await supabase.functions.invoke(
+        'browser-ai-tenders/create-samples'
+      );
       
-      if (error) {
-        console.error("Error triggering scraper:", error);
-        throw error;
+      if (sampleError) {
+        console.error("Error creating sample data:", sampleError);
+        throw sampleError;
       }
       
       toast({
-        title: "Scraper triggered",
-        description: "Tenders will be updated shortly",
+        title: "Sample tenders created",
+        description: `Created ${sampleData?.totalInserted || 0} sample tenders for demonstration`,
       });
     } catch (err) {
       console.error("Failed to refresh tenders:", err);

@@ -65,6 +65,43 @@ export function useTenderFeed() {
       
       console.log(`Fetched ${latestTenders?.length || 0} tenders directly from database`);
       
+      // If no tenders found, automatically trigger a refresh
+      if (!latestTenders || latestTenders.length === 0) {
+        console.log("No tenders found, triggering automatic refresh");
+        try {
+          await refreshTenderFeed();
+          
+          // Fetch again after refresh
+          const { data: refreshedTenders, error: refreshError } = await supabase
+            .from('tenders')
+            .select('*')
+            .order('created_at', { ascending: false });
+            
+          if (refreshError) {
+            console.error("Error fetching refreshed tenders:", refreshError);
+            throw refreshError;
+          }
+          
+          return {
+            latest_tenders: refreshedTenders || [],
+            total_tenders: refreshedTenders?.length || 0,
+            last_scrape: new Date().toISOString(),
+            source: "database_with_refresh",
+            sources_breakdown: calculateSourcesBreakdown(refreshedTenders || [])
+          };
+        } catch (refreshError) {
+          console.error("Error during automatic refresh:", refreshError);
+          // Return empty data if refresh fails
+          return {
+            latest_tenders: [],
+            total_tenders: 0,
+            last_scrape: new Date().toISOString(),
+            source: "database_empty",
+            sources_breakdown: []
+          };
+        }
+      }
+      
       // Get total count
       const totalTenders = await getTotalTendersCount();
       
@@ -85,7 +122,7 @@ export function useTenderFeed() {
     },
     staleTime: 1000 * 60 * 5,
     refetchInterval: false,
-    retry: 3,
+    retry: 2,
     refetchOnWindowFocus: false,
     gcTime: 1000 * 60 * 10
   });
@@ -101,24 +138,22 @@ export function useTenderFeed() {
           setRetryAttempts(prev => prev + 1);
           const result = await refetch();
           
-          // If we have data but it's empty, try to refresh right away
+          // If we have data but it's empty, show a helpful message
           if (result.data && (!result.data.latest_tenders || result.data.latest_tenders.length === 0)) {
             toast({
               title: "No tenders found",
-              description: "Fetching tenders from external sources...",
+              description: "Click the refresh button to fetch the latest tenders",
             });
-            await refreshTenderFeed();
           }
         }
       } catch (err) {
         console.error("Failed initial tender feed fetch:", err);
         
-        if (retryAttempts >= 2) {
+        if (retryAttempts >= 1) {
           toast({
-            title: "Fetching tenders",
-            description: "Using direct API access...",
+            title: "Loading tenders",
+            description: "Please use the refresh button if no tenders appear",
           });
-          await refreshTenderFeed();
         }
       }
     };
@@ -128,7 +163,7 @@ export function useTenderFeed() {
     return () => {
       isMounted = false;
     };
-  }, [refetch, retryAttempts, refreshTenderFeed, toast]);
+  }, [refetch, retryAttempts, toast]);
 
   const tendersToDisplay = data?.latest_tenders as Tender[] || [];
   
@@ -151,7 +186,7 @@ export function useTenderFeed() {
     });
     
     return Object.entries(sources).map(([name, count]) => ({
-      name: name === 'browser-ai' ? 'Browser AI' : name.charAt(0).toUpperCase() + name.slice(1),
+      name: name === 'browser-ai' ? 'Browser AI' : name === 'sample' ? 'Sample Data' : name.charAt(0).toUpperCase() + name.slice(1),
       count,
       status: 'active'
     }));
