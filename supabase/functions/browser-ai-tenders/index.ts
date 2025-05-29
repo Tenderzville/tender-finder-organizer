@@ -15,78 +15,9 @@ const MYGOV_ROBOT_ID = "ac84ba46-2da7-4a54-b083-48de0011fb36";
 // PPIP Robot  
 const PPIP_ROBOT_ID = "f55e700b-f976-4a56-9bd5-9e837c70d9b7";
 
-async function createSampleTenders() {
-  console.log("Creating sample tenders as fallback...");
-  
-  const sampleTenders = [
-    {
-      title: "Supply of Office Furniture and Equipment",
-      description: "Ministry of Education seeks suppliers for office furniture including desks, chairs, and filing cabinets for regional offices.",
-      deadline: new Date(Date.now() + 21 * 24 * 60 * 60 * 1000).toISOString(),
-      contact_info: "Ministry of Education, Procurement Department",
-      category: "Supplies & Equipment",
-      location: "Nairobi",
-      tender_url: "https://www.mygov.go.ke/all-tenders",
-      requirements: "Valid business registration, tax compliance certificate, and 3 years experience in office equipment supply",
-      source: "sample"
-    },
-    {
-      title: "Construction of Water Borehole in Machakos County",
-      description: "County Government of Machakos invites bids for drilling and construction of water boreholes in rural areas.",
-      deadline: new Date(Date.now() + 28 * 24 * 60 * 60 * 1000).toISOString(),
-      contact_info: "County Government of Machakos, Water Department",
-      category: "Construction",
-      location: "Machakos",
-      tender_url: "https://tenders.go.ke/website/tenders/index",
-      requirements: "Experience in borehole drilling, valid licenses, and environmental compliance certificates",
-      source: "sample"
-    },
-    {
-      title: "IT Support and Maintenance Services",
-      description: "National Hospital requires comprehensive IT support services including hardware maintenance and software support.",
-      deadline: new Date(Date.now() + 14 * 24 * 60 * 60 * 1000).toISOString(),
-      contact_info: "National Hospital, IT Department",
-      category: "IT & Telecommunications",
-      location: "Nairobi",
-      tender_url: "https://www.mygov.go.ke/all-tenders",
-      requirements: "ISO 27001 certification, 5 years experience in hospital IT systems, and 24/7 support capability",
-      source: "sample"
-    }
-  ];
-
-  let insertedCount = 0;
-  
-  for (const tender of sampleTenders) {
-    try {
-      // Check if tender with same title exists
-      const { data: existingTender } = await supabase
-        .from("tenders")
-        .select("id")
-        .eq("title", tender.title)
-        .limit(1);
-      
-      if (!existingTender || existingTender.length === 0) {
-        const { error: insertError } = await supabase
-          .from("tenders")
-          .insert([tender]);
-          
-        if (!insertError) {
-          insertedCount++;
-        } else {
-          console.error("Error inserting sample tender:", insertError);
-        }
-      }
-    } catch (error) {
-      console.error("Error processing sample tender:", error);
-    }
-  }
-  
-  return insertedCount;
-}
-
 async function fetchTendersFromBrowserAI(robotId = PPIP_ROBOT_ID, originUrl = "https://tenders.go.ke/tenders") {
   try {
-    console.log(`Fetching tenders from Browser AI using robot ${robotId} and URL ${originUrl}...`);
+    console.log(`Fetching real tenders from Browser AI using robot ${robotId} and URL ${originUrl}...`);
     
     if (!BROWSER_AI_API_KEY) {
       console.error("Browser AI API key not configured");
@@ -143,9 +74,8 @@ async function fetchTendersFromBrowserAI(robotId = PPIP_ROBOT_ID, originUrl = "h
     } else if (data && data.data && Array.isArray(data.data)) {
       tenders = data.data;
     } else {
-      console.log("No tenders found in Browser AI response, creating sample data");
-      const sampleCount = await createSampleTenders();
-      return { success: true, inserted: sampleCount, tenders: [] };
+      console.log("No real tenders found in Browser AI response");
+      return { success: false, inserted: 0, tenders: [], message: "No real tenders available from Browser AI" };
     }
     
     const insertedTenders = [];
@@ -190,21 +120,17 @@ async function fetchTendersFromBrowserAI(robotId = PPIP_ROBOT_ID, originUrl = "h
       }
     }
     
-    console.log(`Successfully inserted ${insertedTenders.length} tenders from Browser AI`);
+    console.log(`Successfully inserted ${insertedTenders.length} real tenders from Browser AI`);
     return { success: true, inserted: insertedTenders.length, tenders: insertedTenders };
   } catch (error) {
     console.error("Error in fetchTendersFromBrowserAI:", error);
-    
-    // Fallback to sample data if Browser AI fails
-    console.log("Browser AI failed, creating sample data as fallback");
-    const sampleCount = await createSampleTenders();
-    return { success: true, inserted: sampleCount, tenders: [], fallback: true };
+    return { success: false, error: error.message, inserted: 0 };
   }
 }
 
 // Function to fetch tenders from both robots
 async function fetchAllBrowserAITenders() {
-  console.log("Fetching tenders from all Browser AI robots...");
+  console.log("Fetching real tenders from all Browser AI robots...");
   
   const results = [];
   let totalInserted = 0;
@@ -223,17 +149,11 @@ async function fetchAllBrowserAITenders() {
     totalInserted += mygovResult.inserted;
   }
   
-  // If no real tenders were found, ensure we have sample data
-  if (totalInserted === 0) {
-    console.log("No tenders found from Browser AI, ensuring sample data exists");
-    const sampleCount = await createSampleTenders();
-    totalInserted = sampleCount;
-  }
-  
   return {
     success: totalInserted > 0,
     totalInserted,
-    results
+    results,
+    message: totalInserted > 0 ? `Successfully fetched ${totalInserted} real tenders` : "No real tenders found from Browser AI sources"
   };
 }
 
@@ -272,35 +192,17 @@ serve(async (req: Request) => {
     const url = new URL(req.url);
     const path = url.pathname.split("/").pop();
     
-    // Parse request body if present
-    let requestData = {};
-    if (req.method === "POST") {
-      try {
-        requestData = await req.json();
-      } catch (e) {
-        // If JSON parsing fails, continue with empty object
-      }
-    }
-    
     let result;
     
     if (path === "fetch-browser-ai") {
-      // First remove any sample tenders if we're doing a fresh fetch
+      // Remove any sample tenders first
       await removeAllSampleTenders();
       
-      // Then fetch tenders from both robots
+      // Then fetch real tenders from both robots
       result = await fetchAllBrowserAITenders();
     } else if (path === "remove-samples") {
-      // Just remove sample tenders
+      // Remove sample tenders only
       result = await removeAllSampleTenders();
-    } else if (path === "create-samples") {
-      // Create sample tenders
-      const sampleCount = await createSampleTenders();
-      result = {
-        success: true,
-        totalInserted: sampleCount,
-        message: `Created ${sampleCount} sample tenders`
-      };
     } else {
       // Default to status check
       result = { 
@@ -308,9 +210,9 @@ serve(async (req: Request) => {
         browser_ai_configured: !!BROWSER_AI_API_KEY,
         available_endpoints: [
           "fetch-browser-ai",
-          "remove-samples",
-          "create-samples"
-        ]
+          "remove-samples"
+        ],
+        note: "Sample data creation has been permanently removed"
       };
     }
     

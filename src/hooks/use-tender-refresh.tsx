@@ -12,10 +12,10 @@ export function useTenderRefresh() {
       setIsRefreshing(true);
       toast({
         title: "Refreshing tenders",
-        description: "Fetching the latest tenders...",
+        description: "Fetching the latest tenders from real sources...",
       });
 
-      // First, try to use Browser AI to get tenders
+      // Use Browser AI to get real tenders only
       console.log("Triggering Browser AI tender fetching");
       const { data: browserAIData, error: browserAIError } = await supabase.functions.invoke(
         'browser-ai-tenders/fetch-browser-ai'
@@ -23,57 +23,32 @@ export function useTenderRefresh() {
 
       if (browserAIError) {
         console.error("Error fetching tenders via Browser AI:", browserAIError);
-        
-        // Fallback to creating sample data
-        console.log("Browser AI failed, creating sample data");
-        const { data: sampleData, error: sampleError } = await supabase.functions.invoke(
-          'browser-ai-tenders/create-samples'
-        );
-        
-        if (sampleError) {
-          console.error("Error creating sample data:", sampleError);
-          throw new Error(`Failed to create sample data: ${sampleError.message}`);
-        }
-        
-        toast({
-          title: "Sample tenders created",
-          description: `Created ${sampleData?.totalInserted || 0} sample tenders for demonstration`,
-        });
-        return;
+        throw new Error(`Failed to fetch real tender data: ${browserAIError.message}`);
       }
 
       if (browserAIData?.success && browserAIData.totalInserted > 0) {
         toast({
           title: "Tenders refreshed",
-          description: `Successfully imported ${browserAIData.totalInserted} tenders from external sources`,
+          description: `Successfully imported ${browserAIData.totalInserted} real tenders from external sources`,
         });
         return;
       }
 
-      // If Browser AI doesn't return tenders, create sample data
-      console.log("No tenders from Browser AI, creating sample data");
-      const { data: sampleData, error: sampleError } = await supabase.functions.invoke(
-        'browser-ai-tenders/create-samples'
-      );
-      
-      if (sampleError) {
-        console.error("Error creating sample data:", sampleError);
-        throw sampleError;
-      }
-      
+      // If no real tenders found, inform user
       toast({
-        title: "Sample tenders created",
-        description: `Created ${sampleData?.totalInserted || 0} sample tenders for demonstration`,
+        title: "No tenders available",
+        description: "No real tenders found from external sources. Please check Browser AI configuration.",
+        variant: "destructive"
       });
+      
     } catch (err) {
       console.error("Failed to refresh tenders:", err);
       toast({
         title: "Error",
-        description: "Failed to refresh tenders. Please try again.",
+        description: "Failed to refresh tenders from real sources. Please check your Browser AI configuration.",
         variant: "destructive"
       });
       
-      // Add detailed error logging
       console.error("Detailed refresh error:", JSON.stringify(err, null, 2));
     } finally {
       setIsRefreshing(false);

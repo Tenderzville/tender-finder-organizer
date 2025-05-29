@@ -34,7 +34,6 @@ export function useTenderFeed() {
   
   // Initialize a basic user profile as a fallback
   useEffect(() => {
-    // In a real app, we'd fetch this from the user's profile
     setUserProfile({
       areas_of_expertise: ["IT & Telecommunications", "Construction"],
       industry: "Technology",
@@ -50,12 +49,13 @@ export function useTenderFeed() {
   } = useQuery({
     queryKey: ["dashboard-tenders"],
     queryFn: async () => {
-      console.log("TenderFeed: Fetching latest tenders, attempt #", retryAttempts + 1);
+      console.log("TenderFeed: Fetching real tenders only, attempt #", retryAttempts + 1);
       
-      // Direct database query to get tenders
+      // Direct database query to get real tenders only
       const { data: latestTenders, error: tendersError } = await supabase
         .from('tenders')
         .select('*')
+        .neq('source', 'sample') // Exclude any remaining sample data
         .order('created_at', { ascending: false });
         
       if (tendersError) {
@@ -63,47 +63,25 @@ export function useTenderFeed() {
         throw tendersError;
       }
       
-      console.log(`Fetched ${latestTenders?.length || 0} tenders directly from database`);
+      console.log(`Fetched ${latestTenders?.length || 0} real tenders from database`);
       
-      // If no tenders found, automatically trigger a refresh
+      // If no real tenders found, inform user but don't create samples
       if (!latestTenders || latestTenders.length === 0) {
-        console.log("No tenders found, triggering automatic refresh");
-        try {
-          await refreshTenderFeed();
-          
-          // Fetch again after refresh
-          const { data: refreshedTenders, error: refreshError } = await supabase
-            .from('tenders')
-            .select('*')
-            .order('created_at', { ascending: false });
-            
-          if (refreshError) {
-            console.error("Error fetching refreshed tenders:", refreshError);
-            throw refreshError;
-          }
-          
-          return {
-            latest_tenders: refreshedTenders || [],
-            total_tenders: refreshedTenders?.length || 0,
-            last_scrape: new Date().toISOString(),
-            source: "database_with_refresh",
-            sources_breakdown: calculateSourcesBreakdown(refreshedTenders || [])
-          };
-        } catch (refreshError) {
-          console.error("Error during automatic refresh:", refreshError);
-          // Return empty data if refresh fails
-          return {
-            latest_tenders: [],
-            total_tenders: 0,
-            last_scrape: new Date().toISOString(),
-            source: "database_empty",
-            sources_breakdown: []
-          };
-        }
+        console.log("No real tenders found in database");
+        return {
+          latest_tenders: [],
+          total_tenders: 0,
+          last_scrape: new Date().toISOString(),
+          source: "database_empty",
+          sources_breakdown: []
+        };
       }
       
-      // Get total count
-      const totalTenders = await getTotalTendersCount();
+      // Get total count of real tenders only
+      const { count: totalCount } = await supabase
+        .from('tenders')
+        .select('*', { count: 'exact', head: true })
+        .neq('source', 'sample');
       
       // Calculate sources breakdown
       const sources = calculateSourcesBreakdown(latestTenders || []);
@@ -114,7 +92,7 @@ export function useTenderFeed() {
       
       return {
         latest_tenders: latestTenders || [],
-        total_tenders: totalTenders,
+        total_tenders: totalCount || 0,
         last_scrape: new Date().toISOString(),
         source: "database",
         sources_breakdown: sources
@@ -138,11 +116,11 @@ export function useTenderFeed() {
           setRetryAttempts(prev => prev + 1);
           const result = await refetch();
           
-          // If we have data but it's empty, show a helpful message
+          // If we have no real data, show helpful message
           if (result.data && (!result.data.latest_tenders || result.data.latest_tenders.length === 0)) {
             toast({
-              title: "No tenders found",
-              description: "Click the refresh button to fetch the latest tenders",
+              title: "No real tenders found",
+              description: "Use the refresh button to fetch real tenders from Browser AI sources",
             });
           }
         }
@@ -151,8 +129,9 @@ export function useTenderFeed() {
         
         if (retryAttempts >= 1) {
           toast({
-            title: "Loading tenders",
-            description: "Please use the refresh button if no tenders appear",
+            title: "Unable to load real tenders",
+            description: "Please configure Browser AI or use the refresh button to fetch real tender data",
+            variant: "destructive"
           });
         }
       }
@@ -176,17 +155,19 @@ export function useTenderFeed() {
       })
     : tendersToDisplay;
 
-  // Function to calculate sources breakdown
+  // Function to calculate sources breakdown - exclude sample data
   function calculateSourcesBreakdown(tenders: any[]) {
     const sources: {[key: string]: number} = {};
     
     tenders.forEach(tender => {
       const source = tender.source || 'Unknown';
-      sources[source] = (sources[source] || 0) + 1;
+      if (source !== 'sample') { // Exclude sample data
+        sources[source] = (sources[source] || 0) + 1;
+      }
     });
     
     return Object.entries(sources).map(([name, count]) => ({
-      name: name === 'browser-ai' ? 'Browser AI' : name === 'sample' ? 'Sample Data' : name.charAt(0).toUpperCase() + name.slice(1),
+      name: name === 'browser-ai' ? 'Browser AI' : name.charAt(0).toUpperCase() + name.slice(1),
       count,
       status: 'active'
     }));

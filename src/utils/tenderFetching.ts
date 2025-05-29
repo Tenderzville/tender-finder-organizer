@@ -3,13 +3,14 @@ import { supabase } from "@/integrations/supabase/client";
 import { Tender, parseTenderAffirmativeAction, getTenderStatus } from "@/types/tender";
 
 export async function fetchLatestTenders(): Promise<Tender[]> {
-  console.log("Fetching latest tenders from database...");
+  console.log("Fetching latest real tenders from database...");
   
   try {
-    // Fetch tenders directly from the database
+    // Fetch real tenders only (exclude sample data)
     const { data: tenders, error } = await supabase
       .from('tenders')
       .select('*')
+      .neq('source', 'sample') // Exclude sample data
       .order('created_at', { ascending: false })
       .limit(50);
       
@@ -20,7 +21,7 @@ export async function fetchLatestTenders(): Promise<Tender[]> {
     
     // If we have tenders, return them
     if (tenders && tenders.length > 0) {
-      console.log(`Found ${tenders.length} tenders`);
+      console.log(`Found ${tenders.length} real tenders`);
       return tenders.map(tender => ({
         ...tender,
         affirmative_action: parseTenderAffirmativeAction(tender.affirmative_action),
@@ -28,10 +29,10 @@ export async function fetchLatestTenders(): Promise<Tender[]> {
       }));
     }
     
-    console.log("No tenders found in database");
+    console.log("No real tenders found in database");
     
     // If no tenders, try to fetch them from Browser AI
-    console.log("Triggering Browser AI fetch");
+    console.log("Triggering Browser AI fetch for real tenders");
     try {
       const { data, error } = await supabase.functions.invoke('browser-ai-tenders/fetch-browser-ai');
       
@@ -49,6 +50,7 @@ export async function fetchLatestTenders(): Promise<Tender[]> {
       const { data: refreshedTenders, error: refreshError } = await supabase
         .from('tenders')
         .select('*')
+        .neq('source', 'sample') // Only real tenders
         .order('created_at', { ascending: false })
         .limit(50);
         
@@ -58,7 +60,7 @@ export async function fetchLatestTenders(): Promise<Tender[]> {
       }
       
       if (refreshedTenders && refreshedTenders.length > 0) {
-        console.log(`Found ${refreshedTenders.length} tenders after Browser AI fetch`);
+        console.log(`Found ${refreshedTenders.length} real tenders after Browser AI fetch`);
         return refreshedTenders.map(tender => ({
           ...tender,
           affirmative_action: parseTenderAffirmativeAction(tender.affirmative_action),
@@ -69,8 +71,8 @@ export async function fetchLatestTenders(): Promise<Tender[]> {
       console.error("Browser AI fetch failed:", browserAIError);
     }
     
-    // If all else fails, return an empty array
-    console.error("All tender fetching methods failed");
+    // Return empty array if no real tenders available
+    console.log("No real tenders available from any source");
     return [];
   } catch (error) {
     console.error("Error in fetchLatestTenders:", error);
@@ -82,7 +84,8 @@ export async function getTotalTendersCount(): Promise<number> {
   try {
     const { count, error } = await supabase
       .from('tenders')
-      .select('*', { count: 'exact', head: true });
+      .select('*', { count: 'exact', head: true })
+      .neq('source', 'sample'); // Only count real tenders
     
     if (error) {
       console.error("Error counting tenders:", error);
@@ -98,7 +101,7 @@ export async function getTotalTendersCount(): Promise<number> {
 
 export async function triggerBrowserAIFetch(): Promise<{ success: boolean; message: string }> {
   try {
-    console.log("Triggering Browser AI fetch...");
+    console.log("Triggering Browser AI fetch for real tenders...");
     
     const { data, error } = await supabase.functions.invoke('browser-ai-tenders/fetch-browser-ai');
     
@@ -111,16 +114,16 @@ export async function triggerBrowserAIFetch(): Promise<{ success: boolean; messa
     }
     
     if (data?.success) {
-      console.log(`Successfully imported ${data.totalInserted || 0} tenders from Browser AI`);
+      console.log(`Successfully imported ${data.totalInserted || 0} real tenders from Browser AI`);
       return { 
         success: true, 
-        message: `Successfully imported ${data.totalInserted || 0} tenders from Browser AI` 
+        message: `Successfully imported ${data.totalInserted || 0} real tenders from Browser AI` 
       };
     } else {
       console.log("Browser AI fetch didn't report success:", data);
       return { 
         success: false, 
-        message: "Browser AI fetch failed or returned no tenders" 
+        message: data?.message || "Browser AI fetch failed or returned no real tenders" 
       };
     }
   } catch (error) {
