@@ -12,44 +12,77 @@ export function useTenderRefresh() {
       setIsRefreshing(true);
       toast({
         title: "Refreshing tenders",
-        description: "Fetching the latest tenders from real sources...",
+        description: "Fetching the latest tenders from all sources...",
       });
 
-      // Use Browser AI to get real tenders only
-      console.log("Triggering Browser AI tender fetching");
-      const { data: browserAIData, error: browserAIError } = await supabase.functions.invoke(
-        'browser-ai-tenders/fetch-browser-ai'
-      );
+      // Parallel fetch from both Browser AI and SheetDB
+      const [browserAIResult, sheetDBResult] = await Promise.allSettled([
+        // Browser AI fetch
+        supabase.functions.invoke('browser-ai-tenders/fetch-browser-ai'),
+        // SheetDB fetch  
+        supabase.functions.invoke('sync-google-sheets-to-supabase')
+      ]);
 
-      if (browserAIError) {
-        console.error("Error fetching tenders via Browser AI:", browserAIError);
-        throw new Error(`Failed to fetch real tender data: ${browserAIError.message}`);
+      let totalImported = 0;
+      let successMessages: string[] = [];
+      let errors: string[] = [];
+
+      // Process Browser AI results
+      if (browserAIResult.status === 'fulfilled') {
+        const { data: browserData, error: browserError } = browserAIResult.value;
+        if (browserError) {
+          console.error("Browser AI error:", browserError);
+          errors.push("Browser AI fetch failed");
+        } else if (browserData?.success && browserData.totalInserted > 0) {
+          totalImported += browserData.totalInserted;
+          successMessages.push(`${browserData.totalInserted} from Browser AI`);
+        }
+      } else {
+        console.error("Browser AI promise rejected:", browserAIResult.reason);
+        errors.push("Browser AI connection failed");
       }
 
-      if (browserAIData?.success && browserAIData.totalInserted > 0) {
+      // Process SheetDB results  
+      if (sheetDBResult.status === 'fulfilled') {
+        const { data: sheetData, error: sheetError } = sheetDBResult.value;
+        if (sheetError) {
+          console.error("SheetDB error:", sheetError);
+          errors.push("SheetDB fetch failed");
+        } else if (sheetData?.success && sheetData.totalImported > 0) {
+          totalImported += sheetData.totalImported;
+          successMessages.push(`${sheetData.totalImported} from SheetDB`);
+        }
+      } else {
+        console.error("SheetDB promise rejected:", sheetDBResult.reason);
+        errors.push("SheetDB connection failed");
+      }
+
+      // Show appropriate toast based on results
+      if (totalImported > 0) {
         toast({
-          title: "Tenders refreshed",
-          description: `Successfully imported ${browserAIData.totalInserted} real tenders from external sources`,
+          title: "Tenders refreshed successfully",
+          description: `Imported ${totalImported} tenders total (${successMessages.join(', ')})`,
         });
-        return;
+      } else if (errors.length > 0) {
+        toast({
+          title: "Partial refresh completed",
+          description: errors.length > 0 ? `Issues: ${errors.join(', ')}` : "No new tenders found from any source",
+          variant: errors.length === 2 ? "destructive" : "default"
+        });
+      } else {
+        toast({
+          title: "Refresh completed",
+          description: "No new tenders found from any source",
+        });
       }
-
-      // If no real tenders found, inform user
-      toast({
-        title: "No tenders available",
-        description: "No real tenders found from external sources. Please check Browser AI configuration.",
-        variant: "destructive"
-      });
       
     } catch (err) {
       console.error("Failed to refresh tenders:", err);
       toast({
         title: "Error",
-        description: "Failed to refresh tenders from real sources. Please check your Browser AI configuration.",
+        description: "Failed to refresh tenders. Please try again.",
         variant: "destructive"
       });
-      
-      console.error("Detailed refresh error:", JSON.stringify(err, null, 2));
     } finally {
       setIsRefreshing(false);
     }
