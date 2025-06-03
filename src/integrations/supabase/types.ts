@@ -378,8 +378,11 @@ export type Database = {
           parsing_error: string | null
           points_required: number | null
           prerequisites: string | null
+          procuring_entity: string | null
           requirements: string | null
+          source: string | null
           subcategory: string | null
+          tender_no: string | null
           tender_url: string | null
           title: string
         }
@@ -397,8 +400,11 @@ export type Database = {
           parsing_error?: string | null
           points_required?: number | null
           prerequisites?: string | null
+          procuring_entity?: string | null
           requirements?: string | null
+          source?: string | null
           subcategory?: string | null
+          tender_no?: string | null
           tender_url?: string | null
           title: string
         }
@@ -416,8 +422,11 @@ export type Database = {
           parsing_error?: string | null
           points_required?: number | null
           prerequisites?: string | null
+          procuring_entity?: string | null
           requirements?: string | null
+          source?: string | null
           subcategory?: string | null
+          tender_no?: string | null
           tender_url?: string | null
           title?: string
         }

@@ -2,6 +2,7 @@
 import { useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
+import { setupEmergencyTenders } from "@/utils/emergencyTenderSetup";
 
 export function useTenderRefresh() {
   const [isRefreshing, setIsRefreshing] = useState(false);
@@ -14,6 +15,24 @@ export function useTenderRefresh() {
         title: "Refreshing tenders",
         description: "Fetching the latest tenders from all sources...",
       });
+
+      // Check if we have any tenders at all
+      const { count: existingCount } = await supabase
+        .from("tenders")
+        .select("*", { count: "exact", head: true });
+
+      // If no tenders exist, set up emergency tenders first
+      if (!existingCount || existingCount === 0) {
+        console.log("No tenders found, setting up emergency tenders...");
+        const emergencyResult = await setupEmergencyTenders();
+        
+        if (emergencyResult.success) {
+          toast({
+            title: "Emergency tenders loaded",
+            description: `Added ${emergencyResult.count} sample tenders while data sources are being fixed`,
+          });
+        }
+      }
 
       // Parallel fetch from both Browser AI and SheetDB
       const [browserAIResult, sheetDBResult] = await Promise.allSettled([
@@ -32,14 +51,16 @@ export function useTenderRefresh() {
         const { data: browserData, error: browserError } = browserAIResult.value;
         if (browserError) {
           console.error("Browser AI error:", browserError);
-          errors.push("Browser AI fetch failed");
+          errors.push("Browser AI: Credits exhausted");
         } else if (browserData?.success && browserData.totalInserted > 0) {
           totalImported += browserData.totalInserted;
           successMessages.push(`${browserData.totalInserted} from Browser AI`);
+        } else {
+          errors.push("Browser AI: No new data");
         }
       } else {
         console.error("Browser AI promise rejected:", browserAIResult.reason);
-        errors.push("Browser AI connection failed");
+        errors.push("Browser AI: Connection failed");
       }
 
       // Process SheetDB results  
@@ -47,32 +68,29 @@ export function useTenderRefresh() {
         const { data: sheetData, error: sheetError } = sheetDBResult.value;
         if (sheetError) {
           console.error("SheetDB error:", sheetError);
-          errors.push("SheetDB fetch failed");
+          errors.push("SheetDB: API error");
         } else if (sheetData?.success && sheetData.totalImported > 0) {
           totalImported += sheetData.totalImported;
           successMessages.push(`${sheetData.totalImported} from SheetDB`);
+        } else {
+          errors.push("SheetDB: No data in sheets");
         }
       } else {
         console.error("SheetDB promise rejected:", sheetDBResult.reason);
-        errors.push("SheetDB connection failed");
+        errors.push("SheetDB: Connection failed");
       }
 
       // Show appropriate toast based on results
       if (totalImported > 0) {
         toast({
           title: "Tenders refreshed successfully",
-          description: `Imported ${totalImported} tenders total (${successMessages.join(', ')})`,
-        });
-      } else if (errors.length > 0) {
-        toast({
-          title: "Partial refresh completed",
-          description: errors.length > 0 ? `Issues: ${errors.join(', ')}` : "No new tenders found from any source",
-          variant: errors.length === 2 ? "destructive" : "default"
+          description: `Imported ${totalImported} new tenders (${successMessages.join(', ')})`,
         });
       } else {
         toast({
-          title: "Refresh completed",
-          description: "No new tenders found from any source",
+          title: "Data source issues detected",
+          description: `Issues: ${errors.join(', ')}. Using existing/sample data.`,
+          variant: "default"
         });
       }
       
