@@ -10,6 +10,7 @@ import Preferences from '@/pages/Preferences';
 import Auth from '@/pages/Auth';
 import Services from '@/pages/Services';
 import NotFound from '@/pages/NotFound';
+import Integrations from '@/pages/Integrations';
 import { Toaster } from "@/components/ui/toaster";
 import TermsPage from '@/pages/Terms';
 import PrivacyPage from '@/pages/Privacy';
@@ -72,6 +73,7 @@ function App() {
             <Route path="/auth" element={<Auth />} />
             <Route path="/services" element={<Services />} />
             <Route path="/learning-hub" element={<LearningHub />} />
+            <Route path="/integrations" element={<Integrations />} />
             <Route path="/terms" element={<TermsPage />} />
             <Route path="/privacy" element={<PrivacyPage />} />
             <Route path="/support" element={<SupportPage />} />
