@@ -1,96 +1,106 @@
 
-import { Link } from "react-router-dom";
-import {
-  NavigationMenu,
-  NavigationMenuContent,
-  NavigationMenuItem,
-  NavigationMenuLink,
-  NavigationMenuList,
-  NavigationMenuTrigger,
-} from "@/components/ui/navigation-menu"
-import { useAuth } from "@/hooks/use-auth";
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
+import { useState } from "react";
+import { Link, useNavigate, useLocation } from "react-router-dom";
 import { Button } from "@/components/ui/button";
-import { LogOut } from "lucide-react";
+import { Menu, X, Home, Search, Settings, Zap, BookOpen, HelpCircle, User } from "lucide-react";
+import { NotificationCenter } from "@/components/notifications/NotificationCenter";
 
-export function Navigation() {
-  const { user, signOut } = useAuth();
+export const Navigation = () => {
+  const [isOpen, setIsOpen] = useState(false);
+  const navigate = useNavigate();
+  const location = useLocation();
+
+  const isActive = (path: string) => location.pathname === path;
+
+  const navItems = [
+    { path: "/", icon: Home, label: "Home" },
+    { path: "/dashboard", icon: User, label: "Dashboard" },
+    { path: "/tenders", icon: Search, label: "Tenders" },
+    { path: "/integrations", icon: Zap, label: "Integrations" },
+    { path: "/learning-hub", icon: BookOpen, label: "Learning" },
+    { path: "/support", icon: HelpCircle, label: "Support" },
+    { path: "/preferences", icon: Settings, label: "Settings" },
+  ];
 
   return (
-    <header className="border-b">
-      <div className="container flex h-16 items-center justify-between">
-        <Link to="/" className="font-bold text-xl">
-          Tenders Ville
-        </Link>
-        <nav className="flex gap-4 items-center">
-          {user ? (
-            <>
-              <Link to="/tenders" className="text-sm font-medium hover:text-primary transition-colors">Tenders</Link>
-              <Link to="/dashboard" className="text-sm font-medium hover:text-primary transition-colors">Dashboard</Link>
-              <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                  <Button variant="ghost" className="h-8 w-8 p-0">
-                    <Avatar className="h-8 w-8">
-                      <AvatarImage src={user.user_metadata?.avatar_url} alt={user.email ?? "User Avatar"} />
-                      <AvatarFallback>{user.email?.[0].toUpperCase() ?? "U"}</AvatarFallback>
-                    </Avatar>
-                  </Button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent className="w-56" align="end" forceMount>
-                  <DropdownMenuLabel>My Account</DropdownMenuLabel>
-                  <DropdownMenuSeparator />
-                  <DropdownMenuItem asChild>
-                    <Link to="/dashboard">Dashboard</Link>
-                  </DropdownMenuItem>
-                  <DropdownMenuItem asChild>
-                    <Link to="/tenders">All Tenders</Link>
-                  </DropdownMenuItem>
-                  <DropdownMenuItem asChild>
-                    <Link to="/preferences">Preferences</Link>
-                  </DropdownMenuItem>
-                  <DropdownMenuSeparator />
-                  <DropdownMenuItem onClick={signOut} className="cursor-pointer">
-                    Logout <LogOut className="ml-2 h-4 w-4" />
-                  </DropdownMenuItem>
-                </DropdownMenuContent>
-              </DropdownMenu>
-            </>
-          ) : (
-            <>
-              <Link to="/tenders" className="text-sm font-medium hover:text-primary transition-colors">Tenders</Link>
-              <Link to="/auth">Sign In</Link>
-              <Link to="/auth">Sign Up</Link>
-            </>
-          )}
-        
-          <NavigationMenu>
-            <NavigationMenuList>
-              <NavigationMenuItem>
-                <NavigationMenuTrigger>Legal</NavigationMenuTrigger>
-                <NavigationMenuContent>
-                  <ul className="grid w-[200px] gap-3 p-4">
-                    <li>
-                      <NavigationMenuLink asChild>
-                        <Link to="/terms" className="block p-2 hover:bg-muted rounded-md">
-                          Terms of Service
-                        </Link>
-                      </NavigationMenuLink>
-                    </li>
-                    <li>
-                      <NavigationMenuLink asChild>
-                        <Link to="/privacy" className="block p-2 hover:bg-muted rounded-md">
-                          Privacy Policy
-                        </Link>
-                      </NavigationMenuLink>
-                    </li>
-                  </ul>
-                </NavigationMenuContent>
-              </NavigationMenuItem>
-            </NavigationMenuList>
-          </NavigationMenu>
-        </nav>
+    <nav className="bg-white shadow-sm border-b">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+        <div className="flex justify-between h-16">
+          <div className="flex items-center">
+            <Link to="/" className="text-xl font-bold text-blue-600">
+              Tender Connect
+            </Link>
+          </div>
+
+          {/* Desktop Navigation */}
+          <div className="hidden md:flex items-center space-x-4">
+            {navItems.map((item) => {
+              const Icon = item.icon;
+              return (
+                <Link
+                  key={item.path}
+                  to={item.path}
+                  className={`flex items-center px-3 py-2 rounded-md text-sm font-medium transition-colors ${
+                    isActive(item.path)
+                      ? "bg-blue-100 text-blue-600"
+                      : "text-gray-600 hover:text-gray-900 hover:bg-gray-100"
+                  }`}
+                >
+                  <Icon className="h-4 w-4 mr-2" />
+                  {item.label}
+                </Link>
+              );
+            })}
+            <NotificationCenter />
+            <Button onClick={() => navigate("/auth")} variant="outline" size="sm">
+              Sign In
+            </Button>
+          </div>
+
+          {/* Mobile menu button */}
+          <div className="md:hidden flex items-center space-x-2">
+            <NotificationCenter />
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => setIsOpen(!isOpen)}
+            >
+              {isOpen ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
+            </Button>
+          </div>
+        </div>
+
+        {/* Mobile Navigation */}
+        {isOpen && (
+          <div className="md:hidden">
+            <div className="px-2 pt-2 pb-3 space-y-1 sm:px-3">
+              {navItems.map((item) => {
+                const Icon = item.icon;
+                return (
+                  <Link
+                    key={item.path}
+                    to={item.path}
+                    className={`flex items-center px-3 py-2 rounded-md text-base font-medium transition-colors ${
+                      isActive(item.path)
+                        ? "bg-blue-100 text-blue-600"
+                        : "text-gray-600 hover:text-gray-900 hover:bg-gray-100"
+                    }`}
+                    onClick={() => setIsOpen(false)}
+                  >
+                    <Icon className="h-5 w-5 mr-3" />
+                    {item.label}
+                  </Link>
+                );
+              })}
+              <div className="px-3 py-2">
+                <Button onClick={() => navigate("/auth")} variant="outline" className="w-full">
+                  Sign In
+                </Button>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
-    </header>
+    </nav>
   );
-}
+};

@@ -1,7 +1,9 @@
+
 import { useEffect, useState } from "react";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuthState } from "@/hooks/useAuthState";
+import { useNotifications } from "@/hooks/use-notifications";
 
 interface UserPreferences {
   push: boolean;
@@ -10,32 +12,21 @@ interface UserPreferences {
   locations?: string[];
 }
 
-// Type guard function to validate UserPreferences
+// Type guard to verify the shape of notification preferences
 function isUserPreferences(data: unknown): data is UserPreferences {
   if (!data || typeof data !== 'object') return false;
-  
-  const preferences = data as Record<string, unknown>;
-  
-  // Check required boolean properties
-  if (typeof preferences.push !== 'boolean' || typeof preferences.email !== 'boolean') {
-    return false;
-  }
-  
-  // Check optional array properties if they exist
-  if (preferences.categories !== undefined && !Array.isArray(preferences.categories)) {
-    return false;
-  }
-  if (preferences.locations !== undefined && !Array.isArray(preferences.locations)) {
-    return false;
-  }
-  
-  return true;
+  const pref = data as Record<string, unknown>;
+  return typeof pref.push === 'boolean' && typeof pref.email === 'boolean';
 }
 
 export const TenderNotification = () => {
   const { toast } = useToast();
   const { isAuthenticated } = useAuthState();
   const [userPreferences, setUserPreferences] = useState<UserPreferences | null>(null);
+  
+  // For demo purposes, using a mock user ID since auth isn't fully implemented
+  const userId = isAuthenticated ? "demo-user-id" : undefined;
+  const { createNotification } = useNotifications(userId);
 
   // Fetch user preferences
   useEffect(() => {
@@ -104,7 +95,7 @@ export const TenderNotification = () => {
 
   // Set up real-time notifications
   useEffect(() => {
-    if (!isAuthenticated || !userPreferences) return;
+    if (!isAuthenticated || !userPreferences || !userId) return;
     if (!userPreferences.push) {
       console.log('Push notifications are disabled for this user');
       return;
@@ -132,6 +123,15 @@ export const TenderNotification = () => {
             userPreferences.locations.includes(tender.location);
 
           if (matchesCategory && matchesLocation) {
+            // Create notification in database
+            createNotification({
+              title: "New Tender Available!",
+              message: `${tender.title} has been posted.`,
+              type: 'info',
+              tender_id: tender.id
+            });
+
+            // Show toast notification
             toast({
               title: "New Tender Available!",
               description: `${tender.title} has been posted.`,
@@ -162,6 +162,14 @@ export const TenderNotification = () => {
             userPreferences.locations.includes(tender.location);
 
           if (matchesCategory && matchesLocation) {
+            // Create notification in database
+            createNotification({
+              title: "Tender Updated",
+              message: `${tender.title} has been updated.`,
+              type: 'info',
+              tender_id: tender.id
+            });
+
             toast({
               title: "Tender Updated",
               description: `${tender.title} has been updated.`,
@@ -175,7 +183,7 @@ export const TenderNotification = () => {
       console.log("Cleaning up tender notification subscription");
       supabase.removeChannel(channel);
     };
-  }, [toast, isAuthenticated, userPreferences]);
+  }, [toast, isAuthenticated, userPreferences, userId, createNotification]);
 
   return null; // This is a background component
 };
