@@ -11,12 +11,18 @@ import { format } from "date-fns";
 import { TenderStatusBadge } from "@/components/ui/tender-status-badge";
 import { getTenderStatus } from "@/types/tender";
 import { useOfflineMode } from "@/hooks/use-offline-mode";
+import { TenderMatchScore } from "@/components/tenders/TenderMatchScore";
+import { AITenderInsights } from "@/components/tenders/AITenderInsights";
+import { ShareSheet } from "@/components/tenders/ShareSheet";
+import { BidStrategyHub } from "@/components/bidding/BidStrategyHub";
+import { useAuth } from "@/hooks/use-auth";
 
 const TenderDetails = () => {
   const { tenderId } = useParams();
   const navigate = useNavigate();
   const { toast } = useToast();
   const { isOnline, offlineData, saveTenderOffline } = useOfflineMode();
+  const { user, profile } = useAuth();
 
   // First check if we have this tender in offline data
   const offlineTender = offlineData.tenders.find(
@@ -297,7 +303,7 @@ const TenderDetails = () => {
                     View Original Tender
                   </Button>
                 )}
-                
+                 
                 <Button
                   variant="outline"
                   onClick={handleShare}
@@ -306,7 +312,7 @@ const TenderDetails = () => {
                   <Share2 className="mr-2 h-4 w-4" />
                   Share Tender
                 </Button>
-                
+                 
                 <Button
                   variant="outline"
                   onClick={handleRefreshTender}
@@ -317,6 +323,60 @@ const TenderDetails = () => {
                 </Button>
               </div>
             </div>
+          </div>
+
+          {/* Additional Analysis and Strategy Components */}
+          <div className="mt-8 space-y-6">
+            {/* Tender Match Score */}
+            {user && profile && (
+              <TenderMatchScore 
+                tender={tender} 
+                supplierProfile={{
+                  areas_of_expertise: profile.areas_of_expertise || [],
+                  industry: profile.industry || '',
+                  location: profile.location || ''
+                }} 
+                showDetails={true}
+              />
+            )}
+
+            {/* AI Tender Insights */}
+            <AITenderInsights tender={tender} />
+
+            {/* Bid Strategy Hub */}
+            {user && profile && (
+              <BidStrategyHub 
+                tender={tender}
+                userProfile={{
+                  areas_of_expertise: profile.areas_of_expertise || [],
+                  industry: profile.industry || '',
+                  location: profile.location || ''
+                }}
+              />
+            )}
+
+            {/* Share Options */}
+            <ShareSheet 
+              title={tender.title}
+              deadline={format(deadlineDate, "PPP")}
+              category={tender.category}
+              location={tender.location}
+              id={tender.id}
+              language="en"
+              translations={{
+                shareTitle: "Share Tender",
+                shareDesc: "Share this tender opportunity with others",
+                email: "Email",
+                whatsapp: "WhatsApp",
+                sendEmail: "Send Email",
+                shareWhatsapp: "Share on WhatsApp",
+                close: "Close",
+                yourEmail: "Your email address",
+                emailSent: "Email Sent",
+                emailError: "Email Error",
+                moreOptions: "More Options"
+              }}
+            />
           </div>
         </div>
       </main>
