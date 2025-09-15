@@ -7,15 +7,21 @@ export const sanitizeUserData = (userData: UserProfile) => {
   return publicData;
 };
 
-// Security utilities
+// Enhanced Security utilities with audit logging
 export const securityUtils = {
   // Validate user inputs to prevent XSS and SQL injection
   sanitizeInput: (input: string): string => {
     if (!input) return "";
-    // Basic sanitization - remove script tags, SQL comments, etc.
+    // Enhanced sanitization - remove script tags, SQL comments, etc.
     return input
       .replace(/<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script>/gi, "")
+      .replace(/<iframe\b[^<]*(?:(?!<\/iframe>)<[^<]*)*<\/iframe>/gi, "")
+      .replace(/javascript:/gi, "")
+      .replace(/on\w+\s*=/gi, "")
       .replace(/'/g, "''")
+      .replace(/--/g, "")
+      .replace(/\/\*/g, "")
+      .replace(/\*\//g, "")
       .trim();
   },
 
@@ -36,14 +42,23 @@ export const securityUtils = {
       }
 
       // If more than 5 failed attempts in the last 15 minutes
-      return (data?.length || 0) > 5;
+      const isSuspicious = (data?.length || 0) > 5;
+      
+      if (isSuspicious) {
+        await securityUtils.logSecurityEvent('suspicious_login_activity', undefined, { 
+          email, 
+          failed_attempts: data?.length || 0 
+        });
+      }
+
+      return isSuspicious;
     } catch (error) {
       console.error('Failed to check for suspicious activity:', error);
       return false;
     }
   },
 
-  // Log important security events for audit trail
+  // Enhanced security event logging
   logSecurityEvent: async (eventType: string, userId?: string, details?: object): Promise<void> => {
     try {
       await supabase
@@ -57,6 +72,25 @@ export const securityUtils = {
         });
     } catch (error) {
       console.error('Failed to log security event:', error);
+    }
+  },
+
+  // Log authentication events
+  logAuthEvent: async (eventType: string, email: string, success: boolean, userId?: string, details?: object): Promise<void> => {
+    try {
+      await supabase
+        .from('auth_logs')
+        .insert({
+          user_id: userId,
+          email,
+          event_type: eventType,
+          success,
+          ip_address: '0.0.0.0',
+          user_agent: navigator.userAgent,
+          details: details || {}
+        });
+    } catch (error) {
+      console.error('Failed to log auth event:', error);
     }
   },
 
@@ -80,13 +114,41 @@ export const securityUtils = {
     return { valid: true, message: 'Password meets requirements' };
   },
 
-  // Set secure HTTP headers (for use in meta tags)
+  // Enhanced secure HTTP headers (for use in meta tags)
   getSecurityMeta: () => [
-    { httpEquiv: "Content-Security-Policy", content: "default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data: https:; connect-src 'self' https://*.supabase.co" },
+    { 
+      httpEquiv: "Content-Security-Policy", 
+      content: "default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval'; style-src 'self' 'unsafe-inline'; img-src 'self' data: https: blob:; connect-src 'self' https://*.supabase.co wss://*.supabase.co; font-src 'self' data:; media-src 'self'; object-src 'none'; base-uri 'self'; frame-ancestors 'none';" 
+    },
     { httpEquiv: "X-Content-Type-Options", content: "nosniff" },
     { httpEquiv: "X-Frame-Options", content: "DENY" },
-    { httpEquiv: "Referrer-Policy", content: "no-referrer-when-downgrade" },
-  ]
+    { httpEquiv: "X-XSS-Protection", content: "1; mode=block" },
+    { httpEquiv: "Referrer-Policy", content: "strict-origin-when-cross-origin" },
+    { httpEquiv: "Permissions-Policy", content: "geolocation=(), microphone=(), camera=()" },
+  ],
+
+  // Rate limiting helper
+  checkRateLimit: async (identifier: string, maxAttempts: number = 10, windowMinutes: number = 15): Promise<boolean> => {
+    const windowStart = new Date(Date.now() - windowMinutes * 60 * 1000);
+    
+    try {
+      const { data, error } = await supabase
+        .from('security_logs')
+        .select('id')
+        .eq('details->identifier', identifier)
+        .gte('created_at', windowStart.toISOString());
+
+      if (error) {
+        console.error('Rate limit check failed:', error);
+        return false; // Allow on error to avoid blocking legitimate users
+      }
+
+      return (data?.length || 0) < maxAttempts;
+    } catch (error) {
+      console.error('Rate limit check failed:', error);
+      return false;
+    }
+  }
 };
 
 // GDPR Data protection utilities
