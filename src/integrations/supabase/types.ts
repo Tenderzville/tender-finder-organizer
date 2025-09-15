@@ -14,6 +14,42 @@ export type Database = {
   }
   public: {
     Tables: {
+      auth_logs: {
+        Row: {
+          created_at: string
+          details: Json | null
+          email: string | null
+          event_type: string
+          id: string
+          ip_address: unknown | null
+          success: boolean
+          user_agent: string | null
+          user_id: string | null
+        }
+        Insert: {
+          created_at?: string
+          details?: Json | null
+          email?: string | null
+          event_type: string
+          id?: string
+          ip_address?: unknown | null
+          success?: boolean
+          user_agent?: string | null
+          user_id?: string | null
+        }
+        Update: {
+          created_at?: string
+          details?: Json | null
+          email?: string | null
+          event_type?: string
+          id?: string
+          ip_address?: unknown | null
+          success?: boolean
+          user_agent?: string | null
+          user_id?: string | null
+        }
+        Relationships: []
+      }
       bid_strategies: {
         Row: {
           competitive_analysis: Json | null
@@ -183,6 +219,7 @@ export type Database = {
           notification_preferences: Json | null
           preferred_language: string | null
           premium_until: string | null
+          profile_visibility: string | null
           total_points: number | null
           user_id: string | null
         }
@@ -195,6 +232,7 @@ export type Database = {
           notification_preferences?: Json | null
           preferred_language?: string | null
           premium_until?: string | null
+          profile_visibility?: string | null
           total_points?: number | null
           user_id?: string | null
         }
@@ -207,6 +245,7 @@ export type Database = {
           notification_preferences?: Json | null
           preferred_language?: string | null
           premium_until?: string | null
+          profile_visibility?: string | null
           total_points?: number | null
           user_id?: string | null
         }
@@ -342,6 +381,36 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      security_logs: {
+        Row: {
+          created_at: string
+          details: Json | null
+          event_type: string
+          id: string
+          ip_address: unknown | null
+          user_agent: string | null
+          user_id: string | null
+        }
+        Insert: {
+          created_at?: string
+          details?: Json | null
+          event_type: string
+          id?: string
+          ip_address?: unknown | null
+          user_agent?: string | null
+          user_id?: string | null
+        }
+        Update: {
+          created_at?: string
+          details?: Json | null
+          event_type?: string
+          id?: string
+          ip_address?: unknown | null
+          user_agent?: string | null
+          user_id?: string | null
+        }
+        Relationships: []
       }
       social_shares: {
         Row: {
@@ -710,6 +779,14 @@ export type Database = {
       initialize_scraping_jobs: {
         Args: Record<PropertyKey, never>
         Returns: undefined
+      }
+      log_data_access: {
+        Args: {
+          access_type: string
+          accessing_user_id: string
+          resource_id: string
+        }
+        Returns: boolean
       }
       remove_expired_tenders: {
         Args: Record<PropertyKey, never>
